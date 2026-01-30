@@ -58,3 +58,10 @@ export interface FinanceOption {
   apr: number;
   termMonths: number;
 }
+
+export interface LandingStats {
+  activeListings: number;
+  verifiedSellers: number;
+  avgTimeToSell: string;
+  escrowProtected: string;
+}
