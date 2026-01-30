@@ -1,0 +1,7 @@
+{
+  "name": "Autousata - Premium Car Auction Marketplace",
+  "description": "A comprehensive car auction platform featuring real-time bidding, KYC verification, integrated financing, and an escrow system.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

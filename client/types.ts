@@ -1,0 +1,60 @@
+
+export enum UserRole {
+  GUEST = 'GUEST',
+  BUYER = 'BUYER',
+  SELLER = 'SELLER',
+  DEALER = 'DEALER',
+  ADMIN = 'ADMIN',
+  BANK = 'BANK'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  isKycVerified: boolean;
+  avatar?: string;
+}
+
+export interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  mileage: number;
+  vin: string;
+  condition: 'Mint' | 'Excellent' | 'Good' | 'Fair';
+  description: string;
+  images: string[];
+  location: string;
+}
+
+export interface Auction {
+  id: string;
+  vehicle: Vehicle;
+  sellerId: string;
+  currentBid: number;
+  startingBid: number;
+  reservePrice: number;
+  buyItNowPrice?: number;
+  bidCount: number;
+  endTime: string;
+  status: 'ACTIVE' | 'ENDED' | 'UPCOMING' | 'CANCELLED';
+  bids: Bid[];
+}
+
+export interface Bid {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  timestamp: string;
+}
+
+export interface FinanceOption {
+  loanAmount: number;
+  monthlyPayment: number;
+  apr: number;
+  termMonths: number;
+}
