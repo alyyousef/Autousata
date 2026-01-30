@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  const hideFooter = location.pathname === '/login';
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-colors ${isActive ? 'text-indigo-600' : 'text-slate-600 hover:text-indigo-600'}`;
@@ -73,7 +75,8 @@ const PublicLayout: React.FC = () => {
         <Outlet />
       </main>
 
-      <footer className="bg-slate-900 text-slate-300">
+      {!hideFooter && (
+        <footer className="bg-slate-900 text-slate-300">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="grid gap-10 md:grid-cols-[1.3fr_0.7fr_0.7fr]">
             <div>
@@ -108,7 +111,8 @@ const PublicLayout: React.FC = () => {
             &copy; 2026 Autousata, Inc. All rights reserved.
           </div>
         </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 };
