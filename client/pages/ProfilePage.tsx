@@ -96,9 +96,9 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
               <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
               <div className="space-y-4">
                 {[
-                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: '$95,000' },
+                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: 'EGP 95,000' },
                   { action: 'Listing Created', target: '2022 Audi RS6', date: 'Yesterday', amount: 'N/A' },
-                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: '$68,500' }
+                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: 'EGP 68,500' }
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
                     <div className="flex items-center gap-4">

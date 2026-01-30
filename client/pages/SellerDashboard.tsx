@@ -38,7 +38,7 @@ const SellerDashboard: React.FC<{ user: User }> = ({ user }) => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
-            { label: 'Total Sales', value: '$412,500', trend: '+12.5%', icon: DollarSign, color: 'indigo' },
+            { label: 'Total Sales', value: 'EGP 412,500', trend: '+12.5%', icon: DollarSign, color: 'indigo' },
             { label: 'Active Listings', value: '8', trend: 'Stable', icon: Package, color: 'emerald' },
             { label: 'Avg. Views', value: '1.2k', trend: '+18.2%', icon: Users, color: 'amber' },
             { label: 'Sale Rate', value: '92%', trend: '+4.3%', icon: TrendingUp, color: 'rose' }
@@ -88,7 +88,7 @@ const SellerDashboard: React.FC<{ user: User }> = ({ user }) => {
             <h3 className="font-bold text-lg text-slate-900 mb-6">Recent Activity</h3>
             <div className="space-y-6">
               {[
-                { title: 'New bid on RS6 Avant', desc: 'From @user123 for $98,500', time: '2m ago' },
+                { title: 'New bid on RS6 Avant', desc: 'From @user123 for EGP 98,500', time: '2m ago' },
                 { title: 'Listing Approved', desc: '2026 Porsche 911 is now live', time: '1h ago' },
                 { title: 'Payout Processed', desc: 'Funds released for Ford Raptor sale', time: '5h ago' }
               ].map((act, idx) => (
@@ -131,9 +131,9 @@ const SellerDashboard: React.FC<{ user: User }> = ({ user }) => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {[
-                  { name: '2021 Porsche 911', price: '$95,000', bids: 14, status: 'Active' },
-                  { name: '2022 Tesla Model S', price: '$82,000', bids: 8, status: 'Active' },
-                  { name: '2021 Ford Bronco', price: '$61,000', bids: 22, status: 'Active' }
+                  { name: '2021 Porsche 911', price: 'EGP 95,000', bids: 14, status: 'Active' },
+                  { name: '2022 Tesla Model S', price: 'EGP 82,000', bids: 8, status: 'Active' },
+                  { name: '2021 Ford Bronco', price: 'EGP 61,000', bids: 22, status: 'Active' }
                 ].map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
                     <td className="px-8 py-6">

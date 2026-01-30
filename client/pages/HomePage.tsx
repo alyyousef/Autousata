@@ -64,7 +64,7 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 mb-12">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center p-1 bg-slate-100 rounded-lg self-start">
@@ -165,7 +165,7 @@ const AuctionCard: React.FC<{ auction: Auction }> = ({ auction }) => {
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-400 font-medium">Current Bid</p>
-            <p className="text-lg font-black text-indigo-600">${auction.currentBid.toLocaleString()}</p>
+            <p className="text-lg font-black text-indigo-600">EGP {auction.currentBid.toLocaleString()}</p>
           </div>
         </div>
         

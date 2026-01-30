@@ -32,7 +32,7 @@ const AuctionDetailPage: React.FC = () => {
       alert("Bid must be higher than the current bid");
       return;
     }
-    alert(`Success! Your bid of $${bidAmount.toLocaleString()} has been placed.`);
+    alert(`Success! Your bid of EGP ${bidAmount.toLocaleString()} has been placed.`);
   };
 
   return (
@@ -181,7 +181,7 @@ const AuctionDetailPage: React.FC = () => {
           {/* Sidebar (Bidding & Finance) */}
           <div className="space-y-6">
             {/* Bidding Widget */}
-            <div className="bg-white rounded-2xl border-2 border-indigo-600 p-6 shadow-xl sticky top-24">
+            <div className="bg-white rounded-2xl border-2 border-indigo-600 p-6 shadow-xl">
               <div className="flex justify-between items-center mb-6">
                 <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse"></span>
@@ -198,7 +198,7 @@ const AuctionDetailPage: React.FC = () => {
                   <span className="text-slate-500">Current Bid</span>
                   <span className="text-slate-400 font-medium">{auction.bidCount} bids</span>
                 </div>
-                <div className="text-4xl font-black text-slate-900">${auction.currentBid.toLocaleString()}</div>
+                <div className="text-4xl font-black text-slate-900">EGP {auction.currentBid.toLocaleString()}</div>
                 <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
                   <ShieldCheck size={14} />
                   Reserve Met
@@ -207,7 +207,7 @@ const AuctionDetailPage: React.FC = () => {
 
               <div className="space-y-3">
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                   <input 
                     type="number"
                     value={bidAmount}
@@ -223,13 +223,13 @@ const AuctionDetailPage: React.FC = () => {
                   Place Your Bid
                 </button>
                 <p className="text-[10px] text-slate-400 text-center uppercase tracking-wider font-medium">
-                  Next min bid: ${(auction.currentBid + 100).toLocaleString()}
+                  Next min bid: EGP {(auction.currentBid + 100).toLocaleString()}
                 </p>
               </div>
 
               <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
                 <button className="flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">
-                  Buy It Now for $105,000
+                  Buy It Now for EGP 105,000
                 </button>
                 <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg flex gap-2">
                   <AlertCircle size={16} className="text-amber-600 shrink-0" />
@@ -257,7 +257,7 @@ const AuctionDetailPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white/10 p-3 rounded-xl">
                         <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">Est. Monthly</p>
-                        <p className="text-xl font-bold">${financeAdvice.monthlyPayment || '1,250'}</p>
+                        <p className="text-xl font-bold">EGP {financeAdvice.monthlyPayment || '1,250'}</p>
                       </div>
                       <div className="bg-white/10 p-3 rounded-xl">
                         <p className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">APR</p>

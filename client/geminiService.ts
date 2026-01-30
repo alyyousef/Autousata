@@ -27,7 +27,7 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `As a financial advisor for car buyers, suggest optimal financing terms for a $${price} vehicle for a buyer with ${creditScore} credit. Provide estimated APR, term length, and a monthly payment range. Format as concise JSON-like text.`,
+        contents: `As a financial advisor for car buyers, suggest optimal financing terms for an EGP ${price} vehicle for a buyer with ${creditScore} credit. Provide estimated APR, term length, and a monthly payment range. Format as concise JSON-like text.`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {

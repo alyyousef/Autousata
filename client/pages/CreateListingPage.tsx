@@ -166,9 +166,9 @@ const CreateListingPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Starting Bid ($)</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Starting Bid (EGP)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
                         className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
@@ -177,9 +177,9 @@ const CreateListingPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Reserve Price ($)</label>
+                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Reserve Price (EGP)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
                         className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
@@ -213,7 +213,7 @@ const CreateListingPage: React.FC = () => {
                   Your listing for the {formData.year} {formData.make} {formData.model} is almost ready. Once submitted, our team will review it within 24 hours.
                 </p>
                 <div className="bg-slate-50 rounded-2xl p-6 text-left max-w-sm mx-auto space-y-2">
-                  <div className="flex justify-between text-sm"><span className="text-slate-400">Listing Fee:</span> <span className="font-bold">$99.00</span></div>
+                  <div className="flex justify-between text-sm"><span className="text-slate-400">Listing Fee:</span> <span className="font-bold">EGP 99.00</span></div>
                   <div className="flex justify-between text-sm"><span className="text-slate-400">Inspection Schedule:</span> <span className="font-bold">Pending</span></div>
                   <div className="flex justify-between text-sm"><span className="text-slate-400">Est. Start:</span> <span className="font-bold">May 15, 2026</span></div>
                 </div>
