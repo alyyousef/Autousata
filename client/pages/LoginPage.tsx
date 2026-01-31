@@ -1,73 +1,149 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-const LoginPage: React.FC = () => (
-  <section className="relative min-h-screen flex items-center justify-center px-4 py-2 text-slate-900">
-    <div
-      className="absolute inset-0 bg-center bg-cover"
-      style={{
-        backgroundImage: 'url("/loginpage.png")',
-        filter: 'none'
-      }}
-      aria-hidden="true"
-    />
-    <div className="absolute inset-0 bg-slate-900/40" aria-hidden="true" />
+const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-    <div className="relative z-10 w-full max-w-5xl">
-      <div className="flex justify-end -translate-y-8">
-        <div className="bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] rounded-[28px] shadow-[0_20px_60px_rgba(15,23,42,0.25)] border border-white/70 p-10 md:p-12 w-full max-w-[560px]">
-          <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 mb-8">Log in to your account</h1>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-          <form className="space-y-5">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-slate-800">Email address</label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  className="w-full rounded-xl border border-white/60 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-slate-800">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  className="w-full rounded-xl border border-white/60 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                />
-              </div>
-            </div>
+    const result = await login(email, password);
+    
+    if (result.success) {
+      navigate('/browse');
+    } else {
+      setError(result.error || 'Login failed');
+    }
+    
+    setLoading(false);
+  };
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm">
-              <label className="inline-flex items-center gap-2 text-slate-700">
-                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                Remember me
-              </label>
-              <Link to="/forgot-password" className="text-slate-700 font-medium hover:text-slate-900">Forgot password?</Link>
-            </div>
+  return (
+    <section className="relative min-h-screen flex items-start justify-end px-4 py-10 sm:px-6 md:py-16 md:items-center text-slate-900 overflow-y-auto">
+      <div
+        className="fixed inset-0 bg-center bg-cover"
+        style={{
+          backgroundImage: 'url("/loginpage.png")',
+          filter: 'none'
+        }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 bg-slate-900/40" aria-hidden="true" />
 
-            <div className="flex flex-col gap-3">
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/30 hover:bg-slate-800 transition-colors"
-              >
-                Continue
-              </button>
-              <p className="text-center text-sm text-slate-700">
-                Don't have an account?{' '}
-                <Link to="/signup" className="underline underline-offset-4 font-semibold text-slate-900">
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </form>
+      <div className="relative z-10 w-full max-w-6xl flex justify-end">
+        <div className="bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-sm my-auto">
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Log in</h1>
+          <p className="text-sm text-slate-600 mb-6">Welcome back to Autousata</p>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+          >
+            Open login
+          </button>
+          <p className="mt-4 text-center text-sm text-slate-600">
+            Don't have an account?{' '}
+            <Link to="/signup" className="font-semibold text-slate-900 hover:underline">
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
 
-    </div>
-  </section>
-);
+      {isModalOpen && (
+        <div className="fixed inset-0 z-20 flex items-start justify-center px-4 pt-16 sm:pt-20">
+          <div
+            className="absolute inset-0 bg-slate-900/55 backdrop-blur-sm"
+            onClick={() => setIsModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] shadow-2xl border border-white/70 p-8 md:p-10"
+          >
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="absolute right-4 top-4 text-slate-500 hover:text-slate-700"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <h2 className="text-2xl font-semibold text-slate-900 mb-2">Log in</h2>
+            <p className="text-sm text-slate-600 mb-6">Welcome back to Autousata</p>
+
+            {error && (
+              <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">Email address</label>
+                  <input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                  <input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <label className="inline-flex items-center gap-2 text-slate-600 cursor-pointer">
+                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
+                  <span>Remember me</span>
+                </label>
+                <Link to="/forgot-password" className="text-slate-900 font-medium hover:underline">Forgot password?</Link>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Logging in...' : 'Continue'}
+              </button>
+
+              <p className="text-center text-sm text-slate-600">
+                Don't have an account?{' '}
+                <Link to="/signup" className="font-semibold text-slate-900 hover:underline">
+                  Sign up
+                </Link>
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
 
 export default LoginPage;

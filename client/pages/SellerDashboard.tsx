@@ -8,7 +8,7 @@ import {
   Plus, Package, DollarSign, TrendingUp, Users, Clock, 
   ChevronRight, ArrowUpRight, MoreHorizontal
 } from 'lucide-react';
-import { User } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const data = [
   { name: 'Jan', sales: 4000, views: 2400 },
@@ -18,7 +18,12 @@ const data = [
   { name: 'May', sales: 1890, views: 4800 },
 ];
 
-const SellerDashboard: React.FC<{ user: User }> = ({ user }) => {
+const SellerDashboard: React.FC = () => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

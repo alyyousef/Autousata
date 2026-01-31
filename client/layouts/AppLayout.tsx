@@ -1,14 +1,28 @@
 import React, { useState } from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
 import { User, UserRole } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface AppLayoutProps {
-  user: User;
+  user: User | null;
 }
 
-const AppLayout: React.FC<AppLayoutProps> = ({ user }) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
+  const { user: authUser, logout } = useAuth();
+  const user = userProp || authUser;
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const navigation = [
     { name: 'Browse', href: '/browse', icon: Car, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.ADMIN] },
@@ -55,7 +69,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user }) => {
                 </div>
                 <img
                   className="h-9 w-9 rounded-full ring-2 ring-indigo-50"
-                  src={user.avatar}
+                  src={user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}
                   alt=""
                 />
               </Link>
@@ -93,7 +107,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user }) => {
             <div className="pt-4 pb-3 border-t border-slate-200">
               <div className="flex items-center px-4">
                 <div className="flex-shrink-0">
-                  <img className="h-10 w-10 rounded-full" src={user.avatar} alt="" />
+                  <img className="h-10 w-10 rounded-full" src={user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)} alt="" />
                 </div>
                 <div className="ml-3">
                   <div className="text-base font-medium text-slate-800">{user.name}</div>
@@ -102,7 +116,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user }) => {
               </div>
               <div className="mt-3 px-2 space-y-1">
                 <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-indigo-600 hover:bg-indigo-50">Profile</Link>
-                <button className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 flex items-center gap-3">
+                <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 flex items-center gap-3">
                   <LogOut size={18} />
                   Sign Out
                 </button>

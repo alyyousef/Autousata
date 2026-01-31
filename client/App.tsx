@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { User as UserType } from './types';
-import { MOCK_USER } from './constants';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -18,8 +17,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
 
-const App: React.FC = () => {
-  const [user, setUser] = useState<UserType>(MOCK_USER);
+const AppRoutes: React.FC = () => {
+  const { user } = useAuth();
 
   return (
     <HashRouter>
@@ -36,12 +35,20 @@ const App: React.FC = () => {
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
-          <Route path="/dashboard" element={<SellerDashboard user={user} />} />
+          <Route path="/dashboard" element={<SellerDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/profile" element={<ProfilePage user={user} />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </HashRouter>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 };
 

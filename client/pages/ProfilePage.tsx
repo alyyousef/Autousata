@@ -1,9 +1,66 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Shield, Mail, Phone, MapPin, ExternalLink, Camera, ChevronRight } from 'lucide-react';
-import { User as UserType } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
 
-const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
+const ProfilePage: React.FC = () => {
+  const { user, updateUser } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(user?.name || '');
+  const [location, setLocation] = useState(user?.location?.city || '');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  const handleUpdateProfile = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiService.updateProfile({
+        name,
+        location: { city: location }
+      });
+
+      if (response.data?.user) {
+        updateUser(response.data.user);
+        setSuccess('Profile updated successfully');
+        setIsEditing(false);
+      } else {
+        setError(response.error || 'Failed to update profile');
+      }
+    } catch (error) {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAvatar = async (avatarUrl: string) => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiService.updateAvatar(avatarUrl);
+      if (response.data?.avatar) {
+        updateUser({ avatar: response.data.avatar });
+        setSuccess('Profile picture updated successfully');
+      } else {
+        setError(response.error || 'Failed to update avatar');
+      }
+    } catch (error) {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -16,8 +73,14 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
               <div className="h-32 bg-indigo-600"></div>
               <div className="px-6 pb-6 text-center">
                 <div className="relative inline-block -mt-16 mb-4">
-                  <img src={user.avatar} className="w-32 h-32 rounded-3xl border-4 border-white shadow-xl bg-white" alt="" />
-                  <button className="absolute bottom-1 right-1 bg-white p-2 rounded-xl shadow-lg border border-slate-100 text-slate-500 hover:text-indigo-600 transition-all">
+                  <img src={user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)} className="w-32 h-32 rounded-3xl border-4 border-white shadow-xl bg-white" alt="" />
+                  <button 
+                    onClick={() => {
+                      const url = prompt('Enter image URL:');
+                      if (url) handleUpdateAvatar(url);
+                    }}
+                    className="absolute bottom-1 right-1 bg-white p-2 rounded-xl shadow-lg border border-slate-100 text-slate-500 hover:text-indigo-600 transition-all"
+                  >
                     <Camera size={16} />
                   </button>
                 </div>
@@ -31,9 +94,33 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
                     </span>
                   )}
                 </div>
-                <button className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all">
-                  Edit Profile
+                <button 
+                  onClick={() => {
+                    if (isEditing) {
+                      handleUpdateProfile();
+                    } else {
+                      setIsEditing(true);
+                      setName(user.name);
+                      setLocation(user.location?.city || '');
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50"
+                >
+                  {isEditing ? (loading ? 'Saving...' : 'Save Changes') : 'Edit Profile'}
                 </button>
+                {isEditing && (
+                  <button
+                    onClick={() => {
+                      setIsEditing(false);
+                      setError('');
+                      setSuccess('');
+                    }}
+                    className="w-full mt-2 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             </div>
 
@@ -42,17 +129,17 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Mail size={18} className="text-emerald-500" />
+                    <Mail size={18} className={user.emailVerified ? "text-emerald-500" : "text-slate-400"} />
                     <span className="text-sm font-medium text-slate-700">Email Verified</span>
                   </div>
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <div className={`w-2 h-2 rounded-full ${user.emailVerified ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Phone size={18} className="text-emerald-500" />
+                    <Phone size={18} className={user.phoneVerified ? "text-emerald-500" : "text-slate-400"} />
                     <span className="text-sm font-medium text-slate-700">Phone Verified</span>
                   </div>
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <div className={`w-2 h-2 rounded-full ${user.phoneVerified ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -70,12 +157,31 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
 
           {/* Main Profile Info */}
           <div className="lg:col-span-2 space-y-8">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
+                {success}
+              </div>
+            )}
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
               <h3 className="text-xl font-black text-slate-900 mb-8">Personal Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</label>
-                  <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">{user.name}</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full text-slate-900 font-bold pb-2 border-b-2 border-indigo-500 focus:outline-none"
+                    />
+                  ) : (
+                    <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">{user.name}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</label>
@@ -83,11 +189,21 @@ const ProfilePage: React.FC<{ user: UserType }> = ({ user }) => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</label>
-                  <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">+1 (555) 123-4567</p>
+                  <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">{user.phone || 'Not set'}</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
-                  <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">San Francisco, CA</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Enter city"
+                      className="w-full text-slate-900 font-bold pb-2 border-b-2 border-indigo-500 focus:outline-none"
+                    />
+                  ) : (
+                    <p className="text-slate-900 font-bold pb-2 border-b border-slate-100">{user.location?.city || 'Not set'}</p>
+                  )}
                 </div>
               </div>
             </div>

@@ -12,9 +12,16 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: UserRole;
   isKycVerified: boolean;
   avatar?: string;
+  location?: {
+    city?: string;
+    country?: string;
+  };
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
 }
 
 export interface Vehicle {
