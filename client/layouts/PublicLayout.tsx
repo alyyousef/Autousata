@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 
@@ -7,41 +7,22 @@ const PublicLayout: React.FC = () => {
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const hideFooter = isAuthPage;
-  const lockScroll = isAuthPage;
-
-  useEffect(() => {
-    if (!lockScroll) {
-      document.body.classList.remove('overflow-hidden');
-      return;
-    }
-
-    document.body.classList.add('overflow-hidden');
-    return () => {
-      document.body.classList.remove('overflow-hidden');
-    };
-  }, [lockScroll]);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `text-sm font-medium tracking-tight transition-colors ${isAuthPage
-      ? (isActive
-        ? 'text-slate-900'
-        : 'text-slate-700 hover:text-slate-900')
-      : (isActive
-        ? 'text-indigo-600'
-        : 'text-slate-600 hover:text-indigo-600')}`;
+    `text-sm font-medium tracking-tight transition-colors ${isActive
+      ? 'text-indigo-600'
+      : 'text-slate-600 hover:text-indigo-600'}`;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className={`sticky top-0 z-50 backdrop-blur-md ${isAuthPage
-        ? 'bg-gradient-to-r from-[#F7F2EC]/95 via-[#E9E2D6]/95 to-[#DCE6F2]/95 border-b border-white/80'
-        : 'bg-white/95 border-b border-slate-200/80 shadow-sm'}`}>
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <Link to="/" className="flex items-center gap-2 group" aria-label="Autousata home">
               <div>
-                <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-14 w-14" />
+                <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-16 w-16" />
               </div>
-              <span className={`text-xl font-bold tracking-tight ${isAuthPage ? 'text-slate-900' : 'text-slate-900'} uppercase`}>
+              <span className="text-2xl font-bold tracking-tight text-slate-900 uppercase">
                 AUTOUSATA
               </span>
             </Link>
@@ -71,7 +52,7 @@ const PublicLayout: React.FC = () => {
 
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`md:hidden p-2 rounded-md ${isAuthPage ? 'text-slate-700 hover:bg-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}
+              className="md:hidden p-2 rounded-md text-slate-500 hover:bg-slate-100"
               aria-label="Toggle menu"
             >
               {isMenuOpen ? <X size={22} /> : <Menu size={22} />}

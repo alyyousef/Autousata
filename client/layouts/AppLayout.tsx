@@ -42,13 +42,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
     <div className="min-h-screen flex flex-col">
       <nav className="bg-white/95 border-b border-slate-200/80 sticky top-0 z-50 backdrop-blur-md shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between h-20">
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2 group">
                 <div>
-                  <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-14 w-14" />
+                  <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-16 w-16" />
                 </div>
-                <span className="text-xl font-bold text-slate-900 tracking-tight uppercase">AUTOUSATA</span>
+                <span className="text-2xl font-bold text-slate-900 tracking-tight uppercase">AUTOUSATA</span>
               </Link>
               <div className="hidden md:ml-10 md:flex md:space-x-8">
                 {navigation.map((item) => (

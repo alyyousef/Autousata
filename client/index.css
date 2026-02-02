@@ -2,12 +2,21 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "Segoe UI", sans-serif;
+  font-family: "Instrument Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   background: radial-gradient(circle at top left, #020617 0, #020617 32%, #020617 48%, #020617 60%, #020617 100%);
   color: #020617;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.01em;
 }
 
 /* Smooth scrolling for a more polished feel */

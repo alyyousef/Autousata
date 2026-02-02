@@ -91,7 +91,6 @@ const HomePage: React.FC = () => {
         const bTime = new Date(b.endTime).getTime();
         return aTime - bTime;
       }
-      // relevance: keep original order
       return 0;
     });
 
@@ -128,7 +127,7 @@ const HomePage: React.FC = () => {
           <div className="max-w-2xl relative hero-fade-in">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-200 mb-4 backdrop-blur-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              BUY WITH CONFIDENCE
+              Buy with confidence
             </div>
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
               Buy a car from verified sellers
@@ -147,82 +146,94 @@ const HomePage: React.FC = () => {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
         <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 premium-card-hover backdrop-blur-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.6fr] gap-6 items-center">
-            <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by make, model, year, or location"
-                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3 items-center justify-between">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-                <SlidersHorizontal size={16} />
-                Filters
+          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-8 items-start">
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Find your next car</p>
+                <div className="relative">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search by make, model, year, or location"
+                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
-                  <button
-                    key={option}
-                    onClick={() => setConditionFilter(option)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
-                      conditionFilter === option
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-sm">
-            <div className="flex flex-wrap items-center gap-4 text-slate-500">
-              <span>Active listings: <strong className="text-slate-900">{activeCount}</strong></span>
-              <span>Delisted: <strong className="text-slate-900">{delistedCount}</strong></span>
+              <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
+                <div>
+                  Active listings: <strong className="text-slate-900">{activeCount}</strong>
+                </div>
+                <div>
+                  Delisted: <strong className="text-slate-900">{delistedCount}</strong>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400">
-                <SlidersHorizontal size={14} />
-                Sort by
+
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
+                  <SlidersHorizontal size={14} />
+                  Condition
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
+                    <button
+                      key={option}
+                      onClick={() => setConditionFilter(option)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
+                        conditionFilter === option
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: 'relevance', label: 'Relevance' },
-                  { id: 'priceAsc', label: 'Price ↑' },
-                  { id: 'priceDesc', label: 'Price ↓' },
-                  { id: 'endingSoon', label: 'Ending soon' }
-                ].map(option => (
-                  <button
-                    key={option.id}
-                    onClick={() => setSortBy(option.id as SortOption)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
-                      sortBy === option.id
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+
+              <div>
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
+                  <SlidersHorizontal size={14} />
+                  Sort by
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'relevance', label: 'Relevance' },
+                    { id: 'priceAsc', label: 'Price: low to high' },
+                    { id: 'priceDesc', label: 'Price: high to low' },
+                    { id: 'endingSoon', label: 'Ending soon' }
+                  ].map(option => (
+                    <button
+                      key={option.id}
+                      onClick={() => setSortBy(option.id as SortOption)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
+                        sortBy === option.id
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
               {canManageListings && (
                 <button
                   onClick={() => setShowDelisted(prev => !prev)}
-                  className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+                  className="w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
                 >
                   {showDelisted ? 'Hide delisted' : 'Show delisted'}
                 </button>
