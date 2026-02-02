@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles, Trophy } from 'lucide-react';
 import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
+import placeholderImage from '../../assests/frontendPictures/placeHolder.jpg';
+import landingHero from '../../assests/frontendPictures/landingPageBackT.jpg';
 
 const LandingPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -37,16 +39,15 @@ const LandingPage: React.FC = () => {
       <section className="relative overflow-hidden bg-slate-900 text-white">
         <div className="absolute inset-0">
           <img
-            src="https://picsum.photos/seed/landing-hero/1600/900"
+            src={landingHero}
             alt="Luxury vehicles on a showroom floor"
-            className="h-full w-full object-cover opacity-30"
+            className="h-full w-full object-cover opacity-60"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/60 to-transparent"></div>
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
           <div className="max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.4em] text-indigo-300 mb-4">Premium marketplace</p>
-            <h1 className="text-4xl md:text-6xl font-semibold leading-tight mb-6">
+                        <h1 className="text-4xl md:text-6xl font-semibold leading-tight mb-6">
               Discover rare and remarkable cars, with trust built in.
             </h1>
             <p className="text-lg text-slate-200 leading-relaxed mb-10">
@@ -62,21 +63,9 @@ const LandingPage: React.FC = () => {
               </Link>
               <Link
                 to="/sell"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/30 text-white font-semibold hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors"
               >
                 Sell a Car
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/30 text-white font-semibold hover:bg-white/10 transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white text-slate-900 font-semibold hover:bg-slate-100 transition-colors"
-              >
-                Sign up
               </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-200">
@@ -133,7 +122,7 @@ const LandingPage: React.FC = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Featured inventory</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-200">Featured inventory</p>
             <h2 className="text-3xl md:text-4xl font-semibold text-slate-900 mt-3">Vehicles trending this week</h2>
           </div>
           <Link to="/browse" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-2">
@@ -189,7 +178,7 @@ const LandingPage: React.FC = () => {
             </div>
             <Link
               to="/sell"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white text-indigo-700 font-semibold hover:bg-indigo-50 transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
             >
               Start selling
               <ArrowRight size={18} />
@@ -207,7 +196,7 @@ const ValueCard: React.FC<{ icon: React.ReactNode; title: string; description: s
   description
 }) => (
   <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-    <div className="flex items-center gap-3 text-indigo-600 mb-4">
+    <div className="flex items-center gap-3 text-white mb-4">
       <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center">{icon}</div>
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
     </div>
@@ -224,11 +213,11 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
 
 const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => (
   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
-    <img src={vehicle.images[0]} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="h-48 w-full object-cover" />
+    <img src={placeholderImage} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="h-48 w-full object-cover" />
     <div className="p-5">
       <p className="text-lg font-semibold text-slate-900">{vehicle.year} {vehicle.make} {vehicle.model}</p>
       <p className="text-sm text-slate-500 mt-1">{vehicle.location}</p>
-      <p className="text-xs text-slate-400 mt-3">{vehicle.mileage.toLocaleString()} miles • {vehicle.condition}</p>
+      <p className="text-xs text-slate-200 mt-3">{vehicle.mileage.toLocaleString()} miles ï¿½ {vehicle.condition}</p>
     </div>
   </div>
 );

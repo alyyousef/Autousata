@@ -16,6 +16,7 @@ import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
+import ListingDetailPage from './pages/ListingDetailPage';
 
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ const AppRoutes: React.FC = () => {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<LandingPage />} />
           <Route path="/browse" element={<HomePage />} />
+          <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -35,6 +37,7 @@ const AppRoutes: React.FC = () => {
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
+          <Route path="/sell/:id" element={<CreateListingPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />

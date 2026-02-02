@@ -37,6 +37,31 @@ export interface Vehicle {
   location: string;
 }
 
+export type ListingStatus = 'DRAFT' | 'PUBLISHED' | 'DELISTED';
+
+export interface Listing {
+  id: string;
+  sellerId: string;
+  status: ListingStatus;
+  title: string;
+  make: string;
+  model: string;
+  year: number;
+  mileage: number;
+  vin: string;
+  condition: Vehicle['condition'];
+  location: string;
+  features: string[];
+  description: string;
+  notes?: string;
+  images: string[];
+  startingBid?: number;
+  reservePrice?: number;
+  inspectionDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Auction {
   id: string;
   vehicle: Vehicle;

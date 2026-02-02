@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import placeholderImage from '../../assests/frontendPictures/carPlaceHolder.jpg';
 
 interface PlaceholderPageProps {
   title: string;
@@ -24,6 +25,11 @@ const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
   return (
     <section className="py-20 px-4">
       <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded-3xl p-10 md:p-14 shadow-lg">
+        <img
+          src={placeholderImage}
+          alt="Placeholder"
+          className="w-full h-56 md:h-64 object-cover rounded-2xl mb-8 border border-slate-200"
+        />
         <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-4">Coming Soon</p>
         <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">{title}</h1>
         <p className="text-slate-600 text-lg leading-relaxed mb-8">{subtitle}</p>

@@ -38,8 +38,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2 group">
-                <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                  <img src="/Autoustata.png" alt="Autousata logo" className="h-8 w-8" />
+                <div>
+                  <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
                 </div>
                 <span className="text-xl font-bold text-slate-900 tracking-tight">Autousata</span>
               </Link>
@@ -135,8 +135,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
-                <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                  <img src="/Autoustata.png" alt="Autousata logo" className="h-8 w-8" />
+                <div>
+                  <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight">Autousata</span>
               </div>

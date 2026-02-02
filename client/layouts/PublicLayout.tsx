@@ -30,24 +30,25 @@ const PublicLayout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 group" aria-label="Autousata home">
-              <div className={`p-2 rounded-xl shadow-sm ${isAuthPage ? 'bg-white/70 border border-white/80' : 'bg-white border border-slate-200'}`}>
-                <img src="/Autoustata.png" alt="Autousata logo" className="h-8 w-8" />
+              <div>
+                <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
               </div>
               <span className={`text-xl font-bold tracking-tight ${isAuthPage ? 'text-slate-900' : 'text-slate-900'}`}>Autousata</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-8" aria-label="Primary">
-              <NavLink to="/browse" className={navLinkClass}>Browse Cars</NavLink>
+              <NavLink to="/browse" className={navLinkClass}>Buy</NavLink>
+              <NavLink to="/sell" className={navLinkClass}>Sell</NavLink>
+              <NavLink to="/browse" className={navLinkClass}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass}>How it Works</NavLink>
               <NavLink to="/about" className={navLinkClass}>About</NavLink>
-              <NavLink to="/sell" className={navLinkClass}>Sell a Car</NavLink>
             </nav>
 
             <div className="hidden md:flex items-center gap-3">
-              <NavLink to="/login" className={`${isAuthPage ? 'text-slate-700 hover:text-slate-900' : 'text-slate-600 hover:text-indigo-600'} text-sm font-semibold`}>Login</NavLink>
+              <NavLink to="/login" className="text-slate-600 hover:text-indigo-600 text-sm font-semibold">Login</NavLink>
               <NavLink
                 to="/signup"
-                className={`${isAuthPage ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-indigo-600 text-white hover:bg-indigo-700'} px-4 py-2 rounded-full text-sm font-semibold transition-colors`}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
               >
                 Sign up
               </NavLink>
@@ -66,10 +67,11 @@ const PublicLayout: React.FC = () => {
         {isMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white">
             <div className="px-4 py-4 space-y-3">
-              <NavLink to="/browse" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Browse Cars</NavLink>
+              <NavLink to="/browse" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Buy</NavLink>
+              <NavLink to="/sell" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Sell</NavLink>
+              <NavLink to="/browse" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
               <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
-              <NavLink to="/sell" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Sell a Car</NavLink>
               <div className="pt-2 border-t border-slate-200 flex gap-3">
                 <NavLink to="/login" className="text-sm font-semibold text-slate-600 hover:text-indigo-600" onClick={() => setIsMenuOpen(false)}>Login</NavLink>
                 <NavLink
@@ -95,8 +97,8 @@ const PublicLayout: React.FC = () => {
           <div className="grid gap-10 md:grid-cols-[1.3fr_0.7fr_0.7fr]">
             <div>
               <div className="flex items-center gap-2 mb-5">
-                <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                  <img src="/Autoustata.png" alt="Autousata logo" className="h-8 w-8" />
+                <div>
+                  <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight">Autousata</span>
               </div>
