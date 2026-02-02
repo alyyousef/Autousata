@@ -1,5 +1,8 @@
 
 import { Auction, UserRole, User } from './types';
+import porsche911Image from '../assests/carsPictures/porsche911.png';
+import teslaModelSPlaidImage from '../assests/carsPictures/teslaModelSPlaid.jpg';
+import fordBroncoImage from '../assests/carsPictures/fordBroncoF.jpg';
 
 export const MOCK_USER: User = {
   id: 'user-1',
@@ -23,7 +26,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       vin: 'WPOZZZ99ZLS123456',
       condition: 'Excellent',
       description: 'Stunning 911 in Chalk with Bordeaux Red interior. Sport Chrono package included.',
-      images: ['https://picsum.photos/seed/porsche1/800/600', 'https://picsum.photos/seed/porsche2/800/600'],
+      images: [porsche911Image],
       location: 'Los Angeles, CA'
     },
     currentBid: 95000,
@@ -46,7 +49,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       vin: '5YJSA1E22NF123456',
       condition: 'Mint',
       description: 'Tri-motor AWD, Full Self-Driving Capability included. Like new condition.',
-      images: ['https://picsum.photos/seed/tesla1/800/600', 'https://picsum.photos/seed/tesla2/800/600'],
+      images: [teslaModelSPlaidImage],
       location: 'Austin, TX'
     },
     currentBid: 82000,
@@ -69,7 +72,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       vin: '1FMCU0G12ML123456',
       condition: 'Excellent',
       description: 'Sasquatch package, 4-door, Lightning Blue. Only 7,000 units made.',
-      images: ['https://picsum.photos/seed/bronco1/800/600'],
+      images: [fordBroncoImage],
       location: 'Denver, CO'
     },
     currentBid: 61000,

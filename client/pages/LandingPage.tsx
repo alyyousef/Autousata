@@ -196,7 +196,7 @@ const ValueCard: React.FC<{ icon: React.ReactNode; title: string; description: s
   description
 }) => (
   <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-    <div className="flex items-center gap-3 text-white mb-4">
+    <div className="flex items-center gap-3 text-indigo-600 mb-4">
       <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center">{icon}</div>
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
     </div>
