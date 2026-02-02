@@ -121,6 +121,16 @@ const CreateListingPage: React.FC = () => {
     }
   };
 
+  const handleDelist = () => {
+    if (!id) return;
+    const confirmed = window.confirm('Delist this vehicle from active listings?');
+    if (!confirmed) return;
+    const updated = listingService.setStatus(id, 'DELISTED');
+    if (updated) {
+      setListingStatus(updated.status);
+    }
+  };
+
   const steps = [
     { title: 'Vehicle Info', icon: Car },
     { title: 'Details & Photos', icon: Camera },
@@ -155,9 +165,9 @@ const CreateListingPage: React.FC = () => {
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="mb-8">
-                  <h2 className="text-2xl font-black text-slate-900">Tell us about your vehicle</h2>
-                  <p className="text-slate-500">Provide the basic details to get started with your listing.</p>
-                </div>
+                <h2 className="text-2xl font-black text-slate-900">Tell us about your vehicle</h2>
+                <p className="text-slate-500">Provide the basic details to get started with your listing.</p>
+              </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -449,6 +459,15 @@ const CreateListingPage: React.FC = () => {
               )}
 
               <div className="flex flex-wrap items-center gap-3">
+                {isEditing && listingStatus === 'PUBLISHED' && (
+                  <button
+                    type="button"
+                    onClick={handleDelist}
+                    className="px-6 py-3 border border-rose-200 text-rose-600 font-bold rounded-xl hover:bg-rose-50 transition-all"
+                  >
+                    Delist Listing
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleSave('DRAFT')}
