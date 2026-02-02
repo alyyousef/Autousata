@@ -5,7 +5,7 @@ const AboutPage: React.FC = () => (
   <PlaceholderPage
     title="About Autousata"
     subtitle="We are building the most trusted destination for automotive auctions, with verified sellers and seamless escrow-backed transactions."
-    primaryAction={{ label: 'Browse Cars', to: '/browse' }}
+    primaryAction={{ label: 'Buy a car', to: '/browse' }}
     secondaryAction={{ label: 'How it Works', to: '/how-it-works' }}
   />
 );

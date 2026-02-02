@@ -46,9 +46,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2 group">
                 <div>
-                  <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
+                  <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-14 w-14" />
                 </div>
-                <span className="text-xl font-bold text-slate-900 tracking-tight">Autousata</span>
+                <span className="text-xl font-bold text-slate-900 tracking-tight uppercase">AUTOUSATA</span>
               </Link>
               <div className="hidden md:ml-10 md:flex md:space-x-8">
                 {navigation.map((item) => (
@@ -137,24 +137,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
         <Outlet />
       </main>
 
-      <footer className="bg-slate-950 text-slate-300 border-t border-slate-800/70">
+      <footer className="bg-slate-950 text-slate-200 border-t border-slate-800/70">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
                 <div>
-                  <img src="/Autoustata.png" alt="Autousata logo" className="h-14 w-14" />
+                  <img src="/assests/frontendPictures/logoWhiteA.png" alt="Autousata logo" className="h-14 w-14" />
                 </div>
-                <span className="text-xl font-bold text-white tracking-tight">Autousata</span>
+                <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
               </div>
-              <p className="text-sm leading-6 max-w-xs text-slate-400">
+              <p className="text-sm leading-6 max-w-xs text-slate-200">
                 The world's most trusted online marketplace for buying and selling exceptional vehicles.
                 Secure, transparent, and built for enthusiasts.
               </p>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Marketplace</h3>
-              <ul className="space-y-3 text-sm text-slate-400">
+              <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/browse" className="hover:text-indigo-400">All Auctions</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-indigo-400">How it Works</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">About</Link></li>
@@ -162,7 +162,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Support</h3>
-              <ul className="space-y-3 text-sm text-slate-400">
+              <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/about" className="hover:text-indigo-400">Help Center</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">Contact Us</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">Buyer Protections</Link></li>
@@ -170,16 +170,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Legal</h3>
-              <ul className="space-y-3 text-sm text-slate-400">
+              <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/about" className="hover:text-indigo-400">Privacy Policy</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">Terms of Service</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">Cookie Policy</Link></li>
               </ul>
             </div>
           </div>
-          <div className="mt-12 pt-8 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500">
-            <p>&copy; 2026 Autousata, Inc. All rights reserved.</p>
-            <div className="flex gap-6 text-slate-400">
+          <div className="mt-12 pt-8 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-slate-300">
+            <p>&copy; 2026 AUTOUSATA, Inc. All rights reserved.</p>
+            <div className="flex gap-6 text-slate-200">
               <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-500" /> SECURE PAYMENTS</span>
               <span>PCI DSS COMPLIANT</span>
             </div>

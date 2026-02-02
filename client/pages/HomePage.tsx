@@ -37,12 +37,15 @@ const formatTimeRemaining = (endTime: string) => {
   return `${minutes}m`;
 };
 
+type SortOption = 'relevance' | 'priceAsc' | 'priceDesc' | 'endingSoon';
+
 const HomePage: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [conditionFilter, setConditionFilter] = useState('All');
   const [showDelisted, setShowDelisted] = useState(false);
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => loadDelistedIds());
+  const [sortBy, setSortBy] = useState<SortOption>('relevance');
 
   useEffect(() => {
     saveDelistedIds(delistedIds);
@@ -62,7 +65,7 @@ const HomePage: React.FC = () => {
 
   const filteredListings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return listings.filter(listing => {
+    const visible = listings.filter(listing => {
       const isDelisted = delistedIds.has(listing.id);
       if (!showDelisted && isDelisted) return false;
       const matchesCondition = conditionFilter === 'All' || listing.vehicle.condition === conditionFilter;
@@ -74,7 +77,26 @@ const HomePage: React.FC = () => {
       ].some(value => value.toLowerCase().includes(query));
       return matchesCondition && matchesQuery;
     });
-  }, [conditionFilter, delistedIds, listings, searchTerm, showDelisted]);
+
+    const sorted = [...visible];
+    sorted.sort((a, b) => {
+      if (sortBy === 'priceAsc') {
+        return a.currentBid - b.currentBid;
+      }
+      if (sortBy === 'priceDesc') {
+        return b.currentBid - a.currentBid;
+      }
+      if (sortBy === 'endingSoon') {
+        const aTime = new Date(a.endTime).getTime();
+        const bTime = new Date(b.endTime).getTime();
+        return aTime - bTime;
+      }
+      // relevance: keep original order
+      return 0;
+    });
+
+    return sorted;
+  }, [conditionFilter, delistedIds, listings, searchTerm, showDelisted, sortBy]);
 
   const activeCount = listings.filter(listing => !delistedIds.has(listing.id)).length;
   const delistedCount = listings.length - activeCount;
@@ -106,20 +128,19 @@ const HomePage: React.FC = () => {
           <div className="max-w-2xl relative hero-fade-in">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-200 mb-4 backdrop-blur-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              LIVE AUCTIONS
+              BUY WITH CONFIDENCE
             </div>
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
-              Browse active listings
+              Buy a car from verified sellers
             </h1>
             <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl">
-              Discover verified inventory, compare bids, and track auctions in real time with
-              transparent pricing and trusted sellers.
+              Explore our curated inventory, compare bids, and review condition details before you commit.
             </p>
           </div>
           <div className="mt-8 flex flex-wrap gap-4 text-xs md:text-sm text-slate-200/90 relative">
             <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />Verified sellers</div>
-            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />Transparent bidding</div>
-            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />Live auction timers</div>
+            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />Transparent pricing</div>
+            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />Clear time remaining</div>
           </div>
         </div>
       </section>
@@ -155,7 +176,7 @@ const HomePage: React.FC = () => {
                   <button
                     key={option}
                     onClick={() => setConditionFilter(option)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
                       conditionFilter === option
                         ? 'bg-indigo-600 text-white'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -169,18 +190,44 @@ const HomePage: React.FC = () => {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-sm">
-            <div className="flex items-center gap-4 text-slate-500">
+            <div className="flex flex-wrap items-center gap-4 text-slate-500">
               <span>Active listings: <strong className="text-slate-900">{activeCount}</strong></span>
               <span>Delisted: <strong className="text-slate-900">{delistedCount}</strong></span>
             </div>
-            {canManageListings && (
-              <button
-                onClick={() => setShowDelisted(prev => !prev)}
-                className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-              >
-                {showDelisted ? 'Hide delisted' : 'Show delisted'}
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400">
+                <SlidersHorizontal size={14} />
+                Sort by
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'relevance', label: 'Relevance' },
+                  { id: 'priceAsc', label: 'Price ↑' },
+                  { id: 'priceDesc', label: 'Price ↓' },
+                  { id: 'endingSoon', label: 'Ending soon' }
+                ].map(option => (
+                  <button
+                    key={option.id}
+                    onClick={() => setSortBy(option.id as SortOption)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
+                      sortBy === option.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {canManageListings && (
+                <button
+                  onClick={() => setShowDelisted(prev => !prev)}
+                  className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600 transition-colors"
+                >
+                  {showDelisted ? 'Hide delisted' : 'Show delisted'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -233,12 +280,16 @@ const HomePage: React.FC = () => {
                         <p className="text-lg font-bold text-indigo-600">EGP {listing.currentBid.toLocaleString()}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                       <div className="flex items-center gap-2">
                         <Clock size={14} />
                         {formatTimeRemaining(listing.endTime)}
                       </div>
                       <span>{listing.bidCount} bids</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                      <span>Mileage: <strong className="text-slate-900">{listing.vehicle.mileage.toLocaleString()} km</strong></span>
+                      <span>Condition: <strong className="text-slate-900">{listing.vehicle.condition}</strong></span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <Link
