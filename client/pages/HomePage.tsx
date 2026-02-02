@@ -99,15 +99,24 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="bg-slate-50 min-h-screen pb-20">
-      <section className="bg-slate-900 text-white">
+      <section className="relative bg-slate-950 text-white overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%)]" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-semibold mt-4">Browse active listings</h1>
-            <p className="text-slate-300 mt-4">
-              Discover verified inventory, compare bids, and track auctions in real time.
+          <div className="max-w-2xl relative hero-fade-in">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-200 mb-4 backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              LIVE AUCTIONS
+            </div>
+            <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
+              Browse active listings
+            </h1>
+            <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl">
+              Discover verified inventory, compare bids, and track auctions in real time with
+              transparent pricing and trusted sellers.
             </p>
           </div>
-          <div className="mt-8 flex flex-wrap gap-4 text-sm text-slate-200">
+          <div className="mt-8 flex flex-wrap gap-4 text-xs md:text-sm text-slate-200/90 relative">
             <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />Verified sellers</div>
             <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />Transparent bidding</div>
             <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />Live auction timers</div>
@@ -116,7 +125,7 @@ const HomePage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
-        <div className="bg-white rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8">
+        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 premium-card-hover backdrop-blur-sm">
           <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.6fr] gap-6 items-center">
             <div className="relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -178,7 +187,7 @@ const HomePage: React.FC = () => {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         {filteredListings.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-600">
+          <div className="bg-white/95 border border-slate-200 rounded-2xl p-8 text-center text-slate-600 premium-card-hover">
             <p className="text-lg font-semibold text-slate-900 mb-2">No listings match your filters</p>
             <p className="text-sm">Try adjusting the search or clearing filters.</p>
           </div>
@@ -187,7 +196,10 @@ const HomePage: React.FC = () => {
             {filteredListings.map(listing => {
               const isDelisted = delistedIds.has(listing.id);
               return (
-                <div key={listing.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow">
+                <div
+                  key={listing.id}
+                  className="bg-white/95 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm"
+                >
                   <div className="relative">
                     <img
                       src={listing.vehicle.images[0]}

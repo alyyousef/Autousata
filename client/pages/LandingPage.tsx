@@ -36,42 +36,60 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="bg-slate-50">
-      <section className="relative overflow-hidden bg-slate-900 text-white">
+      <section className="relative overflow-hidden bg-slate-950 text-white">
         <div className="absolute inset-0">
           <img
             src={landingHero}
             alt="Luxury vehicles on a showroom floor"
-            className="h-full w-full object-cover opacity-60"
+            className="h-full w-full object-cover opacity-55"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/60 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/70 to-transparent" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%)]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
-          <div className="max-w-2xl">
-                        <h1 className="text-4xl md:text-6xl font-semibold leading-tight mb-6">
-              Discover rare and remarkable cars, with trust built in.
+          <div className="max-w-2xl hero-fade-in">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-slate-200 mb-5 backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              CURATED AUCTION HOUSE
+            </div>
+            <h1 className="text-4xl md:text-6xl font-semibold leading-[1.05] mb-6 tracking-tight">
+              <span className="block text-slate-100">Discover rare and</span>
+              <span className="block bg-gradient-to-r from-indigo-300 via-slate-50 to-amber-200 bg-clip-text text-transparent">
+                remarkable cars, with trust built in.
+              </span>
             </h1>
-            <p className="text-lg text-slate-200 leading-relaxed mb-10">
-              Autousata connects collectors and first-time buyers with verified sellers, transparent bidding, and escrow-backed transactions.
+            <p className="text-base md:text-lg text-slate-200/90 leading-relaxed mb-10 max-w-xl">
+              Autousata connects collectors and first-time buyers with verified sellers, transparent bidding,
+              and escrow-backed transactions designed for peace of mind.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 to="/browse"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/35 hover:bg-indigo-400 hover:shadow-indigo-400/40 transition-all"
               >
                 Browse Cars
                 <ArrowRight size={18} />
               </Link>
               <Link
                 to="/sell"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-white/10 text-slate-50 font-semibold border border-white/25 hover:bg-white/15 hover:border-white/40 transition-all"
               >
                 Sell a Car
               </Link>
             </div>
-            <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-200">
-              <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-400" />Verified listings</div>
-              <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-400" />Escrow-backed payments</div>
-              <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-400" />Concierge support</div>
+            <div className="mt-10 flex flex-wrap gap-6 text-xs md:text-sm text-slate-200/90">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                Verified listings
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                Escrow-backed payments
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                Concierge support
+              </div>
             </div>
           </div>
         </div>
@@ -212,12 +230,12 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
 );
 
 const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => (
-  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
+  <div className="bg-white/90 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm">
     <img src={placeholderImage} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="h-48 w-full object-cover" />
     <div className="p-5">
       <p className="text-lg font-semibold text-slate-900">{vehicle.year} {vehicle.make} {vehicle.model}</p>
       <p className="text-sm text-slate-500 mt-1">{vehicle.location}</p>
-      <p className="text-xs text-slate-200 mt-3">{vehicle.mileage.toLocaleString()} miles � {vehicle.condition}</p>
+      <p className="text-xs text-slate-500 mt-3">{vehicle.mileage.toLocaleString()} miles • {vehicle.condition}</p>
     </div>
   </div>
 );

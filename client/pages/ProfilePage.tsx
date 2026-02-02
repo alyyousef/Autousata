@@ -69,7 +69,7 @@ const ProfilePage: React.FC = () => {
           
           {/* User Bio Card */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover">
               <div className="h-32 bg-indigo-600"></div>
               <div className="px-6 pb-6 text-center">
                 <div className="relative inline-block -mt-16 mb-4">
@@ -124,7 +124,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Verification Status</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -167,7 +167,7 @@ const ProfilePage: React.FC = () => {
                 {success}
               </div>
             )}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <h3 className="text-xl font-black text-slate-900 mb-8">Personal Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
@@ -208,7 +208,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
               <div className="space-y-4">
                 {[

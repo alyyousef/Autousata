@@ -27,7 +27,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Priority Queues */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover">
             <div className="bg-indigo-50 text-indigo-600 p-4 rounded-2xl">
               <ShieldCheck size={24} />
             </div>
@@ -37,7 +37,7 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-indigo-600 font-bold mt-1">4 Urgent</p>
             </div>
           </div>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover">
             <div className="bg-amber-50 text-amber-600 p-4 rounded-2xl">
               <AlertTriangle size={24} />
             </div>
@@ -47,7 +47,7 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-amber-600 font-bold mt-1">2 New Claims</p>
             </div>
           </div>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover">
             <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl">
               <AlertTriangle size={24} />
             </div>
@@ -60,7 +60,7 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Requirements Snapshot */}
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200 mb-12">
+        <div className="bg-white/95 rounded-3xl p-8 shadow-sm border border-slate-200 mb-12 premium-card-hover">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-6">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Requirements Overview</p>
@@ -90,7 +90,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover">
           {/* Tabs */}
           <div className="px-8 border-b border-slate-100">
             <div className="flex gap-8">

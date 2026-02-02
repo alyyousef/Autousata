@@ -159,7 +159,7 @@ const CreateListingPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white/95 rounded-3xl shadow-xl border border-slate-200 overflow-hidden premium-card-hover backdrop-blur-sm">
           <div className="p-8 md:p-12">
             
             {step === 1 && (

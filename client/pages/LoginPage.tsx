@@ -37,16 +37,16 @@ const LoginPage: React.FC = () => {
         }}
         aria-hidden="true"
       />
-      <div className="fixed inset-0 bg-slate-900/40" aria-hidden="true" />
+      <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-6xl flex justify-end">
+      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-sm my-auto">
           <h1 className="text-2xl font-semibold text-slate-900 mb-2">Log in</h1>
           <p className="text-sm text-slate-600 mb-6">Welcome back to Autousata</p>
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            className="w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+            className="w-full rounded-lg bg-indigo-500 py-3 text-sm font-semibold text-white hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
           >
             Open login
           </button>
@@ -69,7 +69,7 @@ const LoginPage: React.FC = () => {
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] shadow-2xl border border-white/70 p-8 md:p-10"
+            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] shadow-2xl border border-white/70 p-8 md:p-10 hero-fade-in"
           >
             <button
               type="button"
@@ -127,7 +127,7 @@ const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-lg bg-indigo-500 py-3 text-sm font-semibold text-white hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Logging in...' : 'Continue'}
               </button>

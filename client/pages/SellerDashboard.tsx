@@ -34,7 +34,7 @@ const SellerDashboard: React.FC = () => {
             <h1 className="text-3xl font-black text-slate-900">Seller Dashboard</h1>
             <p className="text-slate-500 mt-1">Track your performance and manage your active listings.</p>
           </div>
-          <button className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/30 transition-all">
+          <button className="px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/30 transition-all">
             <Plus size={20} />
             Create New Listing
           </button>
@@ -48,7 +48,7 @@ const SellerDashboard: React.FC = () => {
             { label: 'Avg. Views', value: '1.2k', trend: '+18.2%', icon: Users, color: 'amber' },
             { label: 'Sale Rate', value: '92%', trend: '+4.3%', icon: TrendingUp, color: 'rose' }
           ].map((stat, idx) => (
-            <div key={idx} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+            <div key={idx} className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
               <div className="flex items-center justify-between mb-4">
                 <div className={`p-2 rounded-xl bg-${stat.color}-50 text-${stat.color}-600`}>
                   <stat.icon size={20} />
@@ -65,7 +65,7 @@ const SellerDashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
           {/* Main Chart */}
-          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+          <div className="lg:col-span-2 bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
             <div className="flex items-center justify-between mb-8">
               <h3 className="font-bold text-lg text-slate-900">Performance Analytics</h3>
               <select className="text-sm border-none bg-slate-50 rounded-lg px-3 py-1.5 focus:ring-0">
@@ -89,7 +89,7 @@ const SellerDashboard: React.FC = () => {
           </div>
 
           {/* Quick Actions / Recent Activity */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+          <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
             <h3 className="font-bold text-lg text-slate-900 mb-6">Recent Activity</h3>
             <div className="space-y-6">
               {[
@@ -114,7 +114,7 @@ const SellerDashboard: React.FC = () => {
         </div>
 
         {/* Listings Table */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover">
           <div className="p-8 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-900">Your Listings</h3>
             <div className="flex gap-2">

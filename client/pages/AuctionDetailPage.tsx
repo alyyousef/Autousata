@@ -38,7 +38,7 @@ const AuctionDetailPage: React.FC = () => {
   return (
     <div className="bg-slate-50 min-h-screen pb-20">
       {/* Top Breadcrumb & Actions */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-white/95 border-b border-slate-200/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link to="/" className="text-slate-500 hover:text-slate-900 flex items-center gap-1 text-sm font-medium transition-colors">
             <ChevronLeft size={16} />
@@ -55,13 +55,13 @@ const AuctionDetailPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Main Content (Left/Center) */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Gallery */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            {/* Main Content (Left/Center) */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Gallery */}
+              <div className="bg-white/95 rounded-2xl border border-slate-200 overflow-hidden shadow-sm premium-card-hover">
               <div className="relative aspect-video group">
                 <img 
                   src={auction.vehicle.images[currentImageIndex]} 
@@ -98,7 +98,7 @@ const AuctionDetailPage: React.FC = () => {
             </div>
 
             {/* Vehicle Info */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+            <div className="bg-white/95 rounded-2xl border border-slate-200 p-8 shadow-sm premium-card-hover">
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{auction.vehicle.year}</span>
                 <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-bold uppercase tracking-wider">{auction.vehicle.condition}</span>
@@ -157,7 +157,7 @@ const AuctionDetailPage: React.FC = () => {
             </div>
 
             {/* Seller Info & Q&A */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+            <div className="bg-white/95 rounded-2xl border border-slate-200 p-8 shadow-sm premium-card-hover">
               <h3 className="text-xl font-bold mb-6">Seller Information</h3>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -181,7 +181,7 @@ const AuctionDetailPage: React.FC = () => {
           {/* Sidebar (Bidding & Finance) */}
           <div className="space-y-6">
             {/* Bidding Widget */}
-            <div className="bg-white rounded-2xl border-2 border-indigo-600 p-6 shadow-xl">
+            <div className="bg-white/95 rounded-2xl border-2 border-indigo-600 p-6 shadow-xl premium-card-hover">
               <div className="flex justify-between items-center mb-6">
                 <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse"></span>
@@ -241,7 +241,7 @@ const AuctionDetailPage: React.FC = () => {
             </div>
 
             {/* Finance AI Widget */}
-            <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg overflow-hidden relative">
+            <div className="bg-slate-950 rounded-2xl p-6 text-white shadow-lg overflow-hidden relative premium-card-hover">
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-600 rounded-full blur-3xl opacity-30"></div>
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-4">
@@ -284,7 +284,7 @@ const AuctionDetailPage: React.FC = () => {
             </div>
 
             {/* Quick Links */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+            <div className="bg-white/95 rounded-2xl border border-slate-200 p-4 space-y-2 premium-card-hover">
               <button className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-all group">
                 <div className="flex items-center gap-3">
                   <div className="bg-slate-100 p-2 rounded-lg text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">

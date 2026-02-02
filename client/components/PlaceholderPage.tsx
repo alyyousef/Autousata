@@ -23,21 +23,21 @@ const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
   secondaryAction
 }) => {
   return (
-    <section className="py-20 px-4">
-      <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded-3xl p-10 md:p-14 shadow-lg">
+    <section className="py-16 px-4 bg-slate-50 min-h-screen flex items-center">
+      <div className="max-w-4xl mx-auto bg-white/95 border border-slate-200 rounded-3xl p-10 md:p-14 shadow-lg premium-card-hover backdrop-blur-sm hero-fade-in">
         <img
           src={placeholderImage}
           alt="Placeholder"
           className="w-full h-56 md:h-64 object-cover rounded-2xl mb-8 border border-slate-200"
         />
-        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-500 mb-4">Coming Soon</p>
-        <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">{title}</h1>
-        <p className="text-slate-600 text-lg leading-relaxed mb-8">{subtitle}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-indigo-500 mb-3">Coming Soon</p>
+        <h1 className="text-3xl md:text-5xl font-semibold text-slate-900 tracking-tight mb-4">{title}</h1>
+        <p className="text-slate-600 text-base md:text-lg leading-relaxed mb-8">{subtitle}</p>
         <div className="flex flex-col sm:flex-row gap-3">
           {primaryAction && (
             <Link
               to={primaryAction.to}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-indigo-500 text-white font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
             >
               {primaryAction.label}
               <ArrowRight size={18} />

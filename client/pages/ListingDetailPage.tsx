@@ -82,7 +82,7 @@ const ListingDetailPage: React.FC = () => {
 
   return (
     <div className="bg-slate-50 min-h-screen pb-16">
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-white/95 border-b border-slate-200 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <Link to="/browse" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
             <ChevronLeft size={16} />
@@ -94,7 +94,7 @@ const ListingDetailPage: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div className="space-y-4">
-            <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
+            <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-sm premium-card-hover bg-slate-900">
               <img
                 src={listing.vehicle.images[0]}
                 alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
@@ -113,14 +113,14 @@ const ListingDetailPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-3 gap-3">
               {listing.vehicle.images.slice(0, 3).map((image, index) => (
-                <div key={index} className="rounded-2xl overflow-hidden border border-slate-200">
+                <div key={index} className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/90">
                   <img src={image} alt="" className="w-full h-24 object-cover" />
                 </div>
               ))}
             </div>
           </div>
 
-          <div>
+          <div className="hero-fade-in">
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">
                 {listing.vehicle.year}
@@ -134,31 +134,31 @@ const ListingDetailPage: React.FC = () => {
               </div>
             </div>
 
-            <h1 className="text-3xl font-semibold text-slate-900">
+            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
               {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
             </h1>
             <p className="text-slate-500 mt-2">{listing.vehicle.description}</p>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
-              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Mileage</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.vehicle.mileage.toLocaleString()} mi</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
                 <p className="text-xs uppercase tracking-wider text-slate-400">VIN</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.vehicle.vin.slice(-8)}</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Current bid</p>
                 <p className="text-lg font-semibold text-indigo-600">EGP {listing.currentBid.toLocaleString()}</p>
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Bids</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.bidCount}</p>
               </div>
             </div>
 
-            <div className="mt-6 bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
+            <div className="mt-6 bg-white/95 border border-slate-200 rounded-2xl p-5 flex items-center justify-between premium-card-hover">
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <Clock size={16} />
                 Time remaining: <span className="text-slate-900 font-semibold">{formatTimeRemaining(listing.endTime)}</span>
@@ -172,7 +172,7 @@ const ListingDetailPage: React.FC = () => {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/browse"
-                className="px-5 py-3 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+                className="px-5 py-3 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
               >
                 Continue browsing
               </Link>
@@ -196,7 +196,7 @@ const ListingDetailPage: React.FC = () => {
               )}
             </div>
 
-            <div className="mt-10 bg-slate-900 text-white rounded-3xl p-6">
+            <div className="mt-10 bg-slate-950 text-white rounded-3xl p-6 premium-card-hover">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-300">
                 <Tag size={14} />
                 Listing highlights
