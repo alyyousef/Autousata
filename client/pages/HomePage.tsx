@@ -163,7 +163,7 @@ const HomePage: React.FC = () => {
         <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm hero-panel">
           <div className="space-y-6">
             <div>
-              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3">Find your next car</p>
+              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">Find your next car</p>
               <div className="relative">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input

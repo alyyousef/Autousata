@@ -163,6 +163,13 @@ button:active {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2);
 }
 
+button.no-hover-rise,
+button.no-hover-rise:hover,
+button.no-hover-rise:active {
+  transform: none;
+  box-shadow: none;
+}
+
 /* Utility: premium card hover used across the app */
 .premium-card-hover {
   transition:

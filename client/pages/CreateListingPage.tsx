@@ -16,6 +16,7 @@ const CreateListingPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [listingStatus, setListingStatus] = useState<ListingStatus>('DRAFT');
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     year: '',
     make: '',
@@ -138,6 +139,64 @@ const CreateListingPage: React.FC = () => {
     { title: 'Review', icon: CheckCircle2 }
   ];
 
+  const requiredFieldsByStep: Record<number, { key: string; label: string; check?: () => boolean }[]> = {
+    1: [
+      { key: 'year', label: 'Year' },
+      { key: 'make', label: 'Make' },
+      { key: 'model', label: 'Model' },
+      { key: 'mileage', label: 'Mileage' },
+      { key: 'vin', label: 'VIN' },
+      { key: 'condition', label: 'Condition' }
+    ],
+    2: [
+      { key: 'images', label: 'Vehicle photos', check: () => formData.images.length > 0 },
+      { key: 'description', label: 'Full listing description' }
+    ],
+    3: [
+      { key: 'startingBid', label: 'Starting bid' },
+      { key: 'reservePrice', label: 'Reserve price' },
+      { key: 'location', label: 'Vehicle location' },
+      { key: 'inspectionDate', label: 'Inspection schedule' }
+    ]
+  };
+
+  const fieldLabelMap = Object.values(requiredFieldsByStep)
+    .flat()
+    .reduce<Record<string, string>>((acc, field) => {
+      acc[field.key] = field.label;
+      return acc;
+    }, {});
+
+  const validateStep = (targetStep: number) => {
+    const required = requiredFieldsByStep[targetStep] || [];
+    const missingKeys = required
+      .filter(field => {
+        if (field.check) return !field.check();
+        const value = (formData as Record<string, string>)[field.key];
+        return !value || value.trim() === '';
+      })
+      .map(field => field.key);
+
+    setMissingFields(missingKeys);
+    return missingKeys.length === 0;
+  };
+
+  const handleNext = () => {
+    const ok = validateStep(step);
+    if (!ok) return;
+    setMissingFields([]);
+    setStep(prev => prev + 1);
+  };
+
+  const handlePublish = () => {
+    const okSteps = [1, 2, 3].every(s => validateStep(s));
+    if (!okSteps) return;
+    setMissingFields([]);
+    handleSave('PUBLISHED');
+  };
+
+  const isMissing = (key: string) => missingFields.includes(key);
+
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -161,6 +220,16 @@ const CreateListingPage: React.FC = () => {
 
         <div className="bg-white/95 rounded-3xl shadow-xl border border-slate-200 overflow-hidden premium-card-hover backdrop-blur-sm">
           <div className="p-8 md:p-12">
+            {missingFields.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <p className="font-semibold mb-1">Please complete the following before continuing:</p>
+                <ul className="list-disc list-inside text-xs space-y-1">
+                  {missingFields.map(field => (
+                    <li key={field}>{fieldLabelMap[field] ?? field}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -174,7 +243,7 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Year</label>
                     <input 
                       type="number" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('year') ? 'border-rose-300' : 'border-slate-200'}`}
                       value={formData.year}
                       onChange={(e) => setFormData({...formData, year: e.target.value})}
                     />
@@ -183,7 +252,7 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Make</label>
                     <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('make') ? 'border-rose-300' : 'border-slate-200'}`}
                       value={formData.make}
                       onChange={(e) => setFormData({...formData, make: e.target.value})}
                     />
@@ -192,7 +261,7 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Model</label>
                     <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('model') ? 'border-rose-300' : 'border-slate-200'}`}
                       value={formData.model}
                       onChange={(e) => setFormData({...formData, model: e.target.value})}
                     />
@@ -201,7 +270,7 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Mileage</label>
                     <input 
                       type="number" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('mileage') ? 'border-rose-300' : 'border-slate-200'}`}
                       placeholder="e.g., 12000"
                       value={formData.mileage}
                       onChange={(e) => setFormData({...formData, mileage: e.target.value})}
@@ -211,7 +280,7 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">VIN</label>
                     <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('vin') ? 'border-rose-300' : 'border-slate-200'}`}
                       placeholder="Vehicle Identification Number"
                       value={formData.vin}
                       onChange={(e) => setFormData({...formData, vin: e.target.value})}
@@ -220,7 +289,7 @@ const CreateListingPage: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Condition</label>
                     <select
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('condition') ? 'border-rose-300' : 'border-slate-200'}`}
                       value={formData.condition}
                       onChange={(e) => setFormData({...formData, condition: e.target.value})}
                     >
@@ -242,7 +311,7 @@ const CreateListingPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
-                  <div className="bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-6">
+                  <div className={`bg-slate-50 border border-dashed rounded-2xl p-6 ${isMissing('images') ? 'border-rose-300' : 'border-slate-300'}`}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h4 className="font-bold text-slate-900">Vehicle Photos</h4>
@@ -358,7 +427,7 @@ const CreateListingPage: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Full Listing Description</label>
                   <textarea 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 min-h-[250px] text-sm"
+                    className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 min-h-[250px] text-sm ${isMissing('description') ? 'border-rose-300' : 'border-slate-200'}`}
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                   />
@@ -380,7 +449,7 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
-                        className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className={`w-full pl-8 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('startingBid') ? 'border-rose-300' : 'border-slate-200'}`}
                         placeholder="0.00"
                         value={formData.startingBid}
                         onChange={(e) => setFormData({...formData, startingBid: e.target.value})}
@@ -393,7 +462,7 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
-                        className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                        className={`w-full pl-8 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('reservePrice') ? 'border-rose-300' : 'border-slate-200'}`}
                         placeholder="0.00"
                         value={formData.reservePrice}
                         onChange={(e) => setFormData({...formData, reservePrice: e.target.value})}
@@ -408,7 +477,7 @@ const CreateListingPage: React.FC = () => {
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                       type="text" 
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      className={`w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('location') ? 'border-rose-300' : 'border-slate-200'}`}
                       placeholder="City, State"
                       value={formData.location}
                       onChange={(e) => setFormData({...formData, location: e.target.value})}
@@ -420,7 +489,7 @@ const CreateListingPage: React.FC = () => {
                   <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Schedule Inspection</label>
                   <input
                     type="datetime-local"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('inspectionDate') ? 'border-rose-300' : 'border-slate-200'}`}
                     value={formData.inspectionDate}
                     onChange={(e) => setFormData({...formData, inspectionDate: e.target.value})}
                   />
@@ -450,7 +519,7 @@ const CreateListingPage: React.FC = () => {
               {step > 1 ? (
                 <button 
                   onClick={() => setStep(step - 1)}
-                  className="px-8 py-3 text-slate-600 font-bold flex items-center gap-2 hover:bg-slate-100 rounded-xl transition-all"
+                  className="px-8 py-3 text-rose-600 font-bold flex items-center gap-2 hover:bg-rose-50 rounded-xl transition-all"
                 >
                   <ArrowLeft size={18} /> Back
                 </button>
@@ -471,13 +540,13 @@ const CreateListingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSave('DRAFT')}
-                  className="px-6 py-3 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all"
+                  className="px-6 py-3 border border-blue-200 text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition-all"
                 >
                   Save Draft
                 </button>
                 <button 
-                  onClick={() => step < 4 ? setStep(step + 1) : handleSave('PUBLISHED')}
-                  className="px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-2 rounded-xl transition-all shadow-lg shadow-indigo-500/30"
+                  onClick={() => (step < 4 ? handleNext() : handlePublish())}
+                  className="px-10 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 rounded-xl transition-all shadow-lg shadow-emerald-500/30"
                 >
                   {step === 4 ? (isEditing ? 'Update & Publish' : 'Publish Listing') : 'Continue'}
                   {step < 4 && <ArrowRight size={18} />}

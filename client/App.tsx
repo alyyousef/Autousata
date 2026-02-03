@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import AppLayout from './layouts/AppLayout';
@@ -19,11 +19,22 @@ import ProfilePage from './pages/ProfilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
 import AuctionsPage from './pages/AuctionsPage';
 
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, [pathname]);
+
+  return null;
+};
+
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <HashRouter>
+      <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<LandingPage />} />

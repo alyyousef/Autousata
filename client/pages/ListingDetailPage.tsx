@@ -215,7 +215,7 @@ const ListingDetailPage: React.FC = () => {
             <div className="mt-8 flex flex-wrap gap-3 justify-center">
               <button
                 onClick={() => setIsBidOpen(true)}
-                className="px-20 py-3 rounded-full bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-400 shadow-md shadow-emerald-500/30 transition-all"
+                className="px-2 py-3 rounded-full bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-400 shadow-md shadow-emerald-500/30 transition-all"
               >
                 Bid
               </button>
