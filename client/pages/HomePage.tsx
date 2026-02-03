@@ -4,6 +4,7 @@ import { Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'l
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
+import ImageLightbox from '../components/ImageLightbox';
 
 const DELISTED_STORAGE_KEY = 'autousata:delistedListings';
 
@@ -46,6 +47,7 @@ const HomePage: React.FC = () => {
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => loadDelistedIds());
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [now, setNow] = useState(() => Date.now());
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   useEffect(() => {
     saveDelistedIds(delistedIds);
@@ -135,7 +137,8 @@ const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen pb-20">
+    <>
+      <div className="bg-slate-50 min-h-screen pb-20">
       <section className="relative bg-slate-950 text-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%)]" />
@@ -316,7 +319,8 @@ const HomePage: React.FC = () => {
                     <img
                       src={listing.vehicle.images[0]}
                       alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
-                      className="h-48 w-full object-cover"
+                      className="h-48 w-full object-cover cursor-zoom-in"
+                      onClick={() => setLightboxSrc(listing.vehicle.images[0])}
                     />
                     <div className="absolute top-4 left-4 flex gap-2">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -384,6 +388,14 @@ const HomePage: React.FC = () => {
         )}
       </section>
     </div>
+      {lightboxSrc && (
+      <ImageLightbox
+        src={lightboxSrc}
+        alt="Listing image"
+        onClose={() => setLightboxSrc(null)}
+      />
+      )}
+    </>
   );
 };
 

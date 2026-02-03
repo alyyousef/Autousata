@@ -5,12 +5,14 @@ import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
 import placeholderImage from '../../assests/frontendPictures/placeHolder.jpg';
 import landingHero from '../../assests/frontendPictures/landingPageBackT.jpg';
+import ImageLightbox from '../components/ImageLightbox';
 
 const LandingPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [stats, setStats] = useState<LandingStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const loadLandingData = async () => {
     setIsLoading(true);
@@ -35,7 +37,8 @@ const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-slate-50 landing-serif">
+    <>
+      <div className="bg-slate-50 landing-serif">
       <section className="relative overflow-hidden bg-[#0B1117] text-white">
         <div className="absolute inset-0">
           <img
@@ -228,7 +231,11 @@ const LandingPage: React.FC = () => {
           ) : (
             <div className="grid gap-6 md:grid-cols-3">
               {vehicles.map(vehicle => (
-                <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                <VehicleCard
+                  key={vehicle.id}
+                  vehicle={vehicle}
+                  onPreview={() => setLightboxSrc(placeholderImage)}
+                />
               ))}
             </div>
           )}
@@ -254,6 +261,14 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
     </div>
+      {lightboxSrc && (
+      <ImageLightbox
+        src={lightboxSrc}
+        alt="Vehicle preview"
+        onClose={() => setLightboxSrc(null)}
+      />
+      )}
+    </>
   );
 };
 
@@ -278,10 +293,15 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 );
 
-const VehicleCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => (
+const VehicleCard: React.FC<{ vehicle: Vehicle; onPreview: () => void }> = ({ vehicle, onPreview }) => (
   <div className="bg-white/90 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm">
     <div className="relative">
-      <img src={placeholderImage} alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`} className="h-48 w-full object-cover" />
+      <img
+        src={placeholderImage}
+        alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        className="h-48 w-full object-cover cursor-zoom-in"
+        onClick={onPreview}
+      />
       <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/70 to-transparent" />
       <div className="absolute left-4 bottom-3 text-xs uppercase tracking-[0.3em] text-white/80">Live auction</div>
     </div>

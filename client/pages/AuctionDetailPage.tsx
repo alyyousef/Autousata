@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { geminiService } from '../geminiService';
+import ImageLightbox from '../components/ImageLightbox';
 
 const MIN_BID = 10000;
 const MIN_INCREMENT = 500;
@@ -34,6 +35,7 @@ const AuctionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const auction = MOCK_AUCTIONS.find(a => a.id === id) || MOCK_AUCTIONS[0];
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [currentBid, setCurrentBid] = useState(auction.currentBid);
   const [bidCount, setBidCount] = useState(auction.bidCount);
   const [bidAmount, setBidAmount] = useState<number>(Math.max(auction.currentBid + MIN_INCREMENT, MIN_BID));
@@ -195,7 +197,8 @@ const AuctionDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen pb-20">
+    <>
+      <div className="bg-slate-50 min-h-screen pb-20">
       {/* Top Breadcrumb & Actions */}
       <div className="bg-white/95 border-b border-slate-200/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -224,8 +227,9 @@ const AuctionDetailPage: React.FC = () => {
               <div className="relative aspect-video group">
                 <img 
                   src={auction.vehicle.images[currentImageIndex]} 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover cursor-zoom-in" 
                   alt="Vehicle" 
+                  onClick={() => setLightboxSrc(auction.vehicle.images[currentImageIndex])}
                 />
                 <button 
                   onClick={() => setCurrentImageIndex(prev => Math.max(0, prev - 1))}
@@ -250,7 +254,15 @@ const AuctionDetailPage: React.FC = () => {
                     onClick={() => setCurrentImageIndex(idx)}
                     className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${currentImageIndex === idx ? 'border-indigo-600' : 'border-transparent opacity-60 hover:opacity-100'}`}
                   >
-                    <img src={img} className="w-full h-full object-cover" alt="" />
+                    <img
+                      src={img}
+                      className="w-full h-full object-cover cursor-zoom-in"
+                      alt=""
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setLightboxSrc(img);
+                      }}
+                    />
                   </button>
                 ))}
               </div>
@@ -623,7 +635,15 @@ const AuctionDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
+    </>
   );
 };
 

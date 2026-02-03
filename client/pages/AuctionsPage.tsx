@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, Tag, Trophy, ArrowRight, SlidersHorizontal } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
+import ImageLightbox from '../components/ImageLightbox';
 
 type SortOption = 'endingSoon' | 'highestBid' | 'mostBids';
 
 const AuctionsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('endingSoon');
   const [now, setNow] = useState(() => Date.now());
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const sortedAuctions = useMemo(() => {
     const items = [...MOCK_AUCTIONS];
@@ -45,7 +47,8 @@ const AuctionsPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen pb-20">
+    <>
+      <div className="bg-slate-50 min-h-screen pb-20">
       <section className="relative bg-slate-950 text-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.22),_transparent_55%)]" />
@@ -115,7 +118,8 @@ const AuctionsPage: React.FC = () => {
                 <img
                   src={auction.vehicle.images[0]}
                   alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
-                  className="h-48 w-full object-cover"
+                  className="h-48 w-full object-cover cursor-zoom-in"
+                  onClick={() => setLightboxSrc(auction.vehicle.images[0])}
                 />
                 <div className="absolute top-4 left-4 flex gap-2">
                   <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
@@ -163,7 +167,15 @@ const AuctionsPage: React.FC = () => {
           ))}
         </div>
       </section>
-    </div>
+      </div>
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt="Auction image"
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
+    </>
   );
 };
 

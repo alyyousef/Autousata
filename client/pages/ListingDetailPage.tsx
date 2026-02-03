@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Clock, MapPin, ShieldCheck, Tag } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Clock, MapPin, ShieldCheck, Tag } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
+import ImageLightbox from '../components/ImageLightbox';
 
 const DELISTED_STORAGE_KEY = 'autousata:delistedListings';
 
@@ -44,6 +45,8 @@ const ListingDetailPage: React.FC = () => {
   const [isBidOpen, setIsBidOpen] = useState(false);
   const [bidAmount, setBidAmount] = useState('');
   const [bidError, setBidError] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [bidSuccess, setBidSuccess] = useState<number | null>(null);
 
   const listing = useMemo(() => MOCK_AUCTIONS.find(auction => auction.id === id), [id]);
 
@@ -109,11 +112,13 @@ const ListingDetailPage: React.FC = () => {
     setBidError('');
     setIsBidOpen(false);
     setBidAmount('');
-    window.alert(`Bid placed: EGP ${amount.toLocaleString()}`);
+    setBidSuccess(amount);
+    window.setTimeout(() => setBidSuccess(null), 2500);
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen pb-16">
+    <>
+      <div className="bg-slate-50 min-h-screen pb-16">
       <div className="bg-white/95 border-b border-slate-200 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <Link to="/browse" className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
@@ -130,7 +135,8 @@ const ListingDetailPage: React.FC = () => {
               <img
                 src={listing.vehicle.images[0]}
                 alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
-                className="w-full h-80 object-cover"
+                className="w-full h-80 object-cover cursor-zoom-in"
+                onClick={() => setLightboxSrc(listing.vehicle.images[0])}
               />
               <div className="absolute top-4 left-4 flex gap-2">
                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -146,7 +152,12 @@ const ListingDetailPage: React.FC = () => {
             <div className="grid grid-cols-3 gap-3">
               {listing.vehicle.images.slice(0, 3).map((image, index) => (
                 <div key={index} className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/90">
-                  <img src={image} alt="" className="w-full h-24 object-cover" />
+                  <img
+                    src={image}
+                    alt=""
+                    className="w-full h-24 object-cover cursor-zoom-in"
+                    onClick={() => setLightboxSrc(image)}
+                  />
                 </div>
               ))}
             </div>
@@ -172,19 +183,19 @@ const ListingDetailPage: React.FC = () => {
             <p className="text-slate-500 mt-2">{listing.vehicle.description}</p>
 
             <div className="mt-6 grid grid-cols-2 gap-4">
-              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Mileage</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.vehicle.mileage.toLocaleString()} mi</p>
               </div>
-              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4">
                 <p className="text-xs uppercase tracking-wider text-slate-400">VIN</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.vehicle.vin.slice(-8)}</p>
               </div>
-              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Current bid</p>
                 <p className="text-lg font-semibold text-indigo-600">EGP {listing.currentBid.toLocaleString()}</p>
               </div>
-              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4 premium-card-hover">
+              <div className="bg-white/95 border border-slate-200 rounded-2xl p-4">
                 <p className="text-xs uppercase tracking-wider text-slate-400">Bids</p>
                 <p className="text-lg font-semibold text-slate-900">{listing.bidCount}</p>
               </div>
@@ -201,10 +212,10 @@ const ListingDetailPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-3 justify-center">
               <button
                 onClick={() => setIsBidOpen(true)}
-                className="px-5 py-3 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
+                className="px-20 py-3 rounded-full bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-400 shadow-md shadow-emerald-500/30 transition-all"
               >
                 Bid
               </button>
@@ -245,10 +256,10 @@ const ListingDetailPage: React.FC = () => {
             onClick={() => setIsBidOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                                <h2 className="text-xl font-semibold text-slate-900 mt-2">Submit your offer</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mt-2">Submit your offer</h2>
               </div>
               <button
                 type="button"
@@ -259,7 +270,7 @@ const ListingDetailPage: React.FC = () => {
                 Close
               </button>
             </div>
-            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 mb-5">
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-8 py-4 mb-5 w-full max-w-xl mx-auto">
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Current bid</p>
                 <p className="text-lg font-semibold text-slate-900">EGP {listing.currentBid.toLocaleString()}</p>
@@ -313,7 +324,45 @@ const ListingDetailPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
+      {bidSuccess !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-slate-950/20" aria-hidden="true" />
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 30 }).map((_, index) => (
+              <span
+                key={index}
+                className="confetti-piece"
+                style={{
+                  left: `${3 + index * 3}%`,
+                  background: ['#22c55e', '#38bdf8', '#f59e0b', '#ef4444', '#a78bfa'][index % 5],
+                  animationDelay: `${index * 35}ms`,
+                  borderRadius: index % 2 === 0 ? '2px' : '999px'
+                }}
+              />
+            ))}
+          </div>
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-emerald-200 bg-white shadow-2xl px-5 py-4">
+            <div className="flex items-start gap-3">
+              <span className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 size={20} />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Bid placed successfully</p>
+                <p className="text-xs text-slate-600 mt-1">EGP {bidSuccess.toLocaleString()} is now live.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
