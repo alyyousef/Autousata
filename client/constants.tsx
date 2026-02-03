@@ -27,7 +27,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       condition: 'Excellent',
       description: 'Stunning 911 in Chalk with Bordeaux Red interior. Sport Chrono package included.',
       images: [porsche911Image],
-      location: 'Los Angeles, CA'
+      location: 'Cairo, Egypt'
     },
     currentBid: 95000,
     startingBid: 80000,
@@ -50,7 +50,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       condition: 'Mint',
       description: 'Tri-motor AWD, Full Self-Driving Capability included. Like new condition.',
       images: [teslaModelSPlaidImage],
-      location: 'Austin, TX'
+      location: 'Giza, Egypt'
     },
     currentBid: 82000,
     startingBid: 75000,
@@ -73,7 +73,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       condition: 'Excellent',
       description: 'Sasquatch package, 4-door, Lightning Blue. Only 7,000 units made.',
       images: [fordBroncoImage],
-      location: 'Denver, CO'
+      location: 'Alexandria, Egypt'
     },
     currentBid: 61000,
     startingBid: 50000,

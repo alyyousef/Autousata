@@ -35,46 +35,46 @@ const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-slate-50">
-      <section className="relative overflow-hidden bg-slate-950 text-white">
+    <div className="bg-slate-50 landing-serif">
+      <section className="relative overflow-hidden bg-[#0B1117] text-white">
         <div className="absolute inset-0">
           <img
             src={landingHero}
             alt="Luxury vehicles on a showroom floor"
-            className="h-full w-full object-cover opacity-60"
+            className="h-full w-full object-cover opacity-55"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950/95 via-slate-900/80 to-slate-950/20" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.22),_transparent_60%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0B1117]/95 via-[#101826]/85 to-[#0B1117]/30" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_60%)]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-start">
             <div className="hero-fade-in">
               <h1 className="text-4xl md:text-6xl font-semibold leading-[1.05] mb-6 tracking-tight">
-                <span className="block text-slate-100">Buy rare vehicles with</span>
-                <span className="block bg-gradient-to-r from-emerald-200 via-slate-50 to-amber-200 bg-clip-text text-transparent">
+                <span className="block text-slate-50">Buy rare vehicles with</span>
+                <span className="block bg-gradient-to-r from-sky-200 via-slate-50 to-emerald-200 bg-clip-text text-transparent">
                   clarity, confidence, and full provenance.
                 </span>
               </h1>
-              <p className="text-base md:text-lg text-slate-200/90 leading-relaxed mb-10 max-w-xl">
+              <p className="text-base md:text-lg text-slate-200/85 leading-relaxed mb-10 max-w-xl">
                 Autousata brings verified sellers, escrow-backed payments, and expert condition reviews into a single
                 premium auction experience.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   to="/browse"
-                  className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-white text-slate-900 font-semibold shadow-lg shadow-slate-900/30 hover:bg-slate-100 transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-white text-slate-900 font-semibold shadow-lg shadow-slate-900/25 hover:bg-slate-100 transition-all"
                 >
                   Explore inventory
                   <ArrowRight size={18} />
                 </Link>
                 <Link
                   to="/sell"
-                  className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-white/10 text-slate-50 font-semibold border border-white/25 hover:bg-white/15 hover:border-white/40 transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full bg-emerald-400/15 text-emerald-100 font-semibold border border-emerald-200/30 hover:bg-emerald-400/25 hover:border-emerald-200/50 transition-all"
                 >
                   List your car
                 </Link>
               </div>
-              <div className="mt-10 grid gap-4 sm:grid-cols-3 text-xs md:text-sm text-slate-200/90">
+              <div className="mt-10 grid gap-4 sm:grid-cols-3 text-xs md:text-sm text-slate-100/90">
                 <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
                   <CheckCircle2 size={16} className="text-emerald-300" />
                   Verified sellers
@@ -91,7 +91,7 @@ const LandingPage: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-sm">
+              <div className="rounded-3xl border border-white/12 bg-white/8 p-6 backdrop-blur-sm shadow-[0_24px_60px_rgba(5,10,20,0.35)]">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <p className="text-xs uppercase tracking-[0.25em] text-slate-200">Market snapshot</p>
@@ -118,25 +118,25 @@ const LandingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-sm">
+              <div className="rounded-3xl border border-white/12 bg-white/8 p-6 backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-[0.25em] text-slate-200 mb-4">How it works</p>
                 <div className="space-y-4 text-sm text-slate-200">
                   <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-emerald-400/20 text-emerald-200 flex items-center justify-center text-xs font-semibold">01</span>
+                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">01</span>
                     <div>
                       <p className="font-semibold text-white">Browse verified listings</p>
                       <p className="text-slate-200/80">Every vehicle is reviewed for history, title, and condition.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-emerald-400/20 text-emerald-200 flex items-center justify-center text-xs font-semibold">02</span>
+                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">02</span>
                     <div>
                       <p className="font-semibold text-white">Bid with full transparency</p>
                       <p className="text-slate-200/80">Real-time bidding with clear pricing guidance.</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-emerald-400/20 text-emerald-200 flex items-center justify-center text-xs font-semibold">03</span>
+                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">03</span>
                     <div>
                       <p className="font-semibold text-white">Close with escrow support</p>
                       <p className="text-slate-200/80">Payments, paperwork, and delivery handled by our team.</p>
@@ -149,17 +149,18 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
-          <div className="text-center mx-auto">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-3">Why Autousata</p>
-            <h2 className="text-3xl md:text-4xl font-semibold text-slate-900">A premium experience, end to end</h2>
-            <p className="text-sm text-slate-600 mt-3 max-w-2xl mx-auto">
-              We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.
-            </p>
+      <section className="section-texture border-y border-slate-200/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div className="text-center mx-auto">
+              <p className="section-eyebrow">Why Autousata</p>
+              <h2 className="section-title">A premium experience, end to end</h2>
+              <p className="section-subtitle max-w-2xl mx-auto">
+                We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
           <ValueCard
             icon={<ShieldCheck size={22} />}
             title="Protected transactions"
@@ -176,15 +177,16 @@ const LandingPage: React.FC = () => {
             description="Dedicated specialists help you bid, finance, and close with confidence."
           />
         </div>
+        </div>
       </section>
 
-      <section className="bg-white border-y border-slate-200">
+      <section className="section-texture border-y border-slate-200/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500 mb-3">Trending now</p>
-              <h2 className="text-3xl md:text-4xl font-semibold text-slate-900">Vehicles trending this week</h2>
-              <p className="text-sm text-slate-600 mt-3 max-w-2xl">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
+            <div className="text-center mx-auto">
+              <p className="section-eyebrow">Trending now</p>
+              <h2 className="section-title">Vehicles trending this week</h2>
+              <p className="section-subtitle max-w-2xl mx-auto">
                 High-interest listings with verified condition reports and active bids.
               </p>
             </div>

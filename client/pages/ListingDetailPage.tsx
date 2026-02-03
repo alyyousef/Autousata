@@ -93,12 +93,17 @@ const ListingDetailPage: React.FC = () => {
   const handleBidSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(bidAmount);
+    const maxAllowed = listing.currentBid * 3;
     if (!amount || Number.isNaN(amount)) {
       setBidError('Enter a valid bid amount.');
       return;
     }
     if (amount <= listing.currentBid) {
       setBidError(`Bid must be higher than EGP ${listing.currentBid.toLocaleString()}.`);
+      return;
+    }
+    if (amount > maxAllowed) {
+      setBidError(`Max bid is EGP ${maxAllowed.toLocaleString()} (3x current bid).`);
       return;
     }
     setBidError('');
@@ -243,22 +248,28 @@ const ListingDetailPage: React.FC = () => {
           <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Place bid</p>
-                <h2 className="text-xl font-semibold text-slate-900 mt-2">Submit your offer</h2>
+                                <h2 className="text-xl font-semibold text-slate-900 mt-2">Submit your offer</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsBidOpen(false)}
-                className="text-slate-500 hover:text-slate-700"
+                className="px-3 py-1 rounded-full text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors"
                 aria-label="Close"
               >
-                ✕
+                Close
               </button>
             </div>
-            <p className="text-sm text-slate-600 mb-5">
-              Current bid: <span className="font-semibold text-slate-900">EGP {listing.currentBid.toLocaleString()}</span>
-            </p>
-            {bidError && (
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 mb-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Current bid</p>
+                <p className="text-lg font-semibold text-slate-900">EGP {listing.currentBid.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Max bid</p>
+                <p className="text-sm font-semibold text-slate-700">EGP {(listing.currentBid * 3).toLocaleString()}</p>
+              </div>
+            </div>
+{bidError && (
               <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
                 {bidError}
               </div>
@@ -272,12 +283,16 @@ const ListingDetailPage: React.FC = () => {
                   id="bidAmount"
                   type="number"
                   min={listing.currentBid + 1}
+                  max={listing.currentBid * 3}
                   value={bidAmount}
                   onChange={(event) => setBidAmount(event.target.value)}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  placeholder={`Min ${listing.currentBid.toLocaleString()}`}
+                  placeholder={`Min ${listing.currentBid.toLocaleString()} • Max ${(listing.currentBid * 3).toLocaleString()}`}
                   required
                 />
+                <p className="text-xs text-slate-400 mt-2">
+                  Minimum bid must be above the current bid. Maximum bid is capped at 3x current bid.
+                </p>
               </div>
               <div className="flex items-center justify-end gap-3">
                 <button

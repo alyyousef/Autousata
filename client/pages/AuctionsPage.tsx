@@ -77,7 +77,7 @@ const AuctionsPage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
-        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 premium-card-hover backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <SlidersHorizontal size={18} className="text-slate-400" />
             <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Sort auctions by</span>

@@ -104,6 +104,17 @@ const HomePage: React.FC = () => {
 
   const activeCount = listings.filter(listing => !delistedIds.has(listing.id)).length;
   const delistedCount = listings.length - activeCount;
+  const buyerBidHistory = [
+    { id: 'bh-1', vehicle: '2021 Porsche 911 Carrera', amount: 95000, status: 'Leading' },
+    { id: 'bh-2', vehicle: '2022 Audi RS7', amount: 88000, status: 'Outbid' }
+  ];
+  const buyerNotifications = [
+    'Outbid on 2022 Audi RS7. Increase your max to regain the lead.',
+    'Proxy bid placed at EGP 95,000 on 2021 Porsche 911.'
+  ];
+  const buyerPayments = [
+    { id: 'pay-1', vehicle: '2019 BMW M4 Competition', status: 'Unpaid', amount: 120000 }
+  ];
 
   const handleDelist = (listingId: string) => {
     const confirmed = window.confirm('Delist this vehicle from active listings?');
@@ -231,6 +242,56 @@ const HomePage: React.FC = () => {
                   {showDelisted ? 'Hide delisted' : 'Show delisted'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Bid history</h3>
+            <div className="space-y-3 text-sm">
+              {buyerBidHistory.map(entry => (
+                <div key={entry.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-700 font-semibold">{entry.vehicle}</p>
+                    <p className={`text-xs ${
+                      entry.status === 'Leading' ? 'text-emerald-600' : 'text-rose-600'
+                    }`}>
+                      {entry.status}
+                    </p>
+                  </div>
+                  <p className="text-slate-900 font-bold">EGP {entry.amount.toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Outbid notifications</h3>
+            <div className="space-y-3 text-sm text-slate-600">
+              {buyerNotifications.map((note, index) => (
+                <div key={index} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                  {note}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Payment status</h3>
+            <div className="space-y-3 text-sm">
+              {buyerPayments.map(payment => (
+                <div key={payment.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-700 font-semibold">{payment.vehicle}</p>
+                    <p className="text-xs text-slate-500">{payment.status}</p>
+                  </div>
+                  <p className="text-slate-900 font-bold">EGP {payment.amount.toLocaleString()}</p>
+                </div>
+              ))}
+              <p className="text-xs text-slate-400 mt-3">
+                Payment methods and Stripe checkout are placeholders for API integration.
+              </p>
             </div>
           </div>
         </div>
