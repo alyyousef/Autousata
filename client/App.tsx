@@ -11,6 +11,8 @@ import AboutPage from './pages/AboutPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import TermsPage from './pages/TermsPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import AuctionDetailPage from './pages/AuctionDetailPage';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -44,9 +46,11 @@ const AppRoutes: React.FC = () => {
           <Route path="/sell" element={<CreateListingPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<AppLayout user={user} />}>

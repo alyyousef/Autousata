@@ -246,7 +246,6 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-white">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-3">Sell with confidence</p>
               <h2 className="text-3xl font-semibold mb-3">Ready to list your car?</h2>
               <p className="text-slate-300">Reach serious buyers with auction-grade exposure and white-glove support.</p>
             </div>

@@ -121,6 +121,7 @@ const PublicLayout: React.FC = () => {
                 <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
                 <ul className="space-y-3 text-sm text-slate-200">
                   <li><Link to="/about" className="hover:text-indigo-400">About</Link></li>
+                  <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
                   <li><Link to="/about" className="hover:text-indigo-400">Contact</Link></li>
                   <li><Link to="/about" className="hover:text-indigo-400">Press</Link></li>
                 </ul>

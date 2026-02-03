@@ -172,7 +172,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Legal</h3>
               <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/about" className="hover:text-indigo-400">Privacy Policy</Link></li>
-                <li><Link to="/about" className="hover:text-indigo-400">Terms of Service</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
                 <li><Link to="/about" className="hover:text-indigo-400">Cookie Policy</Link></li>
               </ul>
             </div>
