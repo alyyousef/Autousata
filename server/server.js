@@ -1,53 +1,76 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
+const mongoose = require('mongoose');
 require('dotenv').config();
+const oracleDb = require('./config/oracle');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const User = require('./models/User');
+// USE PORT 5005 (We verified this port works on your Mac)
+const PORT = process.env.PORT || 5005;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
-mongoose.connect(MONGO_URI)
-  .then(async () => {
-    console.log('MongoDB connected');
-
-    if (process.env.NODE_ENV !== 'production') {
-      const demoEmail = process.env.DEMO_USER_EMAIL || 'demo@autousata.com';
-      const demoPassword = process.env.DEMO_USER_PASSWORD || 'DemoPass123!';
-      const existing = await User.findOne({ email: demoEmail.toLowerCase() });
-      if (!existing) {
-        await User.create({
-          name: 'Demo Seller',
-          email: demoEmail.toLowerCase(),
-          phone: '+10000000000',
-          password: demoPassword,
-          role: 'SELLER',
-          isKycVerified: true
-        });
-        console.log('Demo user created');
-      }
-    }
-  })
-  .catch(err => console.log('MongoDB connection error:', err));
-
-// Routes
-const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profile');
-
-app.use('/api/auth', authRoutes);
-app.use('/api', profileRoutes);
-
-// Test route
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to Autousata API' });
+// 🕵️‍♂️ DEBUG SPY: Logs every request to the terminal
+app.use((req, res, next) => {
+    console.log(`🔎 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// --- ROUTES ---
+const authRoutes = require('./routes/auth');
+
+// Mount Auth Routes
+app.use('/api/auth', authRoutes);
+
+// Test Route (Access this to prove server is alive)
+app.get('/', (req, res) => {
+    res.json({ status: 'Online', message: 'Server is running on Port ' + PORT });
+});
+
+// =====================================================
+// 🚀 STARTUP SEQUENCE: Server First -> Then Databases
+// =====================================================
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n✅ SERVER STARTED SUCCESSFULLY!`);
+    console.log(`👉 Local:   http://127.0.0.1:${PORT}`);
+    console.log(`👉 Network: http://0.0.0.0:${PORT}`);
+    
+    // NOW connect to databases (So they don't block startup)
+    connectDatabases();
+});
+
+async function connectDatabases() {
+    // 1. Oracle Connection
+    try {
+        console.log('⏳ Initializing Oracle Pool...');
+        await oracleDb.initialize();
+        console.log('✅ Oracle Database connected!');
+    } catch (err) {
+        console.error('❌ Oracle Connection FAILED:', err.message);
+        // We do NOT exit the process, so the server stays alive for debugging
+    }
+
+    // 2. MongoDB Connection (Passive)
+    try {
+        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
+        await mongoose.connect(MONGO_URI);
+        console.log('✅ MongoDB connected (Passive Mode)');
+    } catch (err) {
+        console.error('⚠️ MongoDB Connection Failed (Ignored):', err.message);
+    }
+}
+
+// Graceful Shutdown
+process.on('SIGINT', async () => {
+    console.log('\n🛑 Shutting down...');
+    try {
+        await oracleDb.close(); 
+    } catch(e) { console.log('Oracle close error:', e.message); }
+    
+    server.close(() => {
+        console.log('Server closed.');
+        process.exit(0);
+    });
 });
