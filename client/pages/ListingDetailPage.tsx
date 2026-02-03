@@ -77,7 +77,7 @@ const ListingDetailPage: React.FC = () => {
     const confirmed = window.confirm('Delist this vehicle from active listings?');
     if (!confirmed) return;
     setDelistedIds(prev => {
-      const next = new Set(prev);
+      const next = new Set<string>(prev);
       next.add(listing.id);
       updateDelistedIds(next);
       return next;
@@ -86,7 +86,7 @@ const ListingDetailPage: React.FC = () => {
 
   const handleRestore = () => {
     setDelistedIds(prev => {
-      const next = new Set(prev);
+      const next = new Set<string>(prev);
       next.delete(listing.id);
       updateDelistedIds(next);
       return next;
@@ -335,17 +335,11 @@ const ListingDetailPage: React.FC = () => {
       {bidSuccess !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-slate-950/20" aria-hidden="true" />
-          <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 pointer-events-none confetti-layer">
             {Array.from({ length: 30 }).map((_, index) => (
               <span
                 key={index}
                 className="confetti-piece"
-                style={{
-                  left: `${3 + index * 3}%`,
-                  background: ['#22c55e', '#38bdf8', '#f59e0b', '#ef4444', '#a78bfa'][index % 5],
-                  animationDelay: `${index * 35}ms`,
-                  borderRadius: index % 2 === 0 ? '2px' : '999px'
-                }}
               />
             ))}
           </div>

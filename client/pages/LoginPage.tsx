@@ -17,6 +17,17 @@ const LoginPage: React.FC = () => {
     setError('');
     setLoading(true);
 
+    if (!email.trim()) {
+      setError('Please fill in the user name field.');
+      setLoading(false);
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please fill in the password field.');
+      setLoading(false);
+      return;
+    }
+
     const result = await login(email, password);
 
     if (result.success) {
@@ -30,23 +41,13 @@ const LoginPage: React.FC = () => {
 
   return (
     <section className="relative min-h-screen flex items-start justify-end px-4 py-10 sm:px-6 md:py-16 md:items-center text-slate-900 overflow-y-auto">
-      <div
-        className="fixed inset-0 bg-center bg-cover"
-        style={{
-          backgroundImage: 'url("/loginpage.png")',
-          filter: 'none'
-        }}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 bg-center bg-cover auth-bg-login" aria-hidden="true" />
       <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
 
-      <div
-        className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in"
-        style={{ transform: 'scale(0.67)', transformOrigin: 'top right' }}
-      >
-        <div className="bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Welcome back</h1>
-          <p className="text-sm text-slate-600 mb-6">Log in to track bids, saved searches, and your garage.</p>
+      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in auth-scale-67">
+        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Welcome!</h1>
+          <p className="text-sm text-slate-600 mb-6">Log in to track bids, saved searches, and your garage!</p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">

@@ -52,23 +52,13 @@ const SignUpPage: React.FC = () => {
 
   return (
     <section className="relative min-h-screen flex items-start justify-end px-4 py-10 sm:px-6 md:py-16 md:items-center text-slate-900 overflow-y-auto">
-      <div
-        className="fixed inset-0 bg-[position:82%_center] bg-cover"
-        style={{
-          backgroundImage: 'url("/signuppage.jpg")',
-          filter: 'none'
-        }}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 bg-cover auth-bg-signup" aria-hidden="true" />
       <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
 
-      <div
-        className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in"
-        style={{ transform: 'scale(0.67)', transformOrigin: 'top right' }}
-      >
-        <div className="bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Join Autousata</h1>
-          <p className="text-sm text-slate-600 mb-6">Get access to verified listings, transparent bids, and concierge support.</p>
+      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in auth-scale-67">
+        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Become a Autousata Member!</h1>
+          <p className="text-sm text-slate-600 mb-6">Get access to verified listings, transparent bids, and concierge support!</p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">

@@ -234,7 +234,7 @@ const LandingPage: React.FC = () => {
                 <VehicleCard
                   key={vehicle.id}
                   vehicle={vehicle}
-                  onPreview={() => setLightboxSrc(placeholderImage)}
+                  onPreview={() => setLightboxSrc(vehicle.images?.[0] || placeholderImage)}
                 />
               ))}
             </div>
@@ -297,7 +297,7 @@ const VehicleCard: React.FC<{ vehicle: Vehicle; onPreview: () => void }> = ({ ve
   <div className="bg-white/90 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm">
     <div className="relative">
       <img
-        src={placeholderImage}
+        src={vehicle.images?.[0] || placeholderImage}
         alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
         className="h-48 w-full object-cover cursor-zoom-in"
         onClick={onPreview}
