@@ -36,8 +36,7 @@ const SignUpPage: React.FC = () => {
 
     setLoading(true);
 
-    const fullName = `${firstName} ${lastName}`.trim();
-    const result = await register(fullName, email, phone, password);
+    const result = await register(firstName, lastName, email, phone, password);
 
     if (result.success) {
       navigate('/browse');

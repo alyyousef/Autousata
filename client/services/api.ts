@@ -41,10 +41,10 @@ class ApiService {
   }
 
   // Authentication endpoints
-  async register(name: string, email: string, phone: string, password: string) {
+  async register(firstName: string, lastName: string, email: string, phone: string, password: string) {
     const response = await this.request<{ token: string; user: any }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, phone, password }),
+      body: JSON.stringify({ firstName, lastName, email, phone, password }),
     });
 
     if (response.data?.token) {

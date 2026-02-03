@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (firstName: string, lastName: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -52,9 +52,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (name: string, email: string, phone: string, password: string) => {
+  const register = async (firstName: string, lastName: string, email: string, phone: string, password: string) => {
     try {
-      const response = await apiService.register(name, email, phone, password);
+      const response = await apiService.register(firstName, lastName, email, phone, password);
       if (response.data?.user) {
         setUser(response.data.user);
         return { success: true };
