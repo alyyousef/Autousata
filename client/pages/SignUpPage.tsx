@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const SignUpPage: React.FC = () => {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +36,8 @@ const SignUpPage: React.FC = () => {
 
     setLoading(true);
 
-    const result = await register(name, email, phone, password);
+    const fullName = `${firstName} ${lastName}`.trim();
+    const result = await register(fullName, email, phone, password);
 
     if (result.success) {
       navigate('/browse');
@@ -60,9 +62,6 @@ const SignUpPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
-            Create account
-          </div>
           <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Join Autousata</h1>
           <p className="text-sm text-slate-600 mb-6">Get access to verified listings, transparent bids, and concierge support.</p>
 
@@ -74,17 +73,31 @@ const SignUpPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-slate-700 mb-2">Full name</label>
-                <input
-                  id="fullName"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-2">First name</label>
+                  <input
+                    id="firstName"
+                    type="text"
+                    placeholder="Enter your first name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-2">Last name</label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    placeholder="Enter your last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">Email address</label>

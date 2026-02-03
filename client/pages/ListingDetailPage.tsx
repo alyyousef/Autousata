@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, Clock, MapPin, ShieldCheck, Tag } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
@@ -24,25 +24,35 @@ const updateDelistedIds = (ids: Set<string>) => {
   localStorage.setItem(DELISTED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
 };
 
-const formatTimeRemaining = (endTime: string) => {
+const formatTimeRemaining = (endTime: string, now: number) => {
   const end = new Date(endTime).getTime();
-  const diff = end - Date.now();
+  const diff = end - now;
   if (diff <= 0) return 'Ended';
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  if (days > 0) return `${days}d ${remainingHours}h`;
-  return `${hours}h`;
+  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 };
 
 const ListingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => readDelistedIds());
+  const [now, setNow] = useState(() => Date.now());
+  const [isBidOpen, setIsBidOpen] = useState(false);
+  const [bidAmount, setBidAmount] = useState('');
+  const [bidError, setBidError] = useState('');
 
   const listing = useMemo(() => MOCK_AUCTIONS.find(auction => auction.id === id), [id]);
 
   const canManageListings = user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!listing) {
     return (
@@ -78,6 +88,23 @@ const ListingDetailPage: React.FC = () => {
       updateDelistedIds(next);
       return next;
     });
+  };
+
+  const handleBidSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const amount = Number(bidAmount);
+    if (!amount || Number.isNaN(amount)) {
+      setBidError('Enter a valid bid amount.');
+      return;
+    }
+    if (amount <= listing.currentBid) {
+      setBidError(`Bid must be higher than EGP ${listing.currentBid.toLocaleString()}.`);
+      return;
+    }
+    setBidError('');
+    setIsBidOpen(false);
+    setBidAmount('');
+    window.alert(`Bid placed: EGP ${amount.toLocaleString()}`);
   };
 
   return (
@@ -161,7 +188,7 @@ const ListingDetailPage: React.FC = () => {
             <div className="mt-6 bg-white/95 border border-slate-200 rounded-2xl p-5 flex items-center justify-between premium-card-hover">
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <Clock size={16} />
-                Time remaining: <span className="text-slate-900 font-semibold">{formatTimeRemaining(listing.endTime)}</span>
+                Time remaining: <span className="text-slate-900 font-semibold">{formatTimeRemaining(listing.endTime, now)}</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-emerald-600 font-semibold">
                 <ShieldCheck size={14} />
@@ -170,18 +197,12 @@ const ListingDetailPage: React.FC = () => {
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/browse"
+              <button
+                onClick={() => setIsBidOpen(true)}
                 className="px-5 py-3 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
               >
-                Continue browsing
-              </Link>
-              <Link
-                to="/how-it-works"
-                className="px-5 py-3 rounded-full border border-slate-200 text-slate-600 text-sm font-semibold hover:border-indigo-500 hover:text-indigo-600 transition-colors"
-              >
-                How it works
-              </Link>
+                Bid
+              </button>
               {canManageListings && (
                 <button
                   onClick={isDelisted ? handleRestore : handleDelist}
@@ -211,6 +232,72 @@ const ListingDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {isBidOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setIsBidOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Place bid</p>
+                <h2 className="text-xl font-semibold text-slate-900 mt-2">Submit your offer</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBidOpen(false)}
+                className="text-slate-500 hover:text-slate-700"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">
+              Current bid: <span className="font-semibold text-slate-900">EGP {listing.currentBid.toLocaleString()}</span>
+            </p>
+            {bidError && (
+              <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+                {bidError}
+              </div>
+            )}
+            <form onSubmit={handleBidSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="bidAmount" className="block text-sm font-medium text-slate-700 mb-2">
+                  Your bid (EGP)
+                </label>
+                <input
+                  id="bidAmount"
+                  type="number"
+                  min={listing.currentBid + 1}
+                  value={bidAmount}
+                  onChange={(event) => setBidAmount(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  placeholder={`Min ${listing.currentBid.toLocaleString()}`}
+                  required
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsBidOpen(false)}
+                  className="px-4 py-2 rounded-full text-sm font-semibold text-slate-600 hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+                >
+                  Place bid
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, Tag, Trophy, ArrowRight, SlidersHorizontal } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
@@ -7,6 +7,7 @@ type SortOption = 'endingSoon' | 'highestBid' | 'mostBids';
 
 const AuctionsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('endingSoon');
+  const [now, setNow] = useState(() => Date.now());
 
   const sortedAuctions = useMemo(() => {
     const items = [...MOCK_AUCTIONS];
@@ -26,17 +27,21 @@ const AuctionsPage: React.FC = () => {
     }
   }, [sortBy]);
 
-  const formatTimeRemaining = (endTime: string) => {
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const formatTimeRemaining = (endTime: string, nowTime: number) => {
     const end = new Date(endTime).getTime();
-    const diff = end - Date.now();
+    const diff = end - nowTime;
     if (diff <= 0) return 'Ended';
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    if (days > 0) return `${days}d ${remainingHours}h`;
-    if (hours > 0) return `${hours}h`;
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    return `${minutes}m`;
+    const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
   };
 
   return (
@@ -144,7 +149,7 @@ const AuctionsPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
                   <div className="flex items-center gap-2">
                     <Clock size={14} />
-                    {formatTimeRemaining(auction.endTime)}
+                    {formatTimeRemaining(auction.endTime, now)}
                   </div>
                   <span>{auction.bidCount} bids</span>
                 </div>

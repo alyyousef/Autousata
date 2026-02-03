@@ -24,17 +24,16 @@ const saveDelistedIds = (ids: Set<string>) => {
   localStorage.setItem(DELISTED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
 };
 
-const formatTimeRemaining = (endTime: string) => {
+const formatTimeRemaining = (endTime: string, now: number) => {
   const end = new Date(endTime).getTime();
-  const diff = end - Date.now();
+  const diff = end - now;
   if (diff <= 0) return 'Ended';
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  const minutes = Math.floor((diff % 3600000) / 60000);
-  if (days > 0) return `${days}d ${remainingHours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 };
 
 type SortOption = 'relevance' | 'priceAsc' | 'priceDesc' | 'endingSoon';
@@ -46,10 +45,16 @@ const HomePage: React.FC = () => {
   const [showDelisted, setShowDelisted] = useState(false);
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => loadDelistedIds());
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     saveDelistedIds(delistedIds);
   }, [delistedIds]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const canManageListings = user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
 
@@ -124,11 +129,7 @@ const HomePage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.18),_transparent_55%)]" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="max-w-2xl relative hero-fade-in">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-slate-200 mb-4 backdrop-blur-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Buy with confidence
-            </div>
+          <div className="max-w-2xl mx-auto text-center relative hero-fade-in">
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
               Buy a car from verified sellers
             </h1>
@@ -136,7 +137,7 @@ const HomePage: React.FC = () => {
               Explore our curated inventory, compare bids, and review condition details before you commit.
             </p>
           </div>
-          <div className="mt-8 flex flex-wrap gap-4 text-xs md:text-sm text-slate-200/90 relative">
+          <div className="mt-8 flex flex-wrap justify-center gap-4 text-xs md:text-sm text-slate-200/90 relative">
             <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />Verified sellers</div>
             <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />Transparent pricing</div>
             <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />Clear time remaining</div>
@@ -144,96 +145,88 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10">
-        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 premium-card-hover backdrop-blur-sm">
-          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-8 items-start">
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Find your next car</p>
-                <div className="relative">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search by make, model, year, or location"
-                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  />
-                  {searchTerm && (
-                    <button
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
-                <div>
-                  Active listings: <strong className="text-slate-900">{activeCount}</strong>
-                </div>
-                <div>
-                  Delisted: <strong className="text-slate-900">{delistedCount}</strong>
-                </div>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12">
+        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm hero-panel">
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3">Find your next car</p>
+              <div className="relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search by make, model, year, or location"
+                  className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
               <div>
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
+                Active listings: <strong className="text-slate-900">{activeCount}</strong>
+              </div>
+              <div>
+                Delisted: <strong className="text-slate-900">{delistedCount}</strong>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <div>
+                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
                   <SlidersHorizontal size={14} />
                   Condition
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
-                    <button
-                      key={option}
-                      onClick={() => setConditionFilter(option)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
-                        conditionFilter === option
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
+                </label>
+                <div className="relative">
+                  <select
+                    value={conditionFilter}
+                    onChange={(event) => setConditionFilter(event.target.value)}
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  >
+                    {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    ?
+                  </span>
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
+                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
                   <SlidersHorizontal size={14} />
                   Sort by
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'relevance', label: 'Relevance' },
-                    { id: 'priceAsc', label: 'Price: low to high' },
-                    { id: 'priceDesc', label: 'Price: high to low' },
-                    { id: 'endingSoon', label: 'Ending soon' }
-                  ].map(option => (
-                    <button
-                      key={option.id}
-                      onClick={() => setSortBy(option.id as SortOption)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
-                        sortBy === option.id
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                </label>
+                <div className="relative">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortOption)}
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  >
+                    <option value="relevance">Relevance</option>
+                    <option value="priceAsc">Price: low to high</option>
+                    <option value="priceDesc">Price: high to low</option>
+                    <option value="endingSoon">Ending soon</option>
+                  </select>
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    ?
+                  </span>
                 </div>
               </div>
 
               {canManageListings && (
                 <button
                   onClick={() => setShowDelisted(prev => !prev)}
-                  className="w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
+                  className="md:col-span-2 w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
                 >
                   {showDelisted ? 'Hide delisted' : 'Show delisted'}
                 </button>
@@ -294,7 +287,7 @@ const HomePage: React.FC = () => {
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                       <div className="flex items-center gap-2">
                         <Clock size={14} />
-                        {formatTimeRemaining(listing.endTime)}
+                        {formatTimeRemaining(listing.endTime, now)}
                       </div>
                       <span>{listing.bidCount} bids</span>
                     </div>

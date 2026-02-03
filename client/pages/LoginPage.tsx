@@ -40,9 +40,6 @@ const LoginPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="bg-gradient-to-br from-[#F9F6F0] via-[#EEE6DA] to-[#E3EDF7] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
-            Secure access
-          </div>
           <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Welcome back</h1>
           <p className="text-sm text-slate-600 mb-6">Log in to track bids, saved searches, and your garage.</p>
 
