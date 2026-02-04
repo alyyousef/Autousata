@@ -132,7 +132,7 @@ async function login(req, res) {
         res.status(500).json({ error: 'Login failed' });
     } finally {
         if (connection) await connection.close();
-    }
+    } 
 }
 
 module.exports = { register, login };
