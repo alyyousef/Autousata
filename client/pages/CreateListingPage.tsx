@@ -1,8 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Camera, Car, MapPin, DollarSign, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X } from 'lucide-react';
-import { geminiService } from '../geminiService';
+import { Camera, Car, MapPin, DollarSign, ArrowRight, ArrowLeft, CheckCircle2, X } from 'lucide-react';
 import { listingService } from '../listingService';
 import { ListingStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +11,6 @@ const CreateListingPage: React.FC = () => {
   const { user } = useAuth();
   const isEditing = Boolean(id);
   const [step, setStep] = useState(1);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [listingStatus, setListingStatus] = useState<ListingStatus>('DRAFT');
   const [missingFields, setMissingFields] = useState<string[]>([]);
@@ -28,7 +25,6 @@ const CreateListingPage: React.FC = () => {
     reservePrice: '',
     startingBid: '',
     description: '',
-    notes: '',
     features: [] as string[],
     images: [] as string[],
     inspectionDate: ''
@@ -54,25 +50,11 @@ const CreateListingPage: React.FC = () => {
       reservePrice: existing.reservePrice ? String(existing.reservePrice) : '',
       startingBid: existing.startingBid ? String(existing.startingBid) : '',
       description: existing.description ?? '',
-      notes: existing.notes ?? '',
       features: existing.features ?? [],
       images: existing.images ?? [],
       inspectionDate: existing.inspectionDate ?? ''
     });
   }, [id]);
-
-  const handleAIHelp = async () => {
-    setIsGenerating(true);
-    const result = await geminiService.enhanceDescription({
-      make: formData.make,
-      model: formData.model,
-      year: parseInt(formData.year),
-      condition: formData.condition,
-      notes: formData.notes
-    });
-    setFormData(prev => ({ ...prev, description: result || '' }));
-    setIsGenerating(false);
-  };
 
   const handleImagesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) {
@@ -103,7 +85,6 @@ const CreateListingPage: React.FC = () => {
       location: formData.location.trim(),
       features: formData.features,
       description: formData.description.trim(),
-      notes: formData.notes.trim(),
       images: formData.images,
       startingBid: formData.startingBid ? Number(formData.startingBid) : undefined,
       reservePrice: formData.reservePrice ? Number(formData.reservePrice) : undefined,
@@ -198,7 +179,7 @@ const CreateListingPage: React.FC = () => {
   const isMissing = (key: string) => missingFields.includes(key);
 
   return (
-    <div className="bg-slate-50 min-h-screen py-12">
+    <div className="bg-slate-50 min-h-screen py-12 sell-static-cards">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Progress Stepper */}
@@ -234,18 +215,32 @@ const CreateListingPage: React.FC = () => {
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="mb-8">
-                <h2 className="text-2xl font-black text-slate-900">Tell us about your vehicle</h2>
-                <p className="text-slate-500">Provide the basic details to get started with your listing.</p>
-              </div>
+                  <h2 className="text-2xl font-black text-slate-900">Tell us about your vehicle</h2>
+                  <p className="text-slate-500">Provide the basic details to get started with your listing.</p>
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Year</label>
                     <input 
                       type="number" 
+                      min={1950}
+                      max={2025}
+                      step={1}
                       className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('year') ? 'border-rose-300' : 'border-slate-200'}`}
                       value={formData.year}
-                      onChange={(e) => setFormData({...formData, year: e.target.value})}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+                        setFormData({...formData, year: raw});
+                      }}
+                      onBlur={() => {
+                        if (!formData.year) return;
+                        const numeric = Number(formData.year);
+                        const clamped = Math.min(2025, Math.max(1950, numeric));
+                        if (String(clamped) !== formData.year) {
+                          setFormData(prev => ({ ...prev, year: String(clamped) }));
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -269,11 +264,25 @@ const CreateListingPage: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Mileage</label>
                     <input 
-                      type="number" 
+                      type="number"
+                      min={0}
+                      max={1000000}
+                      step={1}
                       className={`w-full px-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('mileage') ? 'border-rose-300' : 'border-slate-200'}`}
                       placeholder="e.g., 12000"
                       value={formData.mileage}
-                      onChange={(e) => setFormData({...formData, mileage: e.target.value})}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+                        setFormData({...formData, mileage: raw});
+                      }}
+                      onBlur={() => {
+                        if (!formData.mileage) return;
+                        const numeric = Number(formData.mileage);
+                        const clamped = Math.min(1000000, Math.max(0, numeric));
+                        if (String(clamped) !== formData.mileage) {
+                          setFormData(prev => ({ ...prev, mileage: String(clamped) }));
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
@@ -307,119 +316,127 @@ const CreateListingPage: React.FC = () => {
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
                   <h2 className="text-2xl font-black text-slate-900">Vehicle Description</h2>
-                  <p className="text-slate-500">Use our AI assistant to craft a professional listing.</p>
+                  <p className="text-slate-500">Write a clear, detailed description that helps buyers trust the listing.</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
-                  <div className={`bg-slate-50 border border-dashed rounded-2xl p-6 ${isMissing('images') ? 'border-rose-300' : 'border-slate-300'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h4 className="font-bold text-slate-900">Vehicle Photos</h4>
-                        <p className="text-xs text-slate-500">Upload clear images from multiple angles.</p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                  {/* Vehicle Photos Card - Symmetrical Design */}
+                  <div className={`bg-white border rounded-2xl p-6 shadow-sm flex flex-col h-[280px] ${isMissing('images') ? 'border-rose-300' : 'border-slate-200'}`}>
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                          <Camera size={16} className="text-indigo-600" />
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-lg">Vehicle Photos</h4>
                       </div>
-                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer">
-                        <Camera size={16} />
-                        Add photos
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => handleImagesSelected(e.target.files)}
-                        />
-                      </label>
+                      <p className="text-xs text-slate-500 ml-10">Upload clear images from multiple angles.</p>
                     </div>
-                    {formData.images.length === 0 ? (
-                      <div className="text-sm text-slate-500 text-center py-10">
-                        No photos yet. Upload at least 3 for best results.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-3">
-                        {formData.images.map((img, idx) => (
-                          <div key={`photo-${idx}`} className="relative group">
-                            <img src={img} alt="Vehicle upload" className="h-24 w-full object-cover rounded-lg border border-slate-200" />
-                            <button
-                              type="button"
-                              onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))}
-                              className="absolute -top-2 -right-2 bg-white border border-slate-200 rounded-full p-1 shadow-sm text-slate-500 opacity-0 group-hover:opacity-100 transition"
-                            >
-                              <X size={12} />
-                            </button>
+                    
+                    <div className="flex-1 overflow-y-auto mb-4">
+                      {formData.images.length === 0 ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                              <Camera size={20} className="text-slate-400" />
+                            </div>
+                            <p className="text-sm text-slate-500">No photos uploaded yet</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h4 className="font-bold text-slate-900">Key Features</h4>
-                        <p className="text-xs text-slate-500">Add highlights buyers care about.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g., Sunroof, AWD, Heated seats"
-                        className="flex-grow px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                        value={featureInput}
-                        onChange={(e) => setFeatureInput(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg"
-                        onClick={() => {
-                          const trimmed = featureInput.trim();
-                          if (!trimmed) return;
-                          setFormData(prev => ({ ...prev, features: [...prev.features, trimmed] }));
-                          setFeatureInput('');
-                        }}
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {formData.features.length === 0 ? (
-                        <span className="text-xs text-slate-400">No features added yet.</span>
+                        </div>
                       ) : (
-                        formData.features.map((feature, idx) => (
-                          <button
-                            key={`feature-${idx}`}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, features: prev.features.filter((_, i) => i !== idx) }))}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-xs font-semibold text-slate-700"
-                          >
-                            {feature} <X size={12} className="text-slate-400" />
-                          </button>
-                        ))
+                        <div className="grid grid-cols-2 gap-3 pr-2">
+                          {formData.images.map((img, idx) => (
+                            <div key={`photo-${idx}`} className="relative group">
+                              <img 
+                                src={img} 
+                                alt="Vehicle upload" 
+                                className="h-24 w-full object-cover rounded-lg border border-slate-200" 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))}
+                                className="absolute -top-1.5 -right-1.5 bg-white border border-slate-200 rounded-full p-1 shadow-sm text-slate-500 opacity-0 group-hover:opacity-100 transition z-10"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                </div>
-
-                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-indigo-600 p-2 rounded-lg text-white">
-                      <Wand2 size={24} />
-                    </div>
-                    <div className="flex-grow">
-                      <h4 className="font-bold text-indigo-900">AutoWriter AI</h4>
-                      <p className="text-xs text-indigo-700 mb-4">Tell us some highlights and we'll write the full description for you.</p>
-                      <textarea 
-                        className="w-full p-4 bg-white border border-indigo-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 min-h-[100px]"
-                        placeholder="e.g., M-Sport package, ceramic coating, new tires, service records available..."
-                        value={formData.notes}
-                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                    
+                    <label className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold cursor-pointer transition hover:bg-slate-800 w-full">
+                      <Camera size={16} />
+                      Add photos
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleImagesSelected(e.target.files)}
                       />
-                      <button 
-                        onClick={handleAIHelp}
-                        disabled={isGenerating}
-                        className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                      >
-                        {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
-                        Generate Description
-                      </button>
+                    </label>
+                  </div>
+
+                  {/* Key Features Card - Symmetrical Design */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col h-[280px]">
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-lg">Key Features</h4>
+                      </div>
+                      <p className="text-xs text-slate-500 ml-10">Add highlights buyers care about.</p>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto mb-4">
+                      <div className="mb-4">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="e.g., Sunroof, AWD, Heated seats"
+                            className="flex-grow px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                            value={featureInput}
+                            onChange={(e) => setFeatureInput(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg whitespace-nowrap transition"
+                            onClick={() => {
+                              const trimmed = featureInput.trim();
+                              if (!trimmed) return;
+                              setFormData(prev => ({ ...prev, features: [...prev.features, trimmed] }));
+                              setFeatureInput('');
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {formData.features.length === 0 ? (
+                        <div className="flex items-center justify-center h-24">
+                          <p className="text-sm text-slate-500">No features added yet</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pr-2">
+                          {formData.features.map((feature, idx) => (
+                            <button
+                              key={`feature-${idx}`}
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, features: prev.features.filter((_, i) => i !== idx) }))}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-xs font-semibold text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition"
+                            >
+                              {feature} 
+                              <X size={12} className="text-emerald-500" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="text-xs text-slate-400">
+                      {formData.features.length} feature{formData.features.length !== 1 ? 's' : ''} added
                     </div>
                   </div>
                 </div>
@@ -449,7 +466,7 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
-                        className={`w-full pl-8 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('startingBid') ? 'border-rose-300' : 'border-slate-200'}`}
+                        className={`w-full pl-14 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('startingBid') ? 'border-rose-300' : 'border-slate-200'}`}
                         placeholder="0.00"
                         value={formData.startingBid}
                         onChange={(e) => setFormData({...formData, startingBid: e.target.value})}
@@ -462,7 +479,7 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
                       <input 
                         type="number" 
-                        className={`w-full pl-8 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('reservePrice') ? 'border-rose-300' : 'border-slate-200'}`}
+                        className={`w-full pl-14 pr-4 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 ${isMissing('reservePrice') ? 'border-rose-300' : 'border-slate-200'}`}
                         placeholder="0.00"
                         value={formData.reservePrice}
                         onChange={(e) => setFormData({...formData, reservePrice: e.target.value})}
@@ -519,7 +536,7 @@ const CreateListingPage: React.FC = () => {
               {step > 1 ? (
                 <button 
                   onClick={() => setStep(step - 1)}
-                  className="px-8 py-3 text-rose-600 font-bold flex items-center gap-2 hover:bg-rose-50 rounded-xl transition-all"
+                  className="px-8 py-3 bg-rose-600 text-white font-bold flex items-center gap-2 hover:bg-rose-700 rounded-full transition-all shadow-md shadow-rose-500/25"
                 >
                   <ArrowLeft size={18} /> Back
                 </button>
@@ -532,7 +549,7 @@ const CreateListingPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleDelist}
-                    className="px-6 py-3 border border-rose-200 text-rose-600 font-bold rounded-xl hover:bg-rose-50 transition-all"
+                    className="px-6 py-3 border border-rose-200 text-rose-600 font-bold rounded-full hover:bg-rose-50 transition-all"
                   >
                     Delist Listing
                   </button>
@@ -540,13 +557,13 @@ const CreateListingPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSave('DRAFT')}
-                  className="px-6 py-3 border border-blue-200 text-blue-700 font-bold rounded-xl hover:bg-blue-50 transition-all"
+                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-full hover:bg-blue-700 transition-all shadow-md shadow-blue-500/25"
                 >
                   Save Draft
                 </button>
                 <button 
                   onClick={() => (step < 4 ? handleNext() : handlePublish())}
-                  className="px-10 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 rounded-xl transition-all shadow-lg shadow-emerald-500/30"
+                  className="px-10 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 rounded-full transition-all shadow-lg shadow-emerald-500/30"
                 >
                   {step === 4 ? (isEditing ? 'Update & Publish' : 'Publish Listing') : 'Continue'}
                   {step < 4 && <ArrowRight size={18} />}

@@ -82,7 +82,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, help="Folder with brochure PDFs")
     parser.add_argument("--out", default="data", help="Output folder")
-    parser.add_argument("--model", default="sentence-transformers/BAAI/bge-m3", help="Embedding model")
+    parser.add_argument("--model", default="intfloat/multilingual-e5-small", help="Embedding model")
     args = parser.parse_args()
 
     pdfs = []

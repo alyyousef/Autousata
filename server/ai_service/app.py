@@ -14,7 +14,7 @@ from llm_runner import generate_json
 DATA_DIR = os.environ.get("AUTOWRITER_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 INDEX_PATH = os.path.join(DATA_DIR, "index.faiss")
 CHUNKS_PATH = os.path.join(DATA_DIR, "chunks.jsonl")
-EMBED_MODEL = os.environ.get("AUTOWRITER_EMBED_MODEL", "sentence-transformers/BAAI/bge-m3")
+EMBED_MODEL = os.environ.get("AUTOWRITER_EMBED_MODEL", "intfloat/multilingual-e5-small")
 
 app = FastAPI()
 

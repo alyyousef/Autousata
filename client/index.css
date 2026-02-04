@@ -263,6 +263,13 @@ button.no-hover-rise:active {
   border-color: inherit;
 }
 
+/* Disable hover lift on sell page cards only */
+.sell-static-cards .premium-card-hover:hover {
+  transform: none;
+  box-shadow: var(--tw-shadow);
+  border-color: inherit;
+}
+
 /* Hero search panel: visually integrate with the dark hero section */
 .hero-panel {
   position: relative;

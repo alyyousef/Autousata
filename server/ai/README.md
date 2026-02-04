@@ -10,7 +10,7 @@ cd C:\Users\yinya\Autousata\server\ai_service
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python ingest_brochures.py --source D:\cars --out data
+python ingest_brochures.py --source D:\cars --out data --model intfloat/multilingual-e5-small
 ```
 
 Outputs:
@@ -62,7 +62,7 @@ Optional:
 - `AUTOWRITER_SERVICE_URL` (default `http://127.0.0.1:7001`)
 - `AUTOWRITER_TIMEOUT_MS` (default `15000`)
 - `AUTOWRITER_DATA_DIR` (python service, default `server/ai_service/data`)
-- `AUTOWRITER_EMBED_MODEL` (python service)
+- `AUTOWRITER_EMBED_MODEL` (python service, default `intfloat/multilingual-e5-small`)
 - `OLLAMA_MODEL` (python service, local LLM)
 
 ## 6) Testing quickly
