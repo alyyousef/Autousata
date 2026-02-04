@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const hideFooter = isAuthPage;
 
@@ -12,6 +15,12 @@ const PublicLayout: React.FC = () => {
     `text-sm font-medium tracking-tight transition-colors ${isActive
       ? 'text-indigo-600'
       : 'text-slate-600 hover:text-indigo-600'}`;
+
+  const handleLogout = async () => {
+    await logout();
+    setIsMenuOpen(false);
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -36,18 +45,29 @@ const PublicLayout: React.FC = () => {
             </nav>
 
             <div className="hidden md:flex items-center gap-3">
-              <NavLink
-                to="/login"
-                className="text-slate-600 hover:text-indigo-600 text-sm font-semibold transition-colors"
-              >
-                Login
-              </NavLink>
-              <NavLink
-                to="/signup"
-                className="bg-indigo-500 text-white hover:bg-indigo-400 px-4 py-2 rounded-full text-sm font-semibold shadow-md shadow-indigo-500/30 transition-all"
-              >
-                Sign up
-              </NavLink>
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-full text-sm font-semibold shadow-md shadow-slate-900/30 transition-all"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <>
+                  <NavLink
+                    to="/login"
+                    className="text-slate-600 hover:text-indigo-600 text-sm font-semibold transition-colors"
+                  >
+                    Login
+                  </NavLink>
+                  <NavLink
+                    to="/signup"
+                    className="bg-indigo-500 text-white hover:bg-indigo-400 px-4 py-2 rounded-full text-sm font-semibold shadow-md shadow-indigo-500/30 transition-all"
+                  >
+                    Sign up
+                  </NavLink>
+                </>
+              )}
             </div>
 
             <button
@@ -69,20 +89,31 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
               <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
               <div className="pt-2 border-t border-slate-200 flex gap-3">
-              <NavLink
-                to="/login"
-                className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Login
-              </NavLink>
-                <NavLink
-                  to="/signup"
-                className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Sign up
-                </NavLink>
+                {user ? (
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 shadow-md shadow-slate-900/30 transition-all"
+                  >
+                    Sign out
+                  </button>
+                ) : (
+                  <>
+                    <NavLink
+                      to="/login"
+                      className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Login
+                    </NavLink>
+                    <NavLink
+                      to="/signup"
+                      className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Sign up
+                    </NavLink>
+                  </>
+                )}
               </div>
             </div>
           </div>
