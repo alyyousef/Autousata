@@ -144,12 +144,16 @@ class ApiService {
     });
   }
 
-  async updateAvatar(avatarUrl: string) {
-    return this.request<{ avatar: string }>('/profile/avatar', {
-      method: 'PUT',
-      body: JSON.stringify({ avatarUrl }),
-    });
-  }
+ // IN src/services/api.ts
+async updateAvatar(file: File) {
+  const formData = new FormData();
+  formData.append('avatar', file); // Field name must match backend 'upload.single("avatar")'
+
+  return this.request<{ avatar: string }>('/profile/avatar', {
+    method: 'PUT',
+    body: formData,
+  });
+}
 
   async updateLocation(city: string, country?: string) {
     return this.request<{ location: any }>('/profile/location', {

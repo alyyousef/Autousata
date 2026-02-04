@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
 import { useAuth } from '../contexts/AuthContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth(); // Removed logout here (moved to Profile page)
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const hideFooter = isAuthPage;
 
@@ -16,17 +15,12 @@ const PublicLayout: React.FC = () => {
       ? 'text-indigo-600'
       : 'text-slate-600 hover:text-indigo-600'}`;
 
-  const handleLogout = async () => {
-    await logout();
-    setIsMenuOpen(false);
-    navigate('/login');
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <header className="sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
+            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 group" aria-label="Autousata home">
               <div>
                 <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-16 w-16" />
@@ -36,6 +30,7 @@ const PublicLayout: React.FC = () => {
               </span>
             </Link>
 
+            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8" aria-label="Primary">
               <NavLink to="/browse" className={navLinkClass}>Buy</NavLink>
               <NavLink to="/sell" className={navLinkClass}>Sell</NavLink>
@@ -44,14 +39,27 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/about" className={navLinkClass}>About</NavLink>
             </nav>
 
+            {/* Desktop User Actions */}
             <div className="hidden md:flex items-center gap-3">
               {user ? (
-                <button
-                  onClick={handleLogout}
-                  className="bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-full text-sm font-semibold shadow-md shadow-slate-900/30 transition-all"
+                // === NEW: PROFILE PICTURE BUTTON ===
+                <Link 
+                  to="/profile" 
+                  className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-slate-200 overflow-hidden hover:border-indigo-600 transition-all shadow-sm"
+                  title="Go to Profile"
                 >
-                  Sign out
-                </button>
+                  {user.profileImage ? (
+                    <img 
+                      src={user.profileImage} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                      <UserIcon size={20} />
+                    </div>
+                  )}
+                </Link>
               ) : (
                 <>
                   <NavLink
@@ -70,6 +78,7 @@ const PublicLayout: React.FC = () => {
               )}
             </div>
 
+            {/* Mobile Menu Toggle */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden p-2 rounded-md text-slate-500 hover:bg-slate-100"
@@ -80,6 +89,7 @@ const PublicLayout: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white">
             <div className="px-4 py-4 space-y-3">
@@ -88,14 +98,29 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/auctions" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
               <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
+              
               <div className="pt-2 border-t border-slate-200 flex gap-3">
                 {user ? (
-                  <button
-                    onClick={handleLogout}
-                    className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 shadow-md shadow-slate-900/30 transition-all"
+                  // === NEW: MOBILE PROFILE LINK ===
+                  <Link 
+                    to="/profile" 
+                    className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
                   >
-                    Sign out
-                  </button>
+                     <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden flex-shrink-0">
+                        {user.profileImage ? (
+                          <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                            <UserIcon size={20} />
+                          </div>
+                        )}
+                     </div>
+                     <div>
+                        <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
+                        <p className="text-xs text-slate-500">View Profile</p>
+                     </div>
+                  </Link>
                 ) : (
                   <>
                     <NavLink
