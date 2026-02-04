@@ -213,9 +213,6 @@ const PublicLayout: React.FC = () => {
                 </ul>
               </div>
             </div>
-            <div className="mt-10 pt-6 border-t border-slate-800 text-xs text-center md:text-left text-slate-300">
-              &copy; 2026 AUTOUSATA, Inc. All rights reserved.
-            </div>
           </div>
         </footer>
       )}
