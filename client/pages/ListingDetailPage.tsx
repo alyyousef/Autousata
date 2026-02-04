@@ -95,6 +95,7 @@ const ListingDetailPage: React.FC = () => {
   const [selectedSuggested, setSelectedSuggested] = useState<number | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
 
   const listing = useMemo(() => MOCK_AUCTIONS.find((auction) => auction.id === id), [id]);
 
@@ -396,20 +397,25 @@ const ListingDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Premium Highlights */}
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 border border-slate-700/50 shadow-xl">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-200 mb-4">
-                  <Tag size={16} className="text-blue-400" />
-                  Premium Features
+              {/* Detailed Description */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200/70 shadow-sm">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Tag size={16} className="text-emerald-500" />
+                    Detailed Description
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionOpen(true)}
+                    className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition-colors"
+                  >
+                    View
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {['Clean Title', 'Verified Seller', 'Escrow Service', 'Nationwide Shipping'].map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500" />
-                      <span className="text-xs text-slate-300">{feature}</span>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
+                  {listing.vehicle.longDescription ||
+                    'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                </p>
               </div>
             </div>
           </div>
@@ -551,6 +557,42 @@ const ListingDetailPage: React.FC = () => {
                     className="flex-1 py-3.5 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg shadow-emerald-500/30"
                   >
                     Confirm Bid
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Description Modal */}
+        {isDescriptionOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-fade-in">
+            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => setIsDescriptionOpen(false)} />
+            <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl shadow-slate-950/30 border border-white/20 overflow-hidden animate-slide-up">
+              <div className="relative p-8">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <Tag size={16} className="text-emerald-500" />
+                    Full Description
+                  </div>
+                  <button onClick={() => setIsDescriptionOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                    ✕
+                  </button>
+                </div>
+                <div className="max-h-[60vh] overflow-auto pr-2 text-sm text-slate-600 leading-relaxed space-y-4">
+                  <p>
+                    {listing.vehicle.longDescription ||
+                      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                  </p>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionOpen(false)}
+                    className="px-6 py-2.5 rounded-full bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors"
+                  >
+                    Close
                   </button>
                 </div>
               </div>
