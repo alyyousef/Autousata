@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'lucide-react';
+import { ChevronDown, Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
@@ -184,13 +184,19 @@ const HomePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
-              <div>
-                Active listings: <strong className="text-slate-900">{activeCount}</strong>
-              </div>
-              <div>
-                Delisted: <strong className="text-slate-900">{delistedCount}</strong>
-              </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                Active listings
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm">
+                  {activeCount}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
+                Delisted
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 shadow-sm">
+                  {delistedCount}
+                </span>
+              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -203,15 +209,13 @@ const HomePage: React.FC = () => {
                   <select
                     value={conditionFilter}
                     onChange={(event) => setConditionFilter(event.target.value)}
-                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
                     {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    ?
-                  </span>
+                  <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
 
@@ -224,16 +228,14 @@ const HomePage: React.FC = () => {
                   <select
                     value={sortBy}
                     onChange={(event) => setSortBy(event.target.value as SortOption)}
-                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
                     <option value="relevance">Relevance</option>
                     <option value="priceAsc">Price: low to high</option>
                     <option value="priceDesc">Price: high to low</option>
                     <option value="endingSoon">Ending soon</option>
                   </select>
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    ?
-                  </span>
+                  <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
 
@@ -256,16 +258,20 @@ const HomePage: React.FC = () => {
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Bid history</h3>
             <div className="space-y-3 text-sm">
               {buyerBidHistory.map(entry => (
-                <div key={entry.id} className="flex items-center justify-between">
+                <div key={entry.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                   <div>
-                    <p className="text-slate-700 font-semibold">{entry.vehicle}</p>
-                    <p className={`text-xs ${
-                      entry.status === 'Leading' ? 'text-emerald-600' : 'text-rose-600'
+                    <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
+                    <span className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                      entry.status === 'Leading'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
                     }`}>
                       {entry.status}
-                    </p>
+                    </span>
                   </div>
-                  <p className="text-slate-900 font-bold">EGP {entry.amount.toLocaleString()}</p>
+                  <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    EGP {entry.amount.toLocaleString()}
+                  </span>
                 </div>
               ))}
             </div>
@@ -274,7 +280,7 @@ const HomePage: React.FC = () => {
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Outbid notifications</h3>
             <div className="space-y-3 text-sm text-slate-600">
               {buyerNotifications.map((note, index) => (
-                <div key={index} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                <div key={index} className="inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
                   {note}
                 </div>
               ))}
@@ -284,12 +290,16 @@ const HomePage: React.FC = () => {
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Payment status</h3>
             <div className="space-y-3 text-sm">
               {buyerPayments.map(payment => (
-                <div key={payment.id} className="flex items-center justify-between">
+                <div key={payment.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                   <div>
-                    <p className="text-slate-700 font-semibold">{payment.vehicle}</p>
-                    <p className="text-xs text-slate-500">{payment.status}</p>
+                    <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
+                    <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                      {payment.status}
+                    </span>
                   </div>
-                  <p className="text-slate-900 font-bold">EGP {payment.amount.toLocaleString()}</p>
+                  <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    EGP {payment.amount.toLocaleString()}
+                  </span>
                 </div>
               ))}
               <p className="text-xs text-slate-400 mt-3">
