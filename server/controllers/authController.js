@@ -77,6 +77,9 @@ async function register(req, res) {
 // ==========================================
 // 2. LOGIN
 // ==========================================
+// ==========================================
+// 2. LOGIN (Updated with Image Support)
+// ==========================================
 async function login(req, res) {
     const { email, password } = req.body;
     let connection;
@@ -86,7 +89,7 @@ async function login(req, res) {
 
         const result = await connection.execute(
             `BEGIN 
-                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :status); 
+                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); 
              END;`,
             {
                 em: email,
@@ -95,6 +98,7 @@ async function login(req, res) {
                 fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                img: { dir: oracledb.BIND_OUT, type: oracledb.STRING }, // <--- Capture Image URL
                 status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
             }
         );
@@ -110,8 +114,6 @@ async function login(req, res) {
         if (match) {
             const token = generateToken(userData.id);
 
-            // Note: We are currently NOT returning the profile_pic_url on login.
-            // We can add that later if you want the image to appear immediately after login.
             res.json({
                 message: 'Login successful',
                 token,
@@ -120,7 +122,8 @@ async function login(req, res) {
                     firstName: userData.fn,
                     lastName: userData.ln,
                     email: email,
-                    role: userData.role
+                    role: userData.role,
+                    profileImage: userData.img // <--- Send to Frontend!
                 }
             });
         } else {
@@ -132,7 +135,6 @@ async function login(req, res) {
         res.status(500).json({ error: 'Login failed' });
     } finally {
         if (connection) await connection.close();
-    } 
+    }
 }
-
 module.exports = { register, login };
