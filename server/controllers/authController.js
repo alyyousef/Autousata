@@ -1,33 +1,44 @@
 const oracledb = require('oracledb');
 const bcrypt = require('bcrypt');
 const { generateToken } = require('../middleware/auth');
+const { uploadToS3 } = require('../middleware/uploadMiddleware'); // <--- Import S3 tool
 require('dotenv').config();
 
 // ==========================================
-// 1. SIGN UP (Updated for Frontend)
+// 1. SIGN UP
 // ==========================================
 async function register(req, res) {
-    // 1. Accept firstName and lastName directly from Frontend
+    // 1. Accept text fields AND the file from the request
     const { firstName, lastName, email, phone, password } = req.body;
+    const file = req.file; // This comes from upload.single() in the route
+    
     let connection;
 
     try {
+        // 2. Upload to S3 (Only if a file was actually sent)
+        let profilePicUrl = null;
+        if (file) {
+            console.log("Uploading image to S3...");
+            profilePicUrl = await uploadToS3(file, 'profiles'); 
+        }
+
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
         connection = await oracledb.getConnection();
 
-        // 2. Pass them directly to Oracle
+        // 3. Execute Procedure (Passing the new :img parameter)
         const result = await connection.execute(
             `BEGIN 
-                sp_register_user(:fn, :ln, :em, :ph, :pw, :out_id, :out_status); 
+                sp_register_user(:fn, :ln, :em, :ph, :pw, :img, :out_id, :out_status); 
              END;`,
             {
-                fn: firstName,     // <--- Direct mapping
-                ln: lastName,      // <--- Direct mapping
+                fn: firstName,
+                ln: lastName,
                 em: email,
                 ph: phone,
                 pw: hashedPassword,
+                img: profilePicUrl, // <--- Passing the S3 URL (or null) to Oracle
                 out_id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
             }
@@ -44,14 +55,14 @@ async function register(req, res) {
                 token,
                 user: {
                     id: newUserId,
-                    firstName: firstName, // Send back separate fields
+                    firstName: firstName,
                     lastName: lastName,
                     email: email,
-                    role: 'client'
+                    role: 'client',
+                    profileImage: profilePicUrl // Send the new URL back to the frontend
                 }
             });
         } else {
-            // Handle Oracle errors (like Duplicate Email)
             res.status(400).json({ error: status });
         }
 
@@ -99,6 +110,8 @@ async function login(req, res) {
         if (match) {
             const token = generateToken(userData.id);
 
+            // Note: We are currently NOT returning the profile_pic_url on login.
+            // We can add that later if you want the image to appear immediately after login.
             res.json({
                 message: 'Login successful',
                 token,
