@@ -16,8 +16,14 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const token = this.getAuthToken();
+    
+    // CHECK: Is this a file upload?
+    // If it is FormData, we MUST NOT set 'Content-Type'. The browser does it automatically.
+    const isFormData = options.body instanceof FormData;
+
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      // Only set JSON header if it's NOT a file upload
+      ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };
@@ -40,11 +46,34 @@ class ApiService {
     }
   }
 
-  // Authentication endpoints
-  async register(firstName: string, lastName: string, email: string, phone: string, password: string) {
+  // =========================================================
+  // UPDATED REGISTER METHOD (Supports Images)
+  // =========================================================
+  async register(
+    firstName: string, 
+    lastName: string, 
+    email: string, 
+    phone: string, 
+    password: string, 
+    profileImage?: File // <--- New Optional Parameter
+  ) {
+    // 1. Create FormData container
+    const formData = new FormData();
+    formData.append('firstName', firstName);
+    formData.append('lastName', lastName);
+    formData.append('email', email);
+    formData.append('phone', phone);
+    formData.append('password', password);
+
+    // 2. Add the file if it exists
+    if (profileImage) {
+      formData.append('profileImage', profileImage);
+    }
+
+    // 3. Send as FormData (not JSON)
     const response = await this.request<{ token: string; user: any }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ firstName, lastName, email, phone, password }),
+      body: formData, 
     });
 
     if (response.data?.token) {
