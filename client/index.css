@@ -256,6 +256,13 @@ button.no-hover-rise:active {
   border-color: rgba(148, 163, 184, 0.55);
 }
 
+/* Disable hover lift on profile page cards only */
+.profile-static-cards .premium-card-hover:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: inherit;
+}
+
 /* Hero search panel: visually integrate with the dark hero section */
 .hero-panel {
   position: relative;

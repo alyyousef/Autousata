@@ -51,13 +51,13 @@ const AppRoutes: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </HashRouter>
