@@ -1,6 +1,6 @@
 import { Listing, ListingStatus } from './types';
 
-const STORAGE_KEY = 'autousata_listings';
+const STORAGE_KEY = 'AUTOUSATA_listings';
 
 const loadListings = (): Listing[] => {
   if (typeof window === 'undefined') {

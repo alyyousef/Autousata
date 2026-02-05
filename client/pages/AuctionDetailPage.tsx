@@ -7,6 +7,7 @@ import {
   History, MessageCircle, FileText, Bell, XCircle, CreditCard, Wallet, Ban
 } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
+import { useNotifications } from '../contexts/NotificationContext';
 import { geminiService } from '../geminiService';
 import ImageLightbox from '../components/ImageLightbox';
 
@@ -15,6 +16,9 @@ const MIN_INCREMENT = 500;
 const RETRACTION_WINDOW_MINUTES = 5;
 const CANCEL_WINDOW_MINUTES = 120;
 const PLATFORM_FEE_RATE = 0.05;
+const BID_STATE_KEY = 'AUTOUSATA:bidState';
+const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
+const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
 
 type BidEntry = {
   id: string;
@@ -31,14 +35,84 @@ type Notification = {
   tone: 'info' | 'warn' | 'success';
 };
 
+const writeBidState = (auctionId: string, currentBid: number, bidCount: number) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(BID_STATE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, { currentBid: number; bidCount: number }>) : {};
+    parsed[auctionId] = { currentBid, bidCount };
+    localStorage.setItem(BID_STATE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage issues
+  }
+};
+
+const readBidState = (auctionId: string) => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BID_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, { currentBid: number; bidCount: number }>;
+    return parsed?.[auctionId] ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const readPaymentNotice = (auctionId: string) => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(PAYMENT_NOTICE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, boolean>;
+    return Boolean(parsed?.[auctionId]);
+  } catch {
+    return false;
+  }
+};
+
+const writePaymentNotice = (auctionId: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PAYMENT_NOTICE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    parsed[auctionId] = true;
+    localStorage.setItem(PAYMENT_NOTICE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage issues
+  }
+};
+
+const readPaymentStatus = (auctionId: string) => {
+  if (typeof window === 'undefined') return 'unpaid' as const;
+  try {
+    const raw = localStorage.getItem(PAYMENT_STATUS_KEY);
+    if (!raw) return 'unpaid' as const;
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return (parsed?.[auctionId] as 'paid' | 'unpaid') ?? 'unpaid';
+  } catch {
+    return 'unpaid' as const;
+  }
+};
+
 const AuctionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const auction = MOCK_AUCTIONS.find(a => a.id === id) || MOCK_AUCTIONS[0];
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [currentBid, setCurrentBid] = useState(auction.currentBid);
-  const [bidCount, setBidCount] = useState(auction.bidCount);
-  const [bidAmount, setBidAmount] = useState<number>(Math.max(auction.currentBid + MIN_INCREMENT, MIN_BID));
+  const [currentBid, setCurrentBid] = useState(() => {
+    const stored = readBidState(auction.id);
+    return stored?.currentBid ?? auction.currentBid;
+  });
+  const [bidCount, setBidCount] = useState(() => {
+    const stored = readBidState(auction.id);
+    return stored?.bidCount ?? auction.bidCount;
+  });
+  const [bidAmount, setBidAmount] = useState<number>(() => {
+    const stored = readBidState(auction.id);
+    const base = stored?.currentBid ?? auction.currentBid;
+    return Math.max(base + MIN_INCREMENT, MIN_BID);
+  });
   const [proxyMax, setProxyMax] = useState<number | ''>('');
   const [bidHistory, setBidHistory] = useState<BidEntry[]>(() => [
     {
@@ -65,6 +139,7 @@ const AuctionDetailPage: React.FC = () => {
   const [isFinancingOpen, setIsFinancingOpen] = useState(false);
   const [financeAdvice, setFinanceAdvice] = useState<any>(null);
   const auctionEndsAt = new Date(auction.endTime).getTime();
+  const { addNotification: pushNotification } = useNotifications();
 
   useEffect(() => {
     // Background fetch finance advice using Gemini
@@ -80,7 +155,18 @@ const AuctionDetailPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const addNotification = (message: string, tone: Notification['tone']) => {
+  useEffect(() => {
+    if (Date.now() < auctionEndsAt) return;
+    if (readPaymentStatus(auction.id) === 'paid') return;
+    if (readPaymentNotice(auction.id)) return;
+    pushNotification(
+      `Auction ended. Please complete payment for ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}.`,
+      'warn'
+    );
+    writePaymentNotice(auction.id);
+  }, [auction, auctionEndsAt, pushNotification]);
+
+  const addLocalNotification = (message: string, tone: Notification['tone']) => {
     setNotifications(prev => [
       { id: Math.random().toString(36).slice(2), message, tone, time: Date.now() },
       ...prev
@@ -93,7 +179,19 @@ const AuctionDetailPage: React.FC = () => {
       { id: Math.random().toString(36).slice(2), amount, by, time: Date.now(), note }
     ]);
     setCurrentBid(amount);
-    setBidCount(prev => prev + 1);
+    setBidCount(prev => {
+      const next = prev + 1;
+      writeBidState(auction.id, amount, next);
+      return next;
+    });
+    if (by === 'you') {
+      pushNotification(
+        `Your bidding on the ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} is completed at EGP ${amount.toLocaleString()}.`,
+        'success'
+      );
+    } else {
+      pushNotification(`New bid placed at EGP ${amount.toLocaleString()}.`, 'info');
+    }
   };
 
   useEffect(() => {
@@ -105,16 +203,16 @@ const AuctionDetailPage: React.FC = () => {
       const incoming = base + jump;
 
       addBid(incoming, 'competitor', 'Live bid');
-      addNotification(`New bid placed at EGP ${incoming.toLocaleString()}`, 'info');
+      addLocalNotification(`New bid placed at EGP ${incoming.toLocaleString()}`, 'info');
 
       if (proxyMax && incoming + MIN_INCREMENT <= proxyMax) {
         const autoAmount = Math.min(proxyMax, incoming + MIN_INCREMENT);
         window.setTimeout(() => {
           addBid(autoAmount, 'you', 'Auto-bid');
-          addNotification(`Auto-bid placed at EGP ${autoAmount.toLocaleString()}`, 'success');
+          addLocalNotification(`Auto-bid placed at EGP ${autoAmount.toLocaleString()}`, 'success');
         }, 400);
       } else if (proxyMax && incoming > proxyMax) {
-        addNotification('You were outbid. Increase your maximum to regain the lead.', 'warn');
+        addLocalNotification('You were outbid. Increase your maximum to regain the lead.', 'warn');
       }
     }, 12000);
 
@@ -149,7 +247,7 @@ const AuctionDetailPage: React.FC = () => {
     }
     setBidError(null);
     addBid(bidAmount, 'you', 'Manual bid');
-    addNotification(`Your bid of EGP ${bidAmount.toLocaleString()} is now live.`, 'success');
+    addLocalNotification(`Your bid of EGP ${bidAmount.toLocaleString()} is now live.`, 'success');
   };
 
   const handleSetProxy = () => {
@@ -158,7 +256,7 @@ const AuctionDetailPage: React.FC = () => {
       return;
     }
     setBidError(null);
-    addNotification(`Proxy max set to EGP ${Number(proxyMax).toLocaleString()}.`, 'success');
+    addLocalNotification(`Proxy max set to EGP ${Number(proxyMax).toLocaleString()}.`, 'success');
   };
 
   const handleRetractBid = () => {
@@ -176,15 +274,19 @@ const AuctionDetailPage: React.FC = () => {
       const next = prev.slice(0, -1);
       const previousAmount = next[next.length - 1]?.amount ?? auction.currentBid;
       setCurrentBid(previousAmount);
-      setBidCount(count => Math.max(0, count - 1));
+      setBidCount(count => {
+        const nextCount = Math.max(0, count - 1);
+        writeBidState(auction.id, previousAmount, nextCount);
+        return nextCount;
+      });
       return next;
     });
-    addNotification('Your last bid was retracted.', 'info');
+    addLocalNotification('Your last bid was retracted.', 'info');
   };
 
   const handleCancelAuction = () => {
     setIsCancelled(true);
-    addNotification('Auction cancelled by seller. Bidding is closed.', 'warn');
+    addLocalNotification('Auction cancelled by seller. Bidding is closed.', 'warn');
   };
 
   const handlePayment = () => {
@@ -192,7 +294,7 @@ const AuctionDetailPage: React.FC = () => {
     setPaymentStatus('processing');
     window.setTimeout(() => {
       setPaymentStatus('paid');
-      addNotification('Payment confirmed. Thank you!', 'success');
+      addLocalNotification('Payment confirmed. Thank you!', 'success');
     }, 1500);
   };
 
@@ -449,95 +551,114 @@ const AuctionDetailPage: React.FC = () => {
             </div>
 
             <div className="bg-white/95 rounded-2xl border border-slate-200 p-6 shadow-sm premium-card-hover">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Bid history</h3>
-                <History size={18} className="text-slate-400" />
-              </div>
-              <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                {bidHistory.slice(-6).map(entry => (
-                  <div key={entry.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${entry.by === 'you' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                      <span className="font-semibold text-slate-700">
-                        {entry.by === 'you' ? 'You' : 'Bidder'}
-                      </span>
-                      {entry.note && <span className="text-xs text-slate-400">{entry.note}</span>}
-                    </div>
-                    <span className="font-bold text-slate-900">EGP {entry.amount.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Bell size={14} />
-                  Outbid notifications
-                </div>
-                <div className="mt-2 space-y-2">
-                  {notifications.length === 0 ? (
-                    <p className="text-xs text-slate-400">No notifications yet. Live updates will appear here.</p>
-                  ) : (
-                    notifications.map(note => (
-                      <div
-                        key={note.id}
-                        className={`text-xs rounded-lg px-3 py-2 ${
-                          note.tone === 'success'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : note.tone === 'warn'
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        {note.message}
-                      </div>
-                    ))
-                  )}
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-slate-900">Bid history & payments</h3>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <History size={16} />
+                  <Wallet size={16} />
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white/95 rounded-2xl border border-slate-200 p-6 shadow-sm premium-card-hover">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900">Payment</h3>
-                <Wallet size={18} className="text-slate-400" />
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Payment status</span>
-                  <span className={`text-xs font-semibold ${
-                    paymentStatus === 'paid'
-                      ? 'text-emerald-600'
-                      : paymentStatus === 'processing'
-                        ? 'text-amber-600'
-                        : 'text-slate-500'
-                  }`}>
-                    {paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'processing' ? 'Processing' : 'Unpaid'}
-                  </span>
-                </div>
+              <div className="space-y-5">
                 <div>
-                  <label className="text-xs uppercase tracking-widest text-slate-400">Payment method</label>
-                  <div className="relative mt-2">
-                    <select
-                      value={paymentMethod}
-                      onChange={(event) => setPaymentMethod(event.target.value)}
-                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                    >
-                      <option value="card">Card (Stripe placeholder)</option>
-                      <option value="bank">Bank transfer</option>
-                      <option value="wallet">Wallet balance</option>
-                    </select>
-                    <CreditCard size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <History size={16} className="text-slate-400" />
+                      Bid history
+                    </div>
+                    <span className="text-xs text-slate-400">{bidCount} total</span>
+                  </div>
+                  <div className="space-y-3 max-h-44 overflow-y-auto pr-1">
+                    {bidHistory.slice(-6).map(entry => (
+                      <div key={entry.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${entry.by === 'you' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          <span className="font-semibold text-slate-700">
+                            {entry.by === 'you' ? 'You' : 'Bidder'}
+                          </span>
+                          {entry.note && <span className="text-xs text-slate-400">{entry.note}</span>}
+                        </div>
+                        <span className="font-bold text-slate-900">EGP {entry.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <button
-                  onClick={handlePayment}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  disabled={paymentStatus === 'processing'}
-                >
-                  Initiate payment
-                </button>
-                <p className="text-[10px] text-slate-400">
-                  This is a Stripe checkout placeholder. API hookup goes here.
-                </p>
+
+                <div className="h-px bg-slate-100" />
+
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <Bell size={16} className="text-slate-400" />
+                    Outbid notifications
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {notifications.length === 0 ? (
+                      <p className="text-xs text-slate-400">No notifications yet. Live updates will appear here.</p>
+                    ) : (
+                      notifications.map(note => (
+                        <div
+                          key={note.id}
+                          className={`text-xs rounded-lg px-3 py-2 ${
+                            note.tone === 'success'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : note.tone === 'warn'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-slate-50 text-slate-600'
+                          }`}
+                        >
+                          {note.message}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-100" />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <Wallet size={16} className="text-slate-400" />
+                      Payment status
+                    </div>
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                        paymentStatus === 'paid'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : paymentStatus === 'processing'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'processing' ? 'Processing' : 'Unpaid'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase tracking-widest text-slate-400">Payment method</label>
+                    <div className="relative mt-2">
+                      <select
+                        value={paymentMethod}
+                        onChange={(event) => setPaymentMethod(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      >
+                        <option value="card">Card (Stripe placeholder)</option>
+                        <option value="bank">Bank transfer</option>
+                        <option value="wallet">Wallet balance</option>
+                      </select>
+                      <CreditCard size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePayment}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={paymentStatus === 'processing'}
+                  >
+                    Initiate payment
+                  </button>
+                  <p className="text-[10px] text-slate-400">
+                    Payment methods and Stripe checkout are placeholders for API integration.
+                  </p>
+                </div>
               </div>
             </div>
 

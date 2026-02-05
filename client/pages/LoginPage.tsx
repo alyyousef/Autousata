@@ -40,14 +40,14 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <section className="relative min-h-screen flex items-start justify-end px-4 py-10 sm:px-6 md:py-16 md:items-center text-slate-900 overflow-y-auto">
+    <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
       <div className="fixed inset-0 bg-center bg-cover auth-bg-login" aria-hidden="true" />
       <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in auth-scale-67">
-        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
+      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
+        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-lg my-auto">
           <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Welcome!</h1>
-          <p className="text-sm text-slate-600 mb-6">Log in to track bids, saved searches, and your garage!</p>
+          <p className="text-sm text-slate-600 mb-5">Log in to track bids, saved searches, and your garage!</p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -55,7 +55,7 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">Email address</label>

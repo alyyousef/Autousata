@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
-import AboutPage from './pages/AboutPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -19,6 +19,8 @@ import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
 import AuctionsPage from './pages/AuctionsPage';
+import PaymentPage from './pages/PaymentPage';
+import PaymentConfirmationPage from './pages/PaymentConfirmationPage';
 import VerifyEmailPage from './pages/VerifyEmailPage'; // <--- Import belongs here at the top!
 
 const ScrollToTop: React.FC = () => {
@@ -47,13 +49,14 @@ const AppRoutes: React.FC = () => {
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
-          <Route path="/about" element={<AboutPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/payment/:id" element={<PaymentPage />} />
+          <Route path="/payment/:id/confirmation" element={<PaymentConfirmationPage />} />
         </Route>
 
         <Route element={<AppLayout user={user} />}>
@@ -70,7 +73,9 @@ const AppRoutes: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <NotificationProvider>
+        <AppRoutes />
+      </NotificationProvider>
     </AuthProvider>
   );
 };
