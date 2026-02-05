@@ -33,6 +33,9 @@ app.use("/api/admin/users", adminUsersRoutes);
 
 //app.use("/api/admin/content", adminContentRoutes);
 
+const adminContentRoutes = require('./routes/adminContent');
+app.use('/api/admin', adminContentRoutes);
+
 // Test Route
 app.get("/", (req, res) => {
   res.json({ status: "Online", message: "Server is running on Port " + PORT });
