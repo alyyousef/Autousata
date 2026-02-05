@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Shield, Mail, Phone, ExternalLink, Camera, ChevronRight, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import ImageLightbox from '../components/ImageLightbox';
 
 const ProfilePage: React.FC = () => {
-  const { user, updateUser, logout } = useAuth();
+  const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -15,9 +16,14 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   if (!user) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <Navigate to="/login" replace />;
   }
 
   // Handle Logout
@@ -86,7 +92,14 @@ const ProfilePage: React.FC = () => {
   const displayAvatar = user.profileImage || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'User')}`;
 
   return (
-    <div className="bg-slate-50 min-h-screen py-12">
+    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards">
+      {isLightboxOpen && (
+        <ImageLightbox
+          src={displayAvatar}
+          alt={`${displayName} profile`}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -97,11 +110,18 @@ const ProfilePage: React.FC = () => {
               <div className="h-32 bg-slate-900"></div>
               <div className="px-6 pb-6 text-center">
                 <div className="relative inline-block -mt-16 mb-4 group">
-                  <img 
-                    src={displayAvatar} 
-                    className="w-32 h-32 rounded-3xl border-4 border-white shadow-xl bg-white object-cover" 
-                    alt="Profile" 
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsLightboxOpen(true)}
+                    className="block no-hover-rise"
+                    aria-label="View profile picture full screen"
+                  >
+                    <img 
+                      src={displayAvatar} 
+                      className="w-32 h-32 rounded-3xl border-4 border-white shadow-xl bg-white object-cover" 
+                      alt="Profile" 
+                    />
+                  </button>
                   
                   {/* === NEW: File Input Label === */}
                   <label className="absolute bottom-1 right-1 bg-white p-2 rounded-xl shadow-lg border border-slate-100 text-slate-500 hover:text-indigo-600 cursor-pointer transition-all hover:scale-110">
@@ -279,4 +299,3 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
-
