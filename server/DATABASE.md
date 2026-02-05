@@ -1,6 +1,6 @@
-# Autousata Database Documentation
+# AUTOUSATA Database Documentation
 
-This document provides a comprehensive reference for the Autousata Oracle Database schema. It is intended for developers and AI agents building APIs and services on top of this data model.
+This document provides a comprehensive reference for the AUTOUSATA Oracle Database schema. It is intended for developers and AI agents building APIs and services on top of this data model.
 
 ## Schema Overview
 

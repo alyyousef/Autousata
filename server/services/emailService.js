@@ -18,16 +18,16 @@ async function sendVerificationEmail(toEmail, token) {
     const heroImage = "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1000&q=80";
 
     const mailOptions = {
-        from: `"AutoUsata" <${process.env.EMAIL_USER}>`,
+        from: `"AUTOUSATA" <${process.env.EMAIL_USER}>`,
         to: toEmail,
-        subject: '🏁 Start your engine! Verify your AutoUsata account',
+        subject: '🏁 Start your engine! Verify your AUTOUSATA account',
         html: `
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Verify AutoUsata Account</title>
+            <title>Verify AUTOUSATA Account</title>
             <style>
                 /* Client-specific resets */
                 body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
@@ -149,7 +149,7 @@ async function sendVerificationEmail(toEmail, token) {
 
                     <div class="content">
                         <h1>You're almost in the driver's seat.</h1>
-                        <p>Welcome to the premium circle of AutoUsata. To start bidding on exclusive vehicles and accessing full inspection reports, we just need to verify it's really you.</p>
+                        <p>Welcome to the premium circle of AUTOUSATA. To start bidding on exclusive vehicles and accessing full inspection reports, we just need to verify it's really you.</p>
                         
                         <div class="btn-container">
                             <a href="${verificationLink}" class="btn">Verify My Email</a>
@@ -175,7 +175,7 @@ async function sendVerificationEmail(toEmail, token) {
                     </div>
 
                     <div class="footer">
-                        <p>&copy; ${new Date().getFullYear()} AutoUsata Inc.<br>New Cairo, Egypt</p>
+                        <p>&copy; ${new Date().getFullYear()} AUTOUSATA Inc.<br>New Cairo, Egypt</p>
                         <p>
                             <a href="#">Privacy Policy</a> • 
                             <a href="#">Terms of Service</a> • 

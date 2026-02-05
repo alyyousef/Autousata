@@ -37,7 +37,7 @@ async function startServer() {
         await db.initialize();
 
         // 2. Initialize MongoDB (Passive)
-        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
+        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/AUTOUSATA';
         try {
             await mongoose.connect(MONGO_URI);
             console.log('✅ MongoDB connected');

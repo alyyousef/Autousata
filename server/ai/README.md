@@ -6,7 +6,7 @@ This folder explains what to do and where. It assumes brochures are in `D:\cars`
 Run these commands in a Python environment:
 
 ```powershell
-cd C:\Users\yinya\Autousata\server\ai_service
+cd C:\Users\yinya\AUTOUSATA\server\ai_service
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -19,7 +19,7 @@ Outputs:
 
 ## 2) Start the local AI service
 ```powershell
-cd C:\Users\yinya\Autousata\server\ai_service
+cd C:\Users\yinya\AUTOUSATA\server\ai_service
 .\.venv\Scripts\Activate.ps1
 $env:OLLAMA_MODEL = "qwen2.5:7b-instruct"
 ollama pull qwen2.5:7b-instruct

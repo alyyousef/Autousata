@@ -74,7 +74,7 @@ const SignUpPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in auth-scale-67">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Become a Autousata Member!</h1>
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Become a AUTOUSATA Member!</h1>
           <p className="text-sm text-slate-600 mb-6">Get access to verified listings, transparent bids, and concierge support!</p>
 
           {error && (

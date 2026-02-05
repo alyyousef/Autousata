@@ -5,14 +5,13 @@ import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
 import placeholderImage from '../../assests/frontendPictures/placeHolder.jpg';
 import landingHero from '../../assests/frontendPictures/landingPageBackT.jpg';
-import ImageLightbox from '../components/ImageLightbox';
+import { MOCK_AUCTIONS } from '../constants';
 
 const LandingPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [stats, setStats] = useState<LandingStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const loadLandingData = async () => {
     setIsLoading(true);
@@ -59,7 +58,7 @@ const LandingPage: React.FC = () => {
                 </span>
               </h1>
               <p className="text-base md:text-lg text-slate-200/85 leading-relaxed mb-10 max-w-xl">
-                Autousata brings verified sellers, escrow-backed payments, and expert condition reviews into a single
+                AUTOUSATA brings verified sellers, escrow-backed payments, and expert condition reviews into a single
                 premium auction experience.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -156,7 +155,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
             <div className="text-center mx-auto">
-              <p className="section-eyebrow">Why Autousata</p>
+              <p className="section-eyebrow">Why AUTOUSATA</p>
               <h2 className="section-title">A premium experience, end to end</h2>
               <p className="section-subtitle max-w-2xl mx-auto">
                 We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.
@@ -230,13 +229,16 @@ const LandingPage: React.FC = () => {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-3">
-              {vehicles.map(vehicle => (
-                <VehicleCard
-                  key={vehicle.id}
-                  vehicle={vehicle}
-                  onPreview={() => setLightboxSrc(vehicle.images?.[0] || placeholderImage)}
-                />
-              ))}
+              {vehicles.map(vehicle => {
+                const matchedAuction = MOCK_AUCTIONS.find(auction => auction.vehicle.id === vehicle.id);
+                return (
+                  <VehicleCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    listingId={matchedAuction?.id ?? vehicle.id}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -260,13 +262,6 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
     </div>
-      {lightboxSrc && (
-      <ImageLightbox
-        src={lightboxSrc}
-        alt="Vehicle preview"
-        onClose={() => setLightboxSrc(null)}
-      />
-      )}
     </>
   );
 };
@@ -292,24 +287,34 @@ const StatCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 );
 
-const VehicleCard: React.FC<{ vehicle: Vehicle; onPreview: () => void }> = ({ vehicle, onPreview }) => (
-  <div className="bg-white/90 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm">
+const VehicleCard: React.FC<{ vehicle: Vehicle; listingId: string }> = ({ vehicle, listingId }) => (
+  <Link
+    to={`/listing/${listingId}`}
+    className="group block bg-white/95 border border-slate-200/80 rounded-3xl overflow-hidden premium-card-hover backdrop-blur-sm shadow-[0_18px_45px_rgba(15,23,42,0.12)] hover:shadow-[0_30px_70px_rgba(15,23,42,0.18)] focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+    aria-label={`View listing for ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+  >
     <div className="relative">
       <img
         src={vehicle.images?.[0] || placeholderImage}
         alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-        className="h-48 w-full object-cover cursor-zoom-in"
-        onClick={onPreview}
+        className="h-52 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
       />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/70 to-transparent" />
-      <div className="absolute left-4 bottom-3 text-xs uppercase tracking-[0.3em] text-white/80">Live auction</div>
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
+      <div className="absolute left-4 bottom-4">
+        <span className="inline-flex items-center rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.28em] text-slate-900 shadow-sm ring-1 ring-slate-200/80">
+          Live auction
+        </span>
+      </div>
     </div>
     <div className="p-5">
       <p className="text-lg font-semibold text-slate-900">{vehicle.year} {vehicle.make} {vehicle.model}</p>
       <p className="text-sm text-slate-500 mt-1">{vehicle.location}</p>
-      <p className="text-xs text-slate-500 mt-3">{vehicle.mileage.toLocaleString()} miles | {vehicle.condition}</p>
+      <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+        <span>{vehicle.mileage.toLocaleString()} miles</span>
+        <span className="font-semibold text-slate-700">{vehicle.condition}</span>
+      </div>
     </div>
-  </div>
+  </Link>
 );
 
 export default LandingPage;

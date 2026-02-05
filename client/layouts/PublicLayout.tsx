@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
+import { Bell, Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { notifications, unreadCount, markAllRead, clearNotifications } = useNotifications();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
   const navigate = useNavigate();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -28,9 +31,9 @@ const PublicLayout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 group" aria-label="Autousata home">
+            <Link to="/" className="flex items-center gap-2 group" aria-label="AUTOUSATA home">
               <div>
-                <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-16 w-16" />
+                <img src="/assests/frontendPictures/logoBlackA.png" alt="AUTOUSATA logo" className="h-16 w-16" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-slate-900 uppercase">
                 AUTOUSATA
@@ -43,11 +46,75 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/sell" className={navLinkClass}>Sell</NavLink>
               <NavLink to="/auctions" className={navLinkClass}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass}>How it Works</NavLink>
-              <NavLink to="/about" className={navLinkClass}>About</NavLink>
             </nav>
 
             {/* Desktop User Actions */}
             <div className="hidden md:flex items-center gap-3">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNotifOpen(prev => !prev);
+                    markAllRead();
+                  }}
+                  className="relative p-2 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  aria-label="Notifications"
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 h-6 min-w-[24px] px-2 rounded-full bg-rose-500 text-white text-[11px] font-semibold flex items-center justify-center leading-none ring-2 ring-white shadow-[0_2px_6px_rgba(0,0,0,0.15)]">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                {isNotifOpen && (
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                      <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                      <button
+                        type="button"
+                        onClick={clearNotifications}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-sm text-slate-500">No notifications yet.</div>
+                      ) : (
+                        notifications.slice(0, 8).map(note => (
+                          <div key={note.id} className="px-4 py-3 border-b border-slate-100 last:border-b-0">
+                            <div
+                              className={`text-xs font-semibold uppercase tracking-[0.2em] ${
+                                note.tone === 'success'
+                                  ? 'text-emerald-600'
+                                  : note.tone === 'warn'
+                                    ? 'text-amber-600'
+                                    : note.tone === 'error'
+                                      ? 'text-rose-600'
+                                      : 'text-slate-500'
+                              }`}
+                            >
+                              {note.tone === 'success'
+                                ? 'Bid completed'
+                                : note.tone === 'warn'
+                                  ? 'Alert'
+                                  : note.tone === 'error'
+                                    ? 'Error'
+                                    : 'Update'}
+                            </div>
+                            <p className="text-sm text-slate-700 mt-1">{note.message}</p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              {new Date(note.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               {user ? (
                 isProfilePage ? (
                   <button
@@ -114,7 +181,6 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/sell" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Sell</NavLink>
               <NavLink to="/auctions" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
-              <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
               
               <div className="pt-2 border-t border-slate-200 flex gap-3">
                 {user ? (
@@ -186,7 +252,7 @@ const PublicLayout: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-5">
                   <div>
-                    <img src="/assests/frontendPictures/logoWhiteA.png" alt="Autousata logo" className="h-14 w-14" />
+                    <img src="/assests/frontendPictures/logoWhiteA.png" alt="AUTOUSATA logo" className="h-14 w-14" />
                   </div>
                   <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
                 </div>
@@ -206,10 +272,7 @@ const PublicLayout: React.FC = () => {
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
                 <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/about" className="hover:text-indigo-400">About</Link></li>
                   <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
-                  <li><Link to="/about" className="hover:text-indigo-400">Contact</Link></li>
-                  <li><Link to="/about" className="hover:text-indigo-400">Press</Link></li>
                 </ul>
               </div>
             </div>
