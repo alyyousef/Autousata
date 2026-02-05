@@ -78,7 +78,12 @@ async function register(req, res) {
                     if(success) console.log(`✉️ Email sent to ${email}`);
                 });
 
-            const token = generateToken(newUserId);
+            const user = {
+            id: newUserId,
+            role: 'client'
+            };
+ 
+            const token = generateToken(user);
 
             res.status(201).json({ 
                 message: 'User registered successfully. Please verify your email.',

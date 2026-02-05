@@ -5,8 +5,8 @@ require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // 1. Generate Token (Same as before)
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+const generateToken = (user) => {
+  return jwt.sign( { userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 };
 
 // 2. Authenticate Middleware (Now uses ORACLE)
