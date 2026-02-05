@@ -1,5 +1,6 @@
-
+ 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
@@ -18,6 +19,9 @@ const AdminDashboard: React.FC = () => {
             <p className="text-slate-500 mt-1">Monitor platform health and handle user verifications.</p>
           </div>
           <div className="flex gap-4">
+            <Link to="/admin/users" className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">
+              User Moderation
+            </Link>
             <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 flex items-center gap-2 hover:bg-slate-50 transition-all">
               <BarChart3 size={18} />
               Platform Metrics
@@ -107,21 +111,6 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="p-8">
-            <div className="flex flex-col md:flex-row gap-4 mb-8">
-              <div className="relative flex-grow">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Search by name, email, or reference ID..."
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                />
-              </div>
-              <button className="px-6 py-3 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 flex items-center gap-2 hover:bg-slate-200 transition-all">
-                <Filter size={18} />
-                Filters
-              </button>
-            </div>
-
             {activeTab === 'kyc' && (
               <div className="overflow-x-auto">
                 <table className="w-full">

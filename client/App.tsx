@@ -16,6 +16,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import AuctionDetailPage from './pages/AuctionDetailPage';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminUsersPage from './pages/AdminUsersPage';
 import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
@@ -75,6 +76,14 @@ const AppRoutes: React.FC = () => {
             element={
               <RequireAdmin>
                 <AdminDashboard />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <RequireAdmin>
+                <AdminUsersPage />
               </RequireAdmin>
             }
           />

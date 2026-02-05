@@ -175,6 +175,17 @@ async updateAvatar(file: File) {
       body: JSON.stringify({ token }),
     });
   }
+
+
+
+  async adminSearchUsers(q: string) {
+  return this.request<any[]>(`/admin/users/search?q=${encodeURIComponent(q)}`);
 }
+
+}
+
+
+
+
 
 export const apiService = new ApiService();
