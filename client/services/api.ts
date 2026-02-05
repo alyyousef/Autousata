@@ -206,6 +206,17 @@ async updateAvatar(file: File) {
       method: 'GET',
     });
   }
+
+
+
+  async adminSearchUsers(q: string) {
+  return this.request<any[]>(`/admin/users/search?q=${encodeURIComponent(q)}`);
 }
+
+}
+
+
+
+
 
 export const apiService = new ApiService();

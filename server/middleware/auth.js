@@ -77,7 +77,9 @@ const authorize = (...roles) => {
     }
     
     // Check if user role matches one of the allowed roles
-    if (!roles.includes(req.user.role)) {
+    const userRole = String(req.user.role || '').toLowerCase();
+    const allowedRoles = roles.map((r) => String(r).toLowerCase());
+    if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     
