@@ -21,8 +21,13 @@ const listingSchema = z.object({
   make: z.string().min(1, "Make is required"),
   model: z.string().min(1, "Model is required"),
   mileage: z.coerce.number().min(0, "Mileage cannot be negative"),
-  vin: z.string().length(17, "VIN must be exactly 17 characters"),
-  plateNumber: z.string().min(1, "Plate number is required"),
+  vin: z.preprocess((val) => (val === '' ? undefined : val), z.string().length(17, "VIN must be exactly 17 characters").optional()),
+  plateNumber: z.preprocess((val) => (val === '' ? undefined : val), z.string().min(1, "Plate number is required").optional()),
+  color: z.string().min(1, "Color is required"),
+  bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
+  transmission: z.enum(['manual', 'automatic']),
+  fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
+  seats: z.coerce.number().min(1, "Seats is required"),
   condition: z.enum(['excellent', 'good', 'fair', 'poor']),
   
   // Step 2: Details & Media
@@ -64,9 +69,14 @@ const CreateListingPage: React.FC = () => {
     mode: 'onChange',
     defaultValues: {
       condition: 'excellent',
+      bodyType: 'sedan',
+      transmission: 'automatic',
+      fuelType: 'petrol',
+      seats: 5,
       features: [],
       images: [],
       durationDays: '3',
+      mileage: 0,
       year: new Date().getFullYear(),
     }
   });
@@ -136,7 +146,7 @@ const CreateListingPage: React.FC = () => {
     let fieldsToValidate: (keyof ListingFormData)[] = [];
     
     if (targetStep === 1) {
-      fieldsToValidate = ['year', 'make', 'model', 'mileage', 'vin', 'plateNumber', 'condition'];
+      fieldsToValidate = ['year', 'make', 'model', 'mileage', 'color', 'bodyType', 'transmission', 'fuelType', 'seats', 'condition'];
     } else if (targetStep === 2) {
       fieldsToValidate = ['description', 'images'];
     } else if (targetStep === 3) {
@@ -155,19 +165,37 @@ const CreateListingPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        setSubmitError('Please log in before creating a listing.');
+        return;
+      }
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+      const normalizedMileage = Number(data.mileage) || 0;
+      const normalizedReservePrice = Number(data.reservePrice) || 0;
+      const normalizedStartingBid = Number(data.startingBid) || 0;
+      const startDate = data.startTime ? new Date(data.startTime) : new Date();
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + parseInt(data.durationDays));
 
       // 1. Create Vehicle
       const vehiclePayload = {
         make: data.make,
         model: data.model,
         year: data.year,
-        mileage: data.mileage,
+        mileage: normalizedMileage,
+        mileageKm: normalizedMileage,
         vin: data.vin,
         plateNumber: data.plateNumber,
+        color: data.color,
+        bodyType: data.bodyType,
+        transmission: data.transmission,
+        fuelType: data.fuelType,
+        seats: data.seats,
         condition: data.condition,
-        price: data.reservePrice, // Using reserve as list price reference
+        price: normalizedReservePrice, // Using reserve as list price reference
+        reservePrice: normalizedReservePrice,
         description: data.description,
         location: data.location,
         features: data.features,
@@ -178,17 +206,12 @@ const CreateListingPage: React.FC = () => {
       const vehicleId = vehicleRes.data._id;
 
       // 2. Create Auction (Draft/Scheduled)
-      // Calculate dates
-      const startDate = new Date(); // Starts now for simplicity, or add scheduler input
-      const endDate = new Date();
-      endDate.setDate(startDate.getDate() + parseInt(data.durationDays));
-
       const auctionPayload = {
         vehicleId: vehicleId,
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
-        startPrice: data.startingBid,
-        reservePrice: data.reservePrice
+        startPrice: normalizedStartingBid,
+        reservePrice: normalizedReservePrice
       };
 
       await axios.post(`${baseUrl}/auctions`, auctionPayload, config);
@@ -296,6 +319,52 @@ const CreateListingPage: React.FC = () => {
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Plate Number</label>
                     <input type="text" {...register('plateNumber')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")} />
                     {errors.plateNumber && <p className="text-xs text-rose-600">{errors.plateNumber.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Color</label>
+                    <input type="text" {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")} />
+                    {errors.color && <p className="text-xs text-rose-600">{errors.color.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Body Type</label>
+                    <select {...register('bodyType')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.bodyType ? "border-rose-300" : "border-slate-200")}>
+                      <option value="sedan">Sedan</option>
+                      <option value="suv">SUV</option>
+                      <option value="truck">Truck</option>
+                      <option value="coupe">Coupe</option>
+                      <option value="hatchback">Hatchback</option>
+                      <option value="van">Van</option>
+                      <option value="convertible">Convertible</option>
+                    </select>
+                    {errors.bodyType && <p className="text-xs text-rose-600">{errors.bodyType.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Transmission</label>
+                    <select {...register('transmission')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.transmission ? "border-rose-300" : "border-slate-200")}>
+                      <option value="automatic">Automatic</option>
+                      <option value="manual">Manual</option>
+                    </select>
+                    {errors.transmission && <p className="text-xs text-rose-600">{errors.transmission.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Fuel Type</label>
+                    <select {...register('fuelType')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.fuelType ? "border-rose-300" : "border-slate-200")}>
+                      <option value="petrol">Petrol</option>
+                      <option value="diesel">Diesel</option>
+                      <option value="electric">Electric</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                    {errors.fuelType && <p className="text-xs text-rose-600">{errors.fuelType.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Seats</label>
+                    <input type="number" {...register('seats')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")} />
+                    {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
                   </div>
                   
                   <div className="space-y-2">

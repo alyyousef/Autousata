@@ -3,10 +3,11 @@ const oracledb = require('oracledb');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 
 // 1. Generate Token (Same as before)
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
 // 2. Authenticate Middleware (Now uses ORACLE)

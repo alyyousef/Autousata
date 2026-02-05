@@ -24,6 +24,8 @@ export interface User {
   phoneVerified?: boolean;
 }
 
+export type VehicleStatus = 'draft' | 'active' | 'sold' | 'delisted';
+
 export interface Vehicle {
   id: string;
   make: string;
@@ -35,9 +37,15 @@ export interface Vehicle {
   description: string;
   images: string[];
   location: string;
+  status?: VehicleStatus;
+  price?: number;
+  plateNumber?: string;
+  sellerId?: string;
 }
 
 export type ListingStatus = 'DRAFT' | 'PUBLISHED' | 'DELISTED';
+
+export type AuctionStatus = 'draft' | 'scheduled' | 'live' | 'ended' | 'settled' | 'cancelled';
 
 export interface Listing {
   id: string;

@@ -16,7 +16,7 @@ router.post('/', auth, async (req, res) => {
       reservePrice
     } = req.body;
 
-    if (!vehicleId || !startTime || !endTime || startPrice === undefined) {
+    if (!vehicleId || !startTime || !endTime || startPrice === undefined || reservePrice === undefined) {
       return res.status(400).json({ msg: 'Missing required auction fields' });
     }
 
@@ -66,7 +66,16 @@ router.post('/', auth, async (req, res) => {
         status,
         start_time,
         end_time,
-        current_bid_egp
+        original_end_time,
+        reserve_price_egp,
+        starting_bid_egp,
+        current_bid_egp,
+        bid_count,
+        min_bid_increment,
+        auto_extend_enabled,
+        auto_extend_minutes,
+        max_auto_extensions,
+        auto_ext_count
       ) VALUES (
         :id,
         :vehicleId,
@@ -74,7 +83,16 @@ router.post('/', auth, async (req, res) => {
         :status,
         :startTime,
         :endTime,
-        :currentBid
+        :originalEndTime,
+        :reservePriceEgp,
+        :startingBidEgp,
+        :currentBid,
+        :bidCount,
+        :minBidIncrement,
+        :autoExtendEnabled,
+        :autoExtendMinutes,
+        :maxAutoExtensions,
+        :autoExtCount
       )`,
       {
         id: auctionId,
@@ -83,7 +101,16 @@ router.post('/', auth, async (req, res) => {
         status: 'draft',
         startTime: startDate,
         endTime: endDate,
-        currentBid: startBid
+        originalEndTime: endDate,
+        reservePriceEgp: Number(reservePrice) || 0,
+        startingBidEgp: startBid,
+        currentBid: startBid,
+        bidCount: 0,
+        minBidIncrement: 50,
+        autoExtendEnabled: 1,
+        autoExtendMinutes: 5,
+        maxAutoExtensions: 3,
+        autoExtCount: 0
       },
       { autoCommit: true }
     );
@@ -94,10 +121,16 @@ router.post('/', auth, async (req, res) => {
       sellerId: req.user.id,
       startTime: startDate,
       endTime: endDate,
+      originalEndTime: endDate,
       startPrice: startBid,
       reservePrice: Number(reservePrice) || 0,
       currentBid: startBid,
       bidCount: 0,
+      minBidIncrement: 50,
+      autoExtendEnabled: true,
+      autoExtendMinutes: 5,
+      maxAutoExtensions: 3,
+      autoExtendCount: 0,
       status: 'draft'
     });
   } catch (err) {
@@ -238,6 +271,52 @@ router.get('/', async (req, res) => {
         pages: Math.ceil(total / limitNum)
       }
     });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error('Oracle connection close error:', closeErr.message);
+      }
+    }
+  }
+});
+
+// GET /api/auctions/seller - List seller auctions (authenticated)
+router.get('/seller', auth, async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection();
+
+    const result = await connection.execute(
+      `SELECT
+        id,
+        vehicle_id,
+        seller_id,
+        status,
+        start_time,
+        end_time,
+        current_bid_egp
+      FROM auctions
+      WHERE seller_id = :sellerId`,
+      { sellerId: req.user.id },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const auctions = (result.rows || []).map((row) => ({
+      _id: row.ID,
+      vehicleId: row.VEHICLE_ID,
+      sellerId: row.SELLER_ID,
+      status: row.STATUS,
+      startTime: row.START_TIME,
+      endTime: row.END_TIME,
+      currentBid: Number(row.CURRENT_BID_EGP) || 0
+    }));
+
+    res.json({ auctions });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

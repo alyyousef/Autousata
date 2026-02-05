@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { upload } = require('../middleware/uploadMiddleware'); // <--- CRITICAL IMPORT
+const { authenticate } = require('../middleware/auth');
 
 // Debug Log: Print to terminal when this file is loaded
 console.log('✅ Auth Routes Loaded');
@@ -17,4 +18,6 @@ router.post('/register', upload.single('profileImage'), (req, res, next) => {
 // POST http://localhost:5001/api/auth/login
 router.post('/login', authController.login);
 router.post('/verify-email', authController.verifyEmail);
+// GET http://localhost:5000/api/auth/me
+router.get('/me', authenticate, authController.getCurrentUser);
 module.exports = router;

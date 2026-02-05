@@ -226,4 +226,62 @@ async function verifyEmail(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmail };
+// ==========================================
+// 4. CURRENT USER
+// ==========================================
+async function getCurrentUser(req, res) {
+    let connection;
+
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city, email_verified, phone_verified
+             FROM users
+             WHERE id = :uid`,
+            { uid: userId }
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const row = result.rows[0];
+        const user = {
+            id: row[0],
+            firstName: row[1],
+            lastName: row[2],
+            name: `${row[1] || ''} ${row[2] || ''}`.trim(),
+            email: row[3],
+            phone: row[4],
+            role: row[5],
+            profileImage: row[6],
+            avatar: row[6],
+            location: { city: row[7] },
+            emailVerified: row[8] === '1',
+            phoneVerified: row[9] === '1'
+        };
+
+        res.json({ user });
+
+    } catch (err) {
+        console.error('Get current user error:', err);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error('Error closing connection:', e);
+            }
+        }
+    }
+}
+
+module.exports = { register, login, verifyEmail, getCurrentUser };

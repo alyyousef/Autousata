@@ -145,6 +145,18 @@ class ApiService {
     return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
   }
 
+  async getSellerVehicles() {
+    return this.request<any[]>('/vehicles');
+  }
+
+  async getVehicleById(vehicleId: string) {
+    return this.request<any>(`/vehicles/${vehicleId}`);
+  }
+
+  async getSellerAuctions() {
+    return this.request<{ auctions: any[] }>('/auctions/seller');
+  }
+
   // Profile endpoints
   async updateProfile(data: { name?: string; location?: { city: string; country?: string } }) {
     return this.request<{ user: any }>('/profile', {
