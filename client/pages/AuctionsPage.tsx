@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, MapPin, Tag, Trophy, ArrowRight, SlidersHorizontal } from 'lucide-react';
-import { MOCK_AUCTIONS } from '../constants';
+import { Clock, MapPin, Tag, Trophy, ArrowRight, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import ImageLightbox from '../components/ImageLightbox';
+import { apiService } from '../services/api';
+import { Auction } from '../types';
 
 type SortOption = 'endingSoon' | 'highestBid' | 'mostBids';
 
@@ -10,24 +11,48 @@ const AuctionsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('endingSoon');
   const [now, setNow] = useState(() => Date.now());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const sortedAuctions = useMemo(() => {
-    const items = [...MOCK_AUCTIONS];
+  useEffect(() => {
+    const fetchAuctions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await apiService.getAuctions(page, 9, sortBy);
+        if (response.error) {
+          setError(response.error);
+        } else if (response.data) {
+          // Transform API data to match Auction interface
+          const transformedAuctions: Auction[] = response.data.auctions.map((item: any) => ({
+            id: item._id,
+            vehicle: item.vehicleId, // Backend populates 'vehicleId' with the object
+            sellerId: item.sellerId,
+            currentBid: item.currentBid,
+            startingBid: item.startPrice,
+            reservePrice: item.reservePrice,
+            bidCount: item.bidCount,
+            endTime: item.endTime,
+            status: 'ACTIVE', // Map 'live' to 'ACTIVE'
+            bids: [], // Not returned in list view
+            buyItNowPrice: undefined 
+          }));
+          setAuctions(transformedAuctions);
+          setTotalPages(response.data.pagination.pages);
+        }
+      } catch (err) {
+        setError('Failed to load auctions');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    switch (sortBy) {
-      case 'highestBid':
-        return items.sort((a, b) => b.currentBid - a.currentBid);
-      case 'mostBids':
-        return items.sort((a, b) => b.bidCount - a.bidCount);
-      case 'endingSoon':
-      default:
-        return items.sort((a, b) => {
-          const aTime = new Date(a.endTime).getTime();
-          const bTime = new Date(b.endTime).getTime();
-          return aTime - bTime;
-        });
-    }
-  }, [sortBy]);
+    fetchAuctions();
+  }, [page, sortBy]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -44,6 +69,18 @@ const AuctionsPage: React.FC = () => {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  };
+
+  const handleSortChange = (newSort: SortOption) => {
+    setSortBy(newSort);
+    setPage(1); // Reset to first page on sort change
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -93,7 +130,7 @@ const AuctionsPage: React.FC = () => {
             ].map(option => (
               <button
                 key={option.id}
-                onClick={() => setSortBy(option.id as SortOption)}
+                onClick={() => handleSortChange(option.id as SortOption)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors pill-anim ${
                   sortBy === option.id
                     ? 'bg-slate-900 text-white'
@@ -108,64 +145,106 @@ const AuctionsPage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sortedAuctions.map((auction) => (
-            <div
-              key={auction.id}
-              className="bg-white/95 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm"
-            >
-              <div className="relative">
-                <img
-                  src={auction.vehicle.images[0]}
-                  alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
-                  className="h-48 w-full object-cover cursor-zoom-in"
-                  onClick={() => setLightboxSrc(auction.vehicle.images[0])}
-                />
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
-                    Live
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
-                    {auction.vehicle.condition}
-                  </span>
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
-                      <MapPin size={14} />
-                      {auction.vehicle.location}
+        {loading ? (
+           <div className="flex justify-center items-center h-64">
+             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+           </div>
+        ) : error ? (
+           <div className="text-center text-red-500 py-10">{error}</div>
+        ) : auctions.length === 0 ? (
+           <div className="text-center text-slate-500 py-10">No active auctions found.</div>
+        ) : (
+          <>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {auctions.map((auction) => (
+                <div
+                  key={auction.id}
+                  className="bg-white/95 border border-slate-200 rounded-2xl overflow-hidden premium-card-hover backdrop-blur-sm"
+                >
+                  <div className="relative">
+                    {auction.vehicle.images && auction.vehicle.images.length > 0 ? (
+                        <img
+                        src={auction.vehicle.images[0]}
+                        alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
+                        className="h-48 w-full object-cover cursor-zoom-in"
+                        onClick={() => setLightboxSrc(auction.vehicle.images[0])}
+                        />
+                    ) : (
+                        <div className="h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400">
+                            No Image
+                        </div>
+                    )}
+                    
+                    <div className="absolute top-4 left-4 flex gap-2">
+                      <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
+                        Live
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
+                        {auction.vehicle.condition}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">Current bid</p>
-                    <p className="text-lg font-bold text-indigo-600">EGP {auction.currentBid.toLocaleString()}</p>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                          <MapPin size={14} />
+                          {auction.vehicle.location}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">Current bid</p>
+                        <p className="text-lg font-bold text-indigo-600">EGP {auction.currentBid.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} />
+                        {formatTimeRemaining(auction.endTime, now)}
+                      </div>
+                      <span>{auction.bidCount} bids</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <Link
+                        to={`/listing/${auction.id}`}
+                        className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-2"
+                      >
+                        Enter auction
+                        <ArrowRight size={16} />
+                      </Link>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Clock size={14} />
-                    {formatTimeRemaining(auction.endTime, now)}
-                  </div>
-                  <span>{auction.bidCount} bids</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <Link
-                    to={`/listing/${auction.id}`}
-                    className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-2"
-                  >
-                    Enter auction
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-center mt-10 gap-2">
+                    <button
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page === 1}
+                        className="p-2 rounded-full border border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <span className="flex items-center px-4 text-sm font-medium text-slate-700">
+                        Page {page} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page === totalPages}
+                        className="p-2 rounded-full border border-slate-300 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+            )}
+          </>
+        )}
       </section>
       </div>
       {lightboxSrc && (
@@ -180,4 +259,3 @@ const AuctionsPage: React.FC = () => {
 };
 
 export default AuctionsPage;
-

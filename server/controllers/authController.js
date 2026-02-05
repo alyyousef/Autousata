@@ -25,7 +25,7 @@ async function register(req, res) {
         if (file) {
             console.log("📸 [1] Starting S3 Upload...");
             profilePicUrl = await uploadToS3(file, 'profiles'); 
-            console.log("✅ [2] S3 Upload Finished. URL generated.");
+            console.log("✅ [2] S3 Upload Finished:", profilePicUrl);
         }
 
         console.log("🔑 [3] Hashing Password...");
@@ -34,10 +34,9 @@ async function register(req, res) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         console.log("🔌 [4] Requesting Database Connection...");
-        // ⚠️ THIS IS THE SUSPECT LINE
-        connection = await db.getConnection(); 
-        console.log("✅ [5] Database Connected! Executing Procedure...");
-
+        connection = await db.getConnection(); // <--- CORRECT WAY
+        
+        console.log("📝 [5] Executing Stored Procedure...");
         const result = await connection.execute(
             `BEGIN 
                 sp_register_user(:fn, :ln, :em, :ph, :pw, :img, :out_id, :out_status); 
@@ -54,29 +53,25 @@ async function register(req, res) {
             }
         );
 
+        console.log("✅ [6] DB Execution Complete.");
         const status = result.outBinds.out_status;
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            console.log("✅ User created. ID:", newUserId);
-
+            // Update token
             await connection.execute(
                 `UPDATE users 
                  SET email_verification_token = :token,
                      email_token_expiry = CURRENT_TIMESTAMP + INTERVAL '1' DAY
                  WHERE id = :u_id`, 
-                { 
-                    token: verificationToken, 
-                    u_id: newUserId 
-                },
+                { token: verificationToken, u_id: newUserId },
                 { autoCommit: true }
             );
 
-            // Send Email (Don't await, let it run in background)
+            console.log("✉️ [7] Sending Verification Email...");
+            // Run email in background so response is fast
             sendVerificationEmail(email, verificationToken)
-                .then(success => {
-                    if(success) console.log(`✉️ Email sent to ${email}`);
-                });
+                .catch(err => console.error("Email failed in background:", err));
 
             const user = {
             id: newUserId,
@@ -91,6 +86,7 @@ async function register(req, res) {
                 user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
         } else {
+            console.log("❌ DB Returned Error:", status);
             res.status(400).json({ error: status });
         }
 
@@ -231,4 +227,62 @@ async function verifyEmail(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmail };
+// ==========================================
+// 4. CURRENT USER
+// ==========================================
+async function getCurrentUser(req, res) {
+    let connection;
+
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city, email_verified, phone_verified
+             FROM users
+             WHERE id = :uid`,
+            { uid: userId }
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const row = result.rows[0];
+        const user = {
+            id: row[0],
+            firstName: row[1],
+            lastName: row[2],
+            name: `${row[1] || ''} ${row[2] || ''}`.trim(),
+            email: row[3],
+            phone: row[4],
+            role: row[5],
+            profileImage: row[6],
+            avatar: row[6],
+            location: { city: row[7] },
+            emailVerified: row[8] === '1',
+            phoneVerified: row[9] === '1'
+        };
+
+        res.json({ user });
+
+    } catch (err) {
+        console.error('Get current user error:', err);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error('Error closing connection:', e);
+            }
+        }
+    }
+}
+
+module.exports = { register, login, verifyEmail, getCurrentUser };
