@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
+import { Menu, X, User as UserIcon } from 'lucide-react'; 
 import { useAuth } from '../contexts/AuthContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
@@ -48,7 +48,9 @@ const PublicLayout: React.FC = () => {
 
             {/* Desktop User Actions */}
             <div className="hidden md:flex items-center gap-3">
-              {user ? (
+              {loading ? (
+                <div className="w-20 h-10"></div>
+              ) : user ? (
                 isProfilePage ? (
                   <button
                     type="button"
@@ -58,7 +60,6 @@ const PublicLayout: React.FC = () => {
                     Sign Out
                   </button>
                 ) : (
-                  // === NEW: PROFILE PICTURE BUTTON ===
                   <Link 
                     to="/profile" 
                     className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-slate-200 overflow-hidden hover:border-indigo-600 transition-all shadow-sm"
@@ -78,6 +79,7 @@ const PublicLayout: React.FC = () => {
                   </Link>
                 )
               ) : (
+                // === User is Guest ===
                 <>
                   <NavLink
                     to="/login"
@@ -117,7 +119,9 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
               
               <div className="pt-2 border-t border-slate-200 flex gap-3">
-                {user ? (
+                {loading ? (
+                    <div className="p-2 text-sm text-slate-400">Loading...</div>
+                ) : user ? (
                   isProfilePage ? (
                     <button
                       type="button"
@@ -130,7 +134,6 @@ const PublicLayout: React.FC = () => {
                       Sign Out
                     </button>
                   ) : (
-                    // === NEW: MOBILE PROFILE LINK ===
                     <Link 
                       to="/profile" 
                       className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
@@ -181,6 +184,7 @@ const PublicLayout: React.FC = () => {
 
       {!hideFooter && (
         <footer className="bg-slate-950 text-slate-200 border-t border-slate-800/70">
+          {/* Footer content unchanged */}
           <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div className="grid gap-10 md:grid-cols-[1.3fr_0.7fr_0.7fr]">
               <div>

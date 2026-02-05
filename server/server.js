@@ -30,6 +30,9 @@ app.use('/api', profileRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/auctions', auctionRoutes);
 
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes); // <--- NEW USE
+
 // Test Route
 app.get('/', (req, res) => {
     res.json({ status: 'Online', message: 'Server is running on Port ' + PORT });
@@ -47,8 +50,19 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`✅ Server is running on port ${PORT}`);
         });
-    } catch (error) {
-        console.error('❌ Failed to start server:', error);
+
+        // Graceful Shutdown Logic
+        process.on('SIGINT', async () => {
+            console.log('\n🛑 Shutting down...');
+            await db.close(); 
+            server.close(() => {
+                console.log('Server closed.');
+                process.exit(0);
+            });
+        });
+
+    } catch (err) {
+        console.error('❌ Failed to start server:', err);
         process.exit(1);
     }
 }

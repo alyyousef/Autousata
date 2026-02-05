@@ -1,17 +1,14 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const oracledb = require('oracledb'); // Keep for BIND_OUT constants
-const db = require('../config/db');   // <--- IMPORT OUR NEW DB MODULE
-const { generateToken } = require('../middleware/auth');
+const oracledb = require('oracledb');
+const db = require('../config/db');
+const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
 const { sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
 // ==========================================
-// 1. SIGN UP
-// ==========================================
-// ==========================================
-// 1. SIGN UP (BREADCRUMB DEBUGGER)
+// 1. REGISTER
 // ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
@@ -34,7 +31,7 @@ async function register(req, res) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         console.log("🔌 [4] Requesting Database Connection...");
-        connection = await db.getConnection(); // <--- CORRECT WAY
+        connection = await db.getConnection();
         
         console.log("📝 [5] Executing Stored Procedure...");
         const result = await connection.execute(
@@ -58,7 +55,7 @@ async function register(req, res) {
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            // Update token
+            // Update token in DB
             await connection.execute(
                 `UPDATE users 
                  SET email_verification_token = :token,
@@ -69,16 +66,27 @@ async function register(req, res) {
             );
 
             console.log("✉️ [7] Sending Verification Email...");
-            // Run email in background so response is fast
             sendVerificationEmail(email, verificationToken)
                 .catch(err => console.error("Email failed in background:", err));
 
-            const token = generateToken(newUserId);
+            const { accessToken, refreshToken } = generateTokens(newUserId);
+
             res.status(201).json({ 
                 message: 'User registered successfully. Please verify your email.',
-                token,
-                user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
+                accessToken,
+                refreshToken,
+                token: accessToken,
+                user: {
+                    id: newUserId,
+                    firstName,
+                    lastName,
+                    email,
+                    role: 'client',
+                    profileImage: profilePicUrl,
+                    emailVerified: false
+                }
             });
+
         } else {
             console.log("❌ DB Returned Error:", status);
             res.status(400).json({ error: status });
@@ -105,11 +113,8 @@ async function login(req, res) {
 
     try {
         console.log(`👉 Logging in: ${email}`);
-        console.log("🔌 [1] Requesting Database Connection...");
         
-        // Use the pool manager
         connection = await db.getConnection();
-        console.log("✅ [2] DB Connected. Checking Credentials...");
 
         const result = await connection.execute(
             `BEGIN 
@@ -127,11 +132,9 @@ async function login(req, res) {
             }
         );
 
-        console.log("✅ [3] Procedure Executed.");
         const userData = result.outBinds;
 
         if (userData.status === 'UNVERIFIED') {
-            console.log("⚠️ [4] User is Unverified.");
             return res.status(403).json({ 
                 error: 'Please verify your email address to log in.',
                 needsVerification: true 
@@ -139,20 +142,19 @@ async function login(req, res) {
         }
 
         if (userData.status !== 'FOUND') {
-            console.log("❌ [4] User Not Found or Invalid.");
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        console.log("🔑 [4] Verifying Password...");
         const match = await bcrypt.compare(password, userData.hash);
 
         if (match) {
-            console.log("✅ [5] Password Correct. Generating Token...");
-            const token = generateToken(userData.id);
+            const { accessToken, refreshToken } = generateTokens(userData.id);
 
             res.json({
                 message: 'Login successful',
-                token,
+                accessToken,
+                refreshToken,
+                token: accessToken,
                 user: {
                     id: userData.id,
                     firstName: userData.fn,
@@ -163,7 +165,6 @@ async function login(req, res) {
                 }
             });
         } else {
-            console.log("❌ [5] Password Wrong.");
             res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -176,6 +177,7 @@ async function login(req, res) {
         }
     }
 }
+
 // ==========================================
 // 3. VERIFY EMAIL
 // ==========================================
@@ -226,7 +228,30 @@ async function verifyEmail(req, res) {
 }
 
 // ==========================================
-// 4. CURRENT USER
+// 4. REFRESH TOKEN
+// ==========================================
+async function refreshToken(req, res) {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
+        return res.status(400).json({ error: 'Refresh token required' });
+    }
+
+    const decoded = verifyRefreshToken(token);
+    if (!decoded) {
+        return res.status(403).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    const tokens = generateTokens(decoded.userId);
+
+    res.json({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+    });
+}
+
+// ==========================================
+// 5. CURRENT USER
 // ==========================================
 async function getCurrentUser(req, res) {
     let connection;
@@ -283,4 +308,6 @@ async function getCurrentUser(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmail, getCurrentUser };
+const getMe = (req, res) => getCurrentUser(req, res);
+
+module.exports = { register, login, verifyEmail, refreshToken, getCurrentUser, getMe };
