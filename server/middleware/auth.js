@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const oracledb = require('oracledb');
-require('dotenv').config(); // Ensure env vars are loaded
+require('dotenv').config();
 
 const ACCESS_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
@@ -8,7 +8,7 @@ const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
 const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 
 // =========================================================
-// 1. GENERATE TOKEN (Legacy single token)
+// 1. GENERATE TOKEN (Legacy support)
 // =========================================================
 const generateToken = (userId) => {
   return jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: LEGACY_TOKEN_EXPIRES_IN });
@@ -23,7 +23,9 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-// 2. Verify Refresh Token
+// =========================================================
+// 3. VERIFY REFRESH TOKEN
+// =========================================================
 const verifyRefreshToken = (token) => {
   try {
     return jwt.verify(token, REFRESH_SECRET);
@@ -32,7 +34,9 @@ const verifyRefreshToken = (token) => {
   }
 };
 
-// 3. Authenticate & MAP DATA
+// =========================================================
+// 4. AUTHENTICATE & MAP DATA (The Critical Part)
+// =========================================================
 const authenticate = async (req, res, next) => {
   let connection;
   try {
@@ -42,14 +46,16 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
+    // Verify Access Token
     const decoded = jwt.verify(token, ACCESS_SECRET);
     
     connection = await oracledb.getConnection();
 
-    // Call the procedure we just fixed
+    // === UPDATED PROCEDURE CALL ===
+    // Added :ver to catch the verification status
     const result = await connection.execute(
       `BEGIN 
-         sp_get_user_by_id(:id, :fn, :ln, :em, :ph, :role, :status, :pic, :city); 
+         sp_get_user_by_id(:id, :fn, :ln, :em, :ph, :role, :status, :pic, :city, :ver); 
        END;`,
       {
         id: decoded.userId,
@@ -60,7 +66,8 @@ const authenticate = async (req, res, next) => {
         role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
         status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
         pic: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        city: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+        city: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ver: { dir: oracledb.BIND_OUT, type: oracledb.STRING } // <--- CATCH VERIFICATION STATUS
       }
     );
 
@@ -70,19 +77,20 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    // === CRITICAL MAPPING STEP ===
-    // This connects DB columns (outBinds) to Frontend variables
+    // === DATA MAPPING ===
     req.user = {
       id: decoded.userId,
-      firstName: userData.fn,      // Maps :fn -> firstName
-      lastName: userData.ln,       // Maps :ln -> lastName
+      firstName: userData.fn,
+      lastName: userData.ln,
       email: userData.em,
       phone: userData.ph,
       role: userData.role,
-      profileImage: userData.pic,  // Maps :pic -> profileImage
+      profileImage: userData.pic,
       location: {
-        city: userData.city        // Maps :city -> location.city
-      }
+        city: userData.city
+      },
+      // Convert '1' to true, '0' to false
+      emailVerified: userData.ver === '1' 
     };
     
     req.token = token;
@@ -114,6 +122,7 @@ const authorize = (...roles) => {
 };
 
 module.exports = {
+  generateToken, // Legacy
   generateTokens,
   verifyRefreshToken,
   authenticate,

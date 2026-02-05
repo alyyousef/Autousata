@@ -129,6 +129,12 @@ class ApiService {
     }
     return response;
   }
+async verifyEmailOtp(email: string, otp: string) {
+    return this.request('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
 
   async login(email: string, password: string) {
     const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {

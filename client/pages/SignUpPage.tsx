@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Camera } from 'lucide-react'; // <--- Added Camera Icon
+import { Eye, EyeOff, Camera } from 'lucide-react'; 
 
 const SignUpPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -13,22 +13,21 @@ const SignUpPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // New State for Image Upload
+  // Image Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  // Handle Image Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      // Create a fake URL just to show a preview instantly
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
@@ -54,17 +53,29 @@ const SignUpPage: React.FC = () => {
 
     setLoading(true);
 
-    // Pass the selectedFile (or undefined) to the register function
-    // NOTE: Ensure your AuthContext 'register' function accepts this 6th argument!
-    const result = await register(firstName, lastName, email, phone, password, selectedFile || undefined);
+    try {
+      // Pass the file (selectedFile) to the register function
+      const result = await register(
+        firstName, 
+        lastName, 
+        email, 
+        phone, 
+        password, 
+        selectedFile || undefined
+      );
 
-    if (result.success) {
-      navigate('/browse');
-    } else {
-      setError(result.error || 'Registration failed');
+      if (result.success) {
+        // === THE CRITICAL UPDATE ===
+        // Redirect to /verify-email and pass the email so the user doesn't have to type it again
+        navigate('/verify-email', { state: { email: email } });
+      } else {
+        setError(result.error || 'Registration failed');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

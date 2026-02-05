@@ -1,92 +1,144 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ShieldCheck, ArrowRight, Mail } from 'lucide-react';
+import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext'; // <--- Import useAuth
 
 const VerifyEmailPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
-  
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Verifying your email...');
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const { updateUser } = useAuth(); // <--- Get the updateUser function
+
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid verification link.');
-      return;
+    if (!state?.email) {
+      navigate('/signup');
     }
+  }, [state, navigate]);
 
-    // Call the Backend API
-    const verify = async () => {
-      try {
-        const response = await fetch('http://localhost:5001/api/auth/verify-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
+  const email = state?.email || '';
 
-        const data = await response.json();
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
 
-        if (response.ok) {
-          setStatus('success');
-          setMessage(data.message);
-        } else {
-          setStatus('error');
-          setMessage(data.error || 'Verification failed.');
+    try {
+      // 1. Verify the Code
+      const response = await apiService.verifyEmailOtp(email, otp);
+
+      if (response.data?.success) {
+        setSuccess(true);
+
+        // === THE FIX IS HERE ===
+        // 2. Fetch the FRESH user profile (which now has is_verified = 1)
+        try {
+          const userResponse = await apiService.getCurrentUser();
+          if (userResponse.data?.user) {
+             // 3. Force the app to update the user state immediately
+             updateUser(userResponse.data.user);
+          }
+        } catch (fetchError) {
+          console.error("Could not refresh user profile", fetchError);
         }
-      } catch (error) {
-        setStatus('error');
-        setMessage('Network error. Please try again.');
-      }
-    };
 
-    verify();
-  }, [token]);
+        // 4. Redirect after a brief moment
+        setTimeout(() => {
+          navigate('/browse');
+        }, 1500);
+
+      } else {
+        setError(response.error || 'Invalid code. Please try again.');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-slate-100">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-slate-50 px-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
         
-        {status === 'loading' && (
-          <div className="flex flex-col items-center">
-            <Loader className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900">Verifying...</h2>
-            <p className="text-slate-500 mt-2">Please wait while we activate your account.</p>
+        {/* Header Section */}
+        <div className="bg-slate-900 px-8 py-8 text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+          <div className="mx-auto w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
+            {success ? <ShieldCheck className="text-emerald-400 w-8 h-8" /> : <Mail className="text-white w-8 h-8" />}
           </div>
-        )}
+          <h2 className="text-2xl font-bold text-white mb-2">{success ? "Account Verified!" : "Check your inbox"}</h2>
+          <p className="text-slate-400 text-sm">
+            We sent a secure code to <br />
+            <span className="text-white font-semibold">{email}</span>
+          </p>
+        </div>
 
-        {status === 'success' && (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+        {/* Body Section */}
+        <div className="px-8 py-10">
+          <form onSubmit={handleVerify} className="space-y-6">
+            
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl text-center font-medium animate-pulse">
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-xl text-center font-bold">
+                Verification successful. Redirecting...
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="otp" className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">
+                Enter 6-Digit Code
+              </label>
+              <input
+                type="text"
+                id="otp"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                placeholder="000000"
+                className="w-full text-center text-3xl font-bold tracking-[0.5em] py-4 rounded-xl border-2 border-slate-200 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-200 text-slate-800"
+                autoFocus
+                disabled={success}
+              />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Email Verified!</h2>
-            <p className="text-slate-600 mt-2 mb-6">{message}</p>
-            <Link 
-              to="/login" 
-              className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all block"
-            >
-              Go to Login
-            </Link>
-          </div>
-        )}
 
-        {status === 'error' && (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <XCircle className="w-8 h-8 text-red-600" />
+            <button
+              type="submit"
+              disabled={loading || otp.length < 6 || success}
+              className={`w-full py-4 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group ${success ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'}`}
+            >
+              {loading ? (
+                'Verifying...'
+              ) : success ? (
+                'Verified'
+              ) : (
+                <>
+                  Verify Account <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {!success && (
+            <div className="mt-8 text-center">
+              <p className="text-sm text-slate-500">
+                Didn't receive the email?{' '}
+                <button className="text-indigo-600 font-semibold hover:underline">
+                  Resend Code
+                </button>
+              </p>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Verification Failed</h2>
-            <p className="text-slate-600 mt-2 mb-6">{message}</p>
-            <Link 
-              to="/login" 
-              className="text-indigo-600 font-semibold hover:underline"
-            >
-              Back to Login
-            </Link>
-          </div>
-        )}
-
+          )}
+        </div>
       </div>
     </div>
   );
