@@ -2,12 +2,23 @@ const jwt = require('jsonwebtoken');
 const oracledb = require('oracledb');
 require('dotenv').config(); // Ensure env vars are loaded
 
-const ACCESS_SECRET = process.env.JWT_SECRET || 'default-access-secret';
+const ACCESS_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
+const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 
-// 1. Generate Tokens
+// =========================================================
+// 1. GENERATE TOKEN (Legacy single token)
+// =========================================================
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: LEGACY_TOKEN_EXPIRES_IN });
+};
+
+// =========================================================
+// 2. GENERATE TOKENS (Access + Refresh)
+// =========================================================
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: '15m' });
+  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
   const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 };
@@ -90,6 +101,9 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+// =========================================================
+// 5. AUTHORIZATION
+// =========================================================
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {

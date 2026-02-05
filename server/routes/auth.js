@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { upload } = require('../middleware/uploadMiddleware');
-// Import the authentication middleware
-const { authenticate } = require('../middleware/auth'); 
+const { authenticate } = require('../middleware/auth');
 
 console.log('✅ Auth Routes Loaded');
 
@@ -14,10 +13,7 @@ router.post('/register', upload.single('profileImage'), (req, res, next) => {
 }, authController.register);
 
 router.post('/login', authController.login);
+router.post('/verify-email', authController.verifyEmail);
 router.post('/refresh-token', authController.refreshToken);
-
-// Protected Route (New!)
-// This answers the frontend's check on page load
-router.get('/me', authenticate, authController.getMe);
-
+router.get('/me', authenticate, authController.getCurrentUser);
 module.exports = router;

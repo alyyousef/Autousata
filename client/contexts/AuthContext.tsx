@@ -20,7 +20,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Check if user is logged in on mount
     const checkAuth = async () => {
-      // CHANGED: We now look for 'accessToken'
       const token = localStorage.getItem('accessToken');
       if (token) {
         try {

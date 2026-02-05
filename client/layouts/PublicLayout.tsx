@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User as UserIcon } from 'lucide-react'; 
 import { useAuth } from '../contexts/AuthContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  
-  // 1. GET THE LOADING STATE
-  const { user, loading } = useAuth(); 
-  
+  const { user, loading, logout } = useAuth();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+  const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium tracking-tight transition-colors ${isActive
@@ -44,31 +48,36 @@ const PublicLayout: React.FC = () => {
 
             {/* Desktop User Actions */}
             <div className="hidden md:flex items-center gap-3">
-              {/* 2. THE FIX: Check 'loading' first.
-                 If loading is true, we render an invisible box (w-20) to keep the spacing correct 
-                 but show NO buttons. 
-              */}
               {loading ? (
-                <div className="w-20 h-10"></div> 
+                <div className="w-20 h-10"></div>
               ) : user ? (
-                // === User is Logged In ===
-                <Link 
-                  to="/profile" 
-                  className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-slate-200 overflow-hidden hover:border-indigo-600 transition-all shadow-sm"
-                  title="Go to Profile"
-                >
-                  {user.profileImage ? (
-                    <img 
-                      src={user.profileImage} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
-                      <UserIcon size={20} />
-                    </div>
-                  )}
-                </Link>
+                isProfilePage ? (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="px-4 py-2 rounded-full bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 border border-red-100 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                ) : (
+                  <Link 
+                    to="/profile" 
+                    className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-slate-200 overflow-hidden hover:border-indigo-600 transition-all shadow-sm"
+                    title="Go to Profile"
+                  >
+                    {user.profileImage ? (
+                      <img 
+                        src={user.profileImage} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                        <UserIcon size={20} />
+                      </div>
+                    )}
+                  </Link>
+                )
               ) : (
                 // === User is Guest ===
                 <>
@@ -110,29 +119,41 @@ const PublicLayout: React.FC = () => {
               <NavLink to="/about" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>About</NavLink>
               
               <div className="pt-2 border-t border-slate-200 flex gap-3">
-                {/* 3. MOBILE FIX: Same logic for mobile menu */}
                 {loading ? (
                     <div className="p-2 text-sm text-slate-400">Loading...</div>
                 ) : user ? (
-                  <Link 
-                    to="/profile" 
-                    className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                     <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden flex-shrink-0">
-                        {user.profileImage ? (
-                          <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
-                            <UserIcon size={20} />
-                          </div>
-                        )}
-                     </div>
-                     <div>
-                        <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
-                        <p className="text-xs text-slate-500">View Profile</p>
-                     </div>
-                  </Link>
+                  isProfilePage ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full p-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold border border-red-100 hover:bg-red-100 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  ) : (
+                    <Link 
+                      to="/profile" 
+                      className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                       <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden flex-shrink-0">
+                          {user.profileImage ? (
+                            <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                              <UserIcon size={20} />
+                            </div>
+                          )}
+                       </div>
+                       <div>
+                          <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
+                          <p className="text-xs text-slate-500">View Profile</p>
+                       </div>
+                    </Link>
+                  )
                 ) : (
                   <>
                     <NavLink
@@ -195,9 +216,6 @@ const PublicLayout: React.FC = () => {
                   <li><Link to="/about" className="hover:text-indigo-400">Press</Link></li>
                 </ul>
               </div>
-            </div>
-            <div className="mt-10 pt-6 border-t border-slate-800 text-xs text-center md:text-left text-slate-300">
-              &copy; 2026 AUTOUSATA, Inc. All rights reserved.
             </div>
           </div>
         </footer>

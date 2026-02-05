@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -154,8 +154,33 @@ class ApiService {
     return this.request<{ user: any }>('/auth/me');
   }
 
-  // Update Profile Text
-  async updateProfile(data: { firstName?: string; lastName?: string; phone?: string; location?: { city: string } }) {
+  async getLoginHistory() {
+    return this.request<{ loginHistory: any[] }>('/auth/login-history');
+  }
+
+  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+    });
+    return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
+  }
+
+  async getSellerVehicles() {
+    return this.request<any[]>('/vehicles');
+  }
+
+  async getVehicleById(vehicleId: string) {
+    return this.request<any>(`/vehicles/${vehicleId}`);
+  }
+
+  async getSellerAuctions() {
+    return this.request<{ auctions: any[] }>('/auctions/seller');
+  }
+
+  // Profile endpoints
+  async updateProfile(data: { name?: string; firstName?: string; lastName?: string; phone?: string; location?: { city: string; country?: string } }) {
     return this.request<{ user: any }>('/profile', {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -1,17 +1,18 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 require('dotenv').config();
 
-// 1. Import the DB Module
+// Import the new DB Configuration (Pool Manager)
 const db = require('./config/db'); 
 
 const app = express();
-const PORT = process.env.PORT || 5001; 
+// USE PORT 5000
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Request Logger
 app.use((req, res, next) => {
@@ -19,9 +20,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- ROUTES ---
+// Routes
 const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profile'); // <--- NEW IMPORT
+const profileRoutes = require('./routes/profile');
+const vehicleRoutes = require('./routes/vehicles');
+const auctionRoutes = require('./routes/auctions');
+app.use('/api/auth', authRoutes);
+app.use('/api', profileRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/auctions', auctionRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes); // <--- NEW USE
@@ -36,22 +43,12 @@ app.get('/', (req, res) => {
 // =====================================================
 async function startServer() {
     try {
-        // 2. Initialize Oracle Pool FIRST (Blocking)
-        await db.initialize(); 
+        // 1. Initialize Oracle Pool FIRST
+        await db.initialize();
 
-        // 3. Initialize MongoDB (Passive - Optional)
-        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
-        try {
-            await mongoose.connect(MONGO_URI);
-            console.log('✅ MongoDB connected');
-        } catch (err) {
-            console.error('⚠️ MongoDB Failed (Ignored):', err.message);
-        }
-
-        // 4. Start Listening ONLY after DB is ready
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`\n✅ SERVER STARTED SUCCESSFULLY!`);
-            console.log(`👉 Local:   http://127.0.0.1:${PORT}`);
+        // 2. Start the server after DB is ready
+        app.listen(PORT, () => {
+            console.log(`✅ Server is running on port ${PORT}`);
         });
 
         // Graceful Shutdown Logic

@@ -1,8 +1,7 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const oracledb = require('oracledb'); 
+const oracledb = require('oracledb');
 const db = require('../config/db');
-// 1. Import ONLY the new plural functions
 const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
 const { sendVerificationEmail } = require('../services/emailService');
@@ -70,23 +69,23 @@ async function register(req, res) {
             sendVerificationEmail(email, verificationToken)
                 .catch(err => console.error("Email failed in background:", err));
 
-            // --- NEW TOKEN LOGIC START ---
             const { accessToken, refreshToken } = generateTokens(newUserId);
-            
+
             res.status(201).json({ 
-                message: 'User registered successfully.',
-                accessToken, 
+                message: 'User registered successfully. Please verify your email.',
+                accessToken,
                 refreshToken,
-                user: { 
-                    id: newUserId, 
-                    firstName, 
-                    lastName, 
-                    email, 
-                    role: 'client', 
-                    profileImage: profilePicUrl 
+                token: accessToken,
+                user: {
+                    id: newUserId,
+                    firstName,
+                    lastName,
+                    email,
+                    role: 'client',
+                    profileImage: profilePicUrl,
+                    emailVerified: false
                 }
             });
-            // --- NEW TOKEN LOGIC END ---
 
         } else {
             console.log("❌ DB Returned Error:", status);
@@ -98,7 +97,9 @@ async function register(req, res) {
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         if (connection) {
-            try { await connection.close(); } catch (e) { console.error(e); }
+            try {
+                await connection.close();
+            } catch (e) { console.error("Error closing connection:", e); }
         }
     }
 }
@@ -147,13 +148,13 @@ async function login(req, res) {
         const match = await bcrypt.compare(password, userData.hash);
 
         if (match) {
-            // --- NEW TOKEN LOGIC START ---
             const { accessToken, refreshToken } = generateTokens(userData.id);
 
             res.json({
                 message: 'Login successful',
                 accessToken,
                 refreshToken,
+                token: accessToken,
                 user: {
                     id: userData.id,
                     firstName: userData.fn,
@@ -163,7 +164,6 @@ async function login(req, res) {
                     profileImage: userData.img 
                 }
             });
-            // --- NEW TOKEN LOGIC END ---
         } else {
             res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -179,22 +179,69 @@ async function login(req, res) {
 }
 
 // ==========================================
-// 3. REFRESH TOKEN (New Endpoint)
+// 3. VERIFY EMAIL
+// ==========================================
+async function verifyEmail(req, res) {
+    const { token } = req.body;
+    let connection;
+
+    try {
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id FROM users 
+             WHERE email_verification_token = :token 
+             AND email_token_expiry > CURRENT_TIMESTAMP`,
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired verification link.' });
+        }
+
+        const userId = result.rows[0][0];
+
+        await connection.execute(
+            `UPDATE users 
+             SET email_verified = '1', 
+                 email_verification_token = NULL, 
+                 email_token_expiry = NULL 
+             WHERE id = :u_id`,
+            { u_id: userId },
+            { autoCommit: true }
+        );
+
+        res.json({ message: 'Email verified successfully! You can now log in.' });
+
+    } catch (err) {
+        console.error('Verification error:', err);
+        res.status(500).json({ error: 'Verification failed' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error("Error closing connection:", e);
+            }
+        }
+    }
+}
+
+// ==========================================
+// 4. REFRESH TOKEN
 // ==========================================
 async function refreshToken(req, res) {
-    const { refreshToken } = req.body;
+    const { refreshToken: token } = req.body;
 
-    if (!refreshToken) {
+    if (!token) {
         return res.status(400).json({ error: 'Refresh token required' });
     }
 
-    // Verify the Refresh Token
-    const decoded = verifyRefreshToken(refreshToken);
+    const decoded = verifyRefreshToken(token);
     if (!decoded) {
         return res.status(403).json({ error: 'Invalid or expired refresh token' });
     }
 
-    // Generate NEW tokens (Rotation)
     const tokens = generateTokens(decoded.userId);
 
     res.json({
@@ -204,18 +251,63 @@ async function refreshToken(req, res) {
 }
 
 // ==========================================
-// 4. GET CURRENT USER (The "Who am I?" Endpoint)
+// 5. CURRENT USER
 // ==========================================
-async function getMe(req, res) {
-    // req.user is already attached by the 'authenticate' middleware
-    if (!req.user) {
-        return res.status(401).json({ error: 'Not authenticated' });
+async function getCurrentUser(req, res) {
+    let connection;
+
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city, email_verified, phone_verified
+             FROM users
+             WHERE id = :uid`,
+            { uid: userId }
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const row = result.rows[0];
+        const user = {
+            id: row[0],
+            firstName: row[1],
+            lastName: row[2],
+            name: `${row[1] || ''} ${row[2] || ''}`.trim(),
+            email: row[3],
+            phone: row[4],
+            role: row[5],
+            profileImage: row[6],
+            avatar: row[6],
+            location: { city: row[7] },
+            emailVerified: row[8] === '1',
+            phoneVerified: row[9] === '1'
+        };
+
+        res.json({ user });
+
+    } catch (err) {
+        console.error('Get current user error:', err);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error('Error closing connection:', e);
+            }
+        }
     }
-    
-    res.json({ 
-        user: req.user 
-    });
 }
 
-// Don't forget to add getMe to the exports!
-module.exports = { register, login, refreshToken, getMe };
+const getMe = (req, res) => getCurrentUser(req, res);
+
+module.exports = { register, login, verifyEmail, refreshToken, getCurrentUser, getMe };

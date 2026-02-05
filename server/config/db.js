@@ -2,6 +2,7 @@ const oracledb = require('oracledb');
 require('dotenv').config();
 
 oracledb.autoCommit = true;
+oracledb.fetchAsString = [oracledb.CLOB];
 
 const dbConfig = {
     user: process.env.ORACLE_USER,
