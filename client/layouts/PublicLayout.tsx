@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
+import { Bell, Menu, Moon, Sun, X, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
@@ -12,6 +12,7 @@ const PublicLayout: React.FC = () => {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     if (!isAuthPage) return;
@@ -24,6 +25,22 @@ const PublicLayout: React.FC = () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, [isAuthPage]);
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(storedTheme ? storedTheme === 'dark' : prefersDark);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('theme-dark');
+      window.localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('theme-dark');
+      window.localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
@@ -32,28 +49,31 @@ const PublicLayout: React.FC = () => {
     navigate('/login');
   };
 
+  const logoSrc = isDarkMode
+    ? '/assests/frontendPictures/logoWhiteA.png'
+    : '/assests/frontendPictures/logoBlackA.png';
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `text-sm font-medium tracking-tight transition-colors ${isActive
-      ? 'text-indigo-600'
-      : 'text-slate-600 hover:text-indigo-600'}`;
+    `nav-link ${isActive ? 'nav-link-active' : ''}`;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b border-slate-200/80 shadow-sm">
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-50 backdrop-blur-md border-b nav-shell">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 group" aria-label="AUTOUSATA home">
-              <div>
-                <img src="/assests/frontendPictures/logoBlackA.png" alt="AUTOUSATA logo" className="h-16 w-16" />
+            <Link to="/" className="flex items-center gap-3 group" aria-label="AUTOUSATA home">
+              <div className="h-12 w-12 rounded-full border border-white/10 bg-white/80 flex items-center justify-center shadow-sm nav-logo-badge">
+                <img src={logoSrc} alt="AUTOUSATA logo" className="h-9 w-9" />
               </div>
-              <span className="text-2xl font-bold tracking-tight text-slate-900 uppercase">
-                AUTOUSATA
-              </span>
+              <div className="leading-none">
+                <span className="block text-xs uppercase tracking-[0.4em] text-slate-500 nav-logo-eyebrow">Registry</span>
+                <span className="block text-2xl font-semibold text-slate-900 tracking-tight nav-logo-title">AUTOUSATA</span>
+              </div>
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-8" aria-label="Primary">
+            <nav className="hidden md:flex items-center gap-8 px-6 py-2 rounded-full border nav-pill shadow-sm" aria-label="Primary">
               <NavLink to="/browse" className={navLinkClass}>Buy</NavLink>
               <NavLink to="/sell" className={navLinkClass}>Sell</NavLink>
               <NavLink to="/auctions" className={navLinkClass}>Auction</NavLink>
@@ -62,6 +82,24 @@ const PublicLayout: React.FC = () => {
 
             {/* Desktop User Actions */}
             <div className="hidden md:flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDarkMode(prev => !prev)}
+                className="relative inline-flex items-center w-14 h-8 rounded-full theme-toggle transition-colors"
+                aria-label="Toggle dark mode"
+              >
+                <span className="absolute left-2 text-xs theme-toggle-icon">
+                  <Sun size={14} />
+                </span>
+                <span className="absolute right-2 text-xs text-white/80">
+                  <Moon size={14} />
+                </span>
+                <span
+                  className={`absolute top-1 left-1 h-6 w-6 rounded-full theme-toggle-thumb shadow-md transition-transform ${
+                    isDarkMode ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
               <div className="relative">
                 <button
                   type="button"
@@ -69,7 +107,7 @@ const PublicLayout: React.FC = () => {
                     setIsNotifOpen(prev => !prev);
                     markAllRead();
                   }}
-                  className="relative p-2 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="relative p-2 rounded-full nav-icon hover:bg-slate-100 transition-colors"
                   aria-label="Notifications"
                 >
                   <Bell size={20} />
@@ -160,13 +198,13 @@ const PublicLayout: React.FC = () => {
                 <>
                   <NavLink
                     to="/login"
-                    className="text-slate-600 hover:text-indigo-600 text-sm font-semibold transition-colors"
+                    className="nav-link text-sm"
                   >
                     Login
                   </NavLink>
                   <NavLink
                     to="/signup"
-                    className="bg-indigo-500 text-white hover:bg-indigo-400 px-4 py-2 rounded-full text-sm font-semibold shadow-md shadow-indigo-500/30 transition-all"
+                    className="nav-cta px-5 py-2 rounded-full text-sm font-semibold transition-all hover:brightness-110"
                   >
                     Sign up
                   </NavLink>
@@ -177,7 +215,7 @@ const PublicLayout: React.FC = () => {
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 rounded-md text-slate-500 hover:bg-slate-100"
+              className="md:hidden p-2 rounded-md nav-icon hover:bg-slate-100"
               aria-label="Toggle menu"
             >
               {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -187,12 +225,30 @@ const PublicLayout: React.FC = () => {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white">
+          <div className="md:hidden border-t border-slate-200 bg-white nav-mobile">
             <div className="px-4 py-4 space-y-3">
               <NavLink to="/browse" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Buy</NavLink>
               <NavLink to="/sell" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Sell</NavLink>
               <NavLink to="/auctions" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Auction</NavLink>
               <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
+
+              <button
+                type="button"
+                onClick={() => setIsDarkMode(prev => !prev)}
+                className="flex items-center justify-between w-full px-4 py-2 rounded-full border nav-pill text-sm font-semibold"
+              >
+                <span className="flex items-center gap-2">
+                  {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+                  {isDarkMode ? 'Dark mode' : 'Light mode'}
+                </span>
+                <span className={`h-4 w-8 rounded-full relative theme-toggle`}>
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full theme-toggle-thumb transition-transform ${
+                      isDarkMode ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </span>
+              </button>
               
               <div className="pt-2 border-t border-slate-200 flex gap-3">
                 {user ? (
@@ -233,7 +289,7 @@ const PublicLayout: React.FC = () => {
                   <>
                     <NavLink
                       to="/login"
-                      className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
+                      className="nav-link text-sm"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Login
