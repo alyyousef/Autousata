@@ -1,35 +1,27 @@
 const jwt = require('jsonwebtoken');
 const oracledb = require('oracledb');
-require('dotenv').config();
+require('dotenv').config(); // Ensure env vars are loaded
 
 const ACCESS_SECRET = process.env.JWT_SECRET || 'default-access-secret';
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
 
-// =========================================================
-// 1. GENERATE TOKENS (Now returns a pair)
-// =========================================================
-// Why: We need a short-lived key for access and a long-lived key for refreshing.
+// 1. Generate Tokens
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: '15m' }); // Expires in 15 Minutes
-  const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '7d' }); // Expires in 7 Days
+  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '7d' });
   return { accessToken, refreshToken };
 };
 
-// =========================================================
-// 2. VERIFY REFRESH TOKEN (Helper)
-// =========================================================
-// Why: The controller will need this to check if a user is allowed to get a new token.
+// 2. Verify Refresh Token
 const verifyRefreshToken = (token) => {
   try {
     return jwt.verify(token, REFRESH_SECRET);
   } catch (error) {
-    return null; // Invalid or expired
+    return null;
   }
 };
 
-// =========================================================
-// 3. AUTHENTICATE MIDDLEWARE (Checks Access Token)
-// =========================================================
+// 3. Authenticate & MAP DATA
 const authenticate = async (req, res, next) => {
   let connection;
   try {
@@ -39,42 +31,53 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Verify against ACCESS_SECRET (Short lived)
     const decoded = jwt.verify(token, ACCESS_SECRET);
     
     connection = await oracledb.getConnection();
 
+    // Call the procedure we just fixed
     const result = await connection.execute(
       `BEGIN 
-         sp_get_user_by_id(:id, :name, :email, :role, :status); 
+         sp_get_user_by_id(:id, :fn, :ln, :em, :ph, :role, :status, :pic, :city); 
        END;`,
       {
         id: decoded.userId,
-        name:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        email:  { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        role:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+        fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        em: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ph: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        pic: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        city: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
       }
     );
 
     const userData = result.outBinds;
 
-    if (userData.status !== 'SUCCESS') {
+    if (userData.status === 'NOT_FOUND') {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // === CRITICAL MAPPING STEP ===
+    // This connects DB columns (outBinds) to Frontend variables
     req.user = {
       id: decoded.userId,
-      name: userData.name,
-      email: userData.email,
-      role: userData.role
+      firstName: userData.fn,      // Maps :fn -> firstName
+      lastName: userData.ln,       // Maps :ln -> lastName
+      email: userData.em,
+      phone: userData.ph,
+      role: userData.role,
+      profileImage: userData.pic,  // Maps :pic -> profileImage
+      location: {
+        city: userData.city        // Maps :city -> location.city
+      }
     };
     
     req.token = token;
     next();
 
   } catch (error) {
-    // Specific error message helps frontend know IF it should try to refresh
     if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ error: 'TokenExpired', message: 'Access token expired' });
     }
@@ -87,15 +90,9 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// =========================================================
-// 4. AUTHORIZATION
-// =========================================================
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();
@@ -103,8 +100,8 @@ const authorize = (...roles) => {
 };
 
 module.exports = {
-  generateTokens, // Renamed from generateToken
-  verifyRefreshToken, // New export
+  generateTokens,
+  verifyRefreshToken,
   authenticate,
   authorize
 };
