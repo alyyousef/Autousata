@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Menu, X, User as UserIcon } from 'lucide-react'; // <--- Added UserIcon
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,18 @@ const PublicLayout: React.FC = () => {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
+
+  useEffect(() => {
+    if (!isAuthPage) return;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, [isAuthPage]);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 

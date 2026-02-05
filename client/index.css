@@ -89,11 +89,6 @@ a, button, input, textarea, select, [role='button'] {
   filter: none;
 }
 
-.auth-scale-67 {
-  transform: scale(0.67);
-  transform-origin: top right;
-}
-
 /* Confetti animation */
 .confetti-piece {
   position: absolute;

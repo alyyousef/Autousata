@@ -68,14 +68,14 @@ const SignUpPage: React.FC = () => {
   };
 
   return (
-    <section className="relative min-h-screen flex items-start justify-end px-4 py-10 sm:px-6 md:py-16 md:items-center text-slate-900 overflow-y-auto">
+    <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
       <div className="fixed inset-0 bg-cover auth-bg-signup" aria-hidden="true" />
       <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in auth-scale-67">
-        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-8 md:p-10 w-full max-w-lg my-auto">
+      <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
+        <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-5 md:p-7 w-full max-w-lg my-auto max-h-[calc(100vh-140px)] overflow-y-auto">
           <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Become a AUTOUSATA Member!</h1>
-          <p className="text-sm text-slate-600 mb-6">Get access to verified listings, transparent bids, and concierge support!</p>
+          <p className="text-sm text-slate-600 mb-4">Get access to verified listings, transparent bids, and concierge support!</p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -83,16 +83,16 @@ const SignUpPage: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             
             {/* === Profile Picture Upload Section === */}
-            <div className="flex flex-col items-center mb-2">
+            <div className="flex flex-col items-center mb-1">
                 <div className="relative group">
-                    <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm">
                         {previewUrl ? (
                             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                         ) : (
-                            <Camera className="text-slate-400 w-8 h-8" />
+                            <Camera className="text-slate-400 w-7 h-7" />
                         )}
                     </div>
                     <label className="absolute bottom-0 right-0 bg-slate-900 text-white p-2 rounded-full cursor-pointer hover:bg-slate-700 transition-colors shadow-md">
