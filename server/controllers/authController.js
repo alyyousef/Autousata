@@ -88,8 +88,84 @@ async function register(req, res) {
     }
 }
 
-async function login(req, res) { 
-    // ... Copy your login logic here or leave as is if it wasn't broken 
-}
+// ==========================================
+// 2. LOGIN (DEBUG VERSION)
+// ==========================================
+async function login(req, res) {
+    const { email, password } = req.body;
+    let connection;
 
+    try {
+        console.log(`👉 Logging in: ${email}`);
+        console.log("🔌 [1] Requesting Database Connection...");
+        
+        // Use the pool manager
+        connection = await db.getConnection();
+        console.log("✅ [2] DB Connected. Checking Credentials...");
+
+        const result = await connection.execute(
+            `BEGIN 
+                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); 
+             END;`,
+            {
+                em: email,
+                id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                hash: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                img: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+            }
+        );
+
+        console.log("✅ [3] Procedure Executed.");
+        const userData = result.outBinds;
+
+        if (userData.status === 'UNVERIFIED') {
+            console.log("⚠️ [4] User is Unverified.");
+            return res.status(403).json({ 
+                error: 'Please verify your email address to log in.',
+                needsVerification: true 
+            });
+        }
+
+        if (userData.status !== 'FOUND') {
+            console.log("❌ [4] User Not Found or Invalid.");
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        console.log("🔑 [4] Verifying Password...");
+        const match = await bcrypt.compare(password, userData.hash);
+
+        if (match) {
+            console.log("✅ [5] Password Correct. Generating Token...");
+            const token = generateToken(userData.id);
+
+            res.json({
+                message: 'Login successful',
+                token,
+                user: {
+                    id: userData.id,
+                    firstName: userData.fn,
+                    lastName: userData.ln,
+                    email: email,
+                    role: userData.role,
+                    profileImage: userData.img 
+                }
+            });
+        } else {
+            console.log("❌ [5] Password Wrong.");
+            res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+    } catch (err) {
+        console.error('❌ Login Error:', err);
+        res.status(500).json({ error: 'Login failed' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { console.error(e); }
+        }
+    }
+}
 module.exports = { register, login }; // removed verifyEmail for brevity unless you have it
