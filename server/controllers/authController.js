@@ -25,7 +25,7 @@ async function register(req, res) {
         if (file) {
             console.log("📸 [1] Starting S3 Upload...");
             profilePicUrl = await uploadToS3(file, 'profiles'); 
-            console.log("✅ [2] S3 Upload Finished. URL generated.");
+            console.log("✅ [2] S3 Upload Finished:", profilePicUrl);
         }
 
         console.log("🔑 [3] Hashing Password...");
@@ -34,10 +34,9 @@ async function register(req, res) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         console.log("🔌 [4] Requesting Database Connection...");
-        // ⚠️ THIS IS THE SUSPECT LINE
-        connection = await db.getConnection(); 
-        console.log("✅ [5] Database Connected! Executing Procedure...");
-
+        connection = await db.getConnection(); // <--- CORRECT WAY
+        
+        console.log("📝 [5] Executing Stored Procedure...");
         const result = await connection.execute(
             `BEGIN 
                 sp_register_user(:fn, :ln, :em, :ph, :pw, :img, :out_id, :out_status); 
@@ -54,38 +53,34 @@ async function register(req, res) {
             }
         );
 
+        console.log("✅ [6] DB Execution Complete.");
         const status = result.outBinds.out_status;
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            console.log("✅ User created. ID:", newUserId);
-
+            // Update token
             await connection.execute(
                 `UPDATE users 
                  SET email_verification_token = :token,
                      email_token_expiry = CURRENT_TIMESTAMP + INTERVAL '1' DAY
                  WHERE id = :u_id`, 
-                { 
-                    token: verificationToken, 
-                    u_id: newUserId 
-                },
+                { token: verificationToken, u_id: newUserId },
                 { autoCommit: true }
             );
 
-            // Send Email (Don't await, let it run in background)
+            console.log("✉️ [7] Sending Verification Email...");
+            // Run email in background so response is fast
             sendVerificationEmail(email, verificationToken)
-                .then(success => {
-                    if(success) console.log(`✉️ Email sent to ${email}`);
-                });
+                .catch(err => console.error("Email failed in background:", err));
 
             const token = generateToken(newUserId);
-
             res.status(201).json({ 
                 message: 'User registered successfully. Please verify your email.',
                 token,
                 user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
         } else {
+            console.log("❌ DB Returned Error:", status);
             res.status(400).json({ error: status });
         }
 
