@@ -7,7 +7,7 @@ require('dotenv').config();
 const db = require('./config/db'); 
 
 const app = express();
-const PORT = process.env.PORT || 5001; // Changed to 5001 to match your previous setup
+const PORT = process.env.PORT || 5001; 
 
 // Middleware
 app.use(cors());
@@ -21,7 +21,10 @@ app.use((req, res, next) => {
 
 // --- ROUTES ---
 const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile'); // <--- NEW IMPORT
+
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes); // <--- NEW USE
 
 // Test Route
 app.get('/', (req, res) => {
@@ -34,7 +37,6 @@ app.get('/', (req, res) => {
 async function startServer() {
     try {
         // 2. Initialize Oracle Pool FIRST (Blocking)
-        // The app will NOT start listening until this finishes
         await db.initialize(); 
 
         // 3. Initialize MongoDB (Passive - Optional)
@@ -55,7 +57,7 @@ async function startServer() {
         // Graceful Shutdown Logic
         process.on('SIGINT', async () => {
             console.log('\n🛑 Shutting down...');
-            await db.close(); // Close Oracle Pool
+            await db.close(); 
             server.close(() => {
                 console.log('Server closed.');
                 process.exit(0);

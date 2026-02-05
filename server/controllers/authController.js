@@ -1,12 +1,16 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const oracledb = require('oracledb'); 
-const db = require('../config/db');   // <--- USES OUR POOL
-const { generateToken } = require('../middleware/auth');
+const db = require('../config/db');
+// 1. Import ONLY the new plural functions
+const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
 const { sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
+// ==========================================
+// 1. REGISTER
+// ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
     const file = req.file; 
@@ -28,7 +32,7 @@ async function register(req, res) {
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         console.log("🔌 [4] Requesting Database Connection...");
-        connection = await db.getConnection(); // <--- CORRECT WAY
+        connection = await db.getConnection();
         
         console.log("📝 [5] Executing Stored Procedure...");
         const result = await connection.execute(
@@ -52,7 +56,7 @@ async function register(req, res) {
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            // Update token
+            // Update token in DB
             await connection.execute(
                 `UPDATE users 
                  SET email_verification_token = :token,
@@ -63,16 +67,27 @@ async function register(req, res) {
             );
 
             console.log("✉️ [7] Sending Verification Email...");
-            // Run email in background so response is fast
             sendVerificationEmail(email, verificationToken)
                 .catch(err => console.error("Email failed in background:", err));
 
-            const token = generateToken(newUserId);
+            // --- NEW TOKEN LOGIC START ---
+            const { accessToken, refreshToken } = generateTokens(newUserId);
+            
             res.status(201).json({ 
                 message: 'User registered successfully.',
-                token,
-                user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl }
+                accessToken, 
+                refreshToken,
+                user: { 
+                    id: newUserId, 
+                    firstName, 
+                    lastName, 
+                    email, 
+                    role: 'client', 
+                    profileImage: profilePicUrl 
+                }
             });
+            // --- NEW TOKEN LOGIC END ---
+
         } else {
             console.log("❌ DB Returned Error:", status);
             res.status(400).json({ error: status });
@@ -89,7 +104,7 @@ async function register(req, res) {
 }
 
 // ==========================================
-// 2. LOGIN (DEBUG VERSION)
+// 2. LOGIN
 // ==========================================
 async function login(req, res) {
     const { email, password } = req.body;
@@ -97,11 +112,8 @@ async function login(req, res) {
 
     try {
         console.log(`👉 Logging in: ${email}`);
-        console.log("🔌 [1] Requesting Database Connection...");
         
-        // Use the pool manager
         connection = await db.getConnection();
-        console.log("✅ [2] DB Connected. Checking Credentials...");
 
         const result = await connection.execute(
             `BEGIN 
@@ -119,11 +131,9 @@ async function login(req, res) {
             }
         );
 
-        console.log("✅ [3] Procedure Executed.");
         const userData = result.outBinds;
 
         if (userData.status === 'UNVERIFIED') {
-            console.log("⚠️ [4] User is Unverified.");
             return res.status(403).json({ 
                 error: 'Please verify your email address to log in.',
                 needsVerification: true 
@@ -131,20 +141,19 @@ async function login(req, res) {
         }
 
         if (userData.status !== 'FOUND') {
-            console.log("❌ [4] User Not Found or Invalid.");
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        console.log("🔑 [4] Verifying Password...");
         const match = await bcrypt.compare(password, userData.hash);
 
         if (match) {
-            console.log("✅ [5] Password Correct. Generating Token...");
-            const token = generateToken(userData.id);
+            // --- NEW TOKEN LOGIC START ---
+            const { accessToken, refreshToken } = generateTokens(userData.id);
 
             res.json({
                 message: 'Login successful',
-                token,
+                accessToken,
+                refreshToken,
                 user: {
                     id: userData.id,
                     firstName: userData.fn,
@@ -154,8 +163,8 @@ async function login(req, res) {
                     profileImage: userData.img 
                 }
             });
+            // --- NEW TOKEN LOGIC END ---
         } else {
-            console.log("❌ [5] Password Wrong.");
             res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -168,4 +177,45 @@ async function login(req, res) {
         }
     }
 }
-module.exports = { register, login }; // removed verifyEmail for brevity unless you have it
+
+// ==========================================
+// 3. REFRESH TOKEN (New Endpoint)
+// ==========================================
+async function refreshToken(req, res) {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(400).json({ error: 'Refresh token required' });
+    }
+
+    // Verify the Refresh Token
+    const decoded = verifyRefreshToken(refreshToken);
+    if (!decoded) {
+        return res.status(403).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    // Generate NEW tokens (Rotation)
+    const tokens = generateTokens(decoded.userId);
+
+    res.json({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+    });
+}
+
+// ==========================================
+// 4. GET CURRENT USER (The "Who am I?" Endpoint)
+// ==========================================
+async function getMe(req, res) {
+    // req.user is already attached by the 'authenticate' middleware
+    if (!req.user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    res.json({ 
+        user: req.user 
+    });
+}
+
+// Don't forget to add getMe to the exports!
+module.exports = { register, login, refreshToken, getMe };
