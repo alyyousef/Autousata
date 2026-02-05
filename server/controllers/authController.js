@@ -1,12 +1,18 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const oracledb = require('oracledb'); 
-const db = require('../config/db');   // <--- USES OUR POOL
+const oracledb = require('oracledb'); // Keep for BIND_OUT constants
+const db = require('../config/db');   // <--- IMPORT OUR NEW DB MODULE
 const { generateToken } = require('../middleware/auth');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
 const { sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
+// ==========================================
+// 1. SIGN UP
+// ==========================================
+// ==========================================
+// 1. SIGN UP (BREADCRUMB DEBUGGER)
+// ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
     const file = req.file; 
@@ -69,9 +75,9 @@ async function register(req, res) {
 
             const token = generateToken(newUserId);
             res.status(201).json({ 
-                message: 'User registered successfully.',
+                message: 'User registered successfully. Please verify your email.',
                 token,
-                user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl }
+                user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
         } else {
             console.log("❌ DB Returned Error:", status);
@@ -83,13 +89,15 @@ async function register(req, res) {
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         if (connection) {
-            try { await connection.close(); } catch (e) { console.error(e); }
+            try {
+                await connection.close();
+            } catch (e) { console.error("Error closing connection:", e); }
         }
     }
 }
 
 // ==========================================
-// 2. LOGIN (DEBUG VERSION)
+// 2. LOGIN
 // ==========================================
 async function login(req, res) {
     const { email, password } = req.body;
@@ -168,4 +176,111 @@ async function login(req, res) {
         }
     }
 }
-module.exports = { register, login }; // removed verifyEmail for brevity unless you have it
+// ==========================================
+// 3. VERIFY EMAIL
+// ==========================================
+async function verifyEmail(req, res) {
+    const { token } = req.body;
+    let connection;
+
+    try {
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id FROM users 
+             WHERE email_verification_token = :token 
+             AND email_token_expiry > CURRENT_TIMESTAMP`,
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired verification link.' });
+        }
+
+        const userId = result.rows[0][0];
+
+        await connection.execute(
+            `UPDATE users 
+             SET email_verified = '1', 
+                 email_verification_token = NULL, 
+                 email_token_expiry = NULL 
+             WHERE id = :u_id`,
+            { u_id: userId },
+            { autoCommit: true }
+        );
+
+        res.json({ message: 'Email verified successfully! You can now log in.' });
+
+    } catch (err) {
+        console.error('Verification error:', err);
+        res.status(500).json({ error: 'Verification failed' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error("Error closing connection:", e);
+            }
+        }
+    }
+}
+
+// ==========================================
+// 4. CURRENT USER
+// ==========================================
+async function getCurrentUser(req, res) {
+    let connection;
+
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city, email_verified, phone_verified
+             FROM users
+             WHERE id = :uid`,
+            { uid: userId }
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const row = result.rows[0];
+        const user = {
+            id: row[0],
+            firstName: row[1],
+            lastName: row[2],
+            name: `${row[1] || ''} ${row[2] || ''}`.trim(),
+            email: row[3],
+            phone: row[4],
+            role: row[5],
+            profileImage: row[6],
+            avatar: row[6],
+            location: { city: row[7] },
+            emailVerified: row[8] === '1',
+            phoneVerified: row[9] === '1'
+        };
+
+        res.json({ user });
+
+    } catch (err) {
+        console.error('Get current user error:', err);
+        res.status(500).json({ error: 'Failed to fetch user' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error('Error closing connection:', e);
+            }
+        }
+    }
+}
+
+module.exports = { register, login, verifyEmail, getCurrentUser };

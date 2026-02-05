@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shield, Mail, Phone, ExternalLink, Camera, ChevronRight, LogOut, MapPin, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
+import ImageLightbox from '../components/ImageLightbox';
+import { AuctionStatus, VehicleStatus } from '../types';
 
 const ProfilePage: React.FC = () => {
-  const { user, updateUser, logout } = useAuth();
+  const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -19,6 +21,26 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listingsError, setListingsError] = useState('');
+  const [sellerListings, setSellerListings] = useState<Array<{
+    id: string;
+    vehicle: {
+      id: string;
+      make: string;
+      model: string;
+      year?: number;
+      price?: number;
+      status?: VehicleStatus | string;
+      images?: string[];
+    };
+    auctionStatus?: AuctionStatus | string;
+  }>>([]);
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
 
   // 2. Initialize state when user data loads
   useEffect(() => {
@@ -31,7 +53,7 @@ const ProfilePage: React.FC = () => {
   }, [user]);
 
   if (!user) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <Navigate to="/login" replace />;
   }
 
   const handleLogout = async () => {
@@ -88,8 +110,132 @@ const ProfilePage: React.FC = () => {
   const displayName = `${user.firstName} ${user.lastName}`.trim() || user.email;
   const displayAvatar = user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`;
 
+  const formatEgp = (value?: number) => {
+    if (value === undefined || value === null) return 'EGP 0';
+    return new Intl.NumberFormat('en-EG', {
+      style: 'currency',
+      currency: 'EGP',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  const getVehicleStatusBadge = (status?: VehicleStatus | string) => {
+    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
+    const map: Record<string, { label: string; className: string }> = {
+      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
+      active: { label: 'Active', className: 'bg-emerald-50 text-emerald-600' },
+      sold: { label: 'Sold', className: 'bg-rose-50 text-rose-600' },
+      delisted: { label: 'Delisted', className: 'bg-amber-50 text-amber-700' }
+    };
+    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
+  };
+
+  const getAuctionStatusBadge = (status?: AuctionStatus | string) => {
+    if (!status) {
+      return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
+    }
+    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
+    const map: Record<string, { label: string; className: string }> = {
+      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
+      scheduled: { label: 'Scheduled', className: 'bg-indigo-50 text-indigo-600' },
+      live: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
+      ended: { label: 'Ended', className: 'bg-rose-50 text-rose-600' },
+      settled: { label: 'Settled', className: 'bg-sky-50 text-sky-600' },
+      cancelled: { label: 'Cancelled', className: 'bg-amber-50 text-amber-700' }
+    };
+    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSellerListings = async () => {
+      if (!user) {
+        setListingsLoading(false);
+        setSellerListings([]);
+        return;
+      }
+
+      setListingsLoading(true);
+      setListingsError('');
+
+      const [vehiclesResponse, auctionsResponse] = await Promise.all([
+        apiService.getSellerVehicles(),
+        apiService.getSellerAuctions()
+      ]);
+
+      if (!isMounted) return;
+
+      if (vehiclesResponse.error) {
+        setListingsError(vehiclesResponse.error);
+        setSellerListings([]);
+        setListingsLoading(false);
+        return;
+      }
+
+      const vehicles = vehiclesResponse.data || [];
+      const auctions = auctionsResponse.data?.auctions || [];
+      const auctionMap = new Map(auctions.map((auction: any) => [auction.vehicleId, auction]));
+
+      const vehicleMap = new Map(vehicles.map((vehicle: any) => [vehicle._id || vehicle.id, vehicle]));
+
+      const missingVehicleIds = Array.from(auctionMap.keys()).filter((vehicleId) => !vehicleMap.has(vehicleId));
+      if (missingVehicleIds.length > 0) {
+        const fetchedVehicles = await Promise.all(
+          missingVehicleIds.map((vehicleId) => apiService.getVehicleById(vehicleId))
+        );
+
+        fetchedVehicles.forEach((response) => {
+          if (response.data) {
+            const vehicleId = response.data._id || response.data.id;
+            if (vehicleId) {
+              vehicleMap.set(vehicleId, response.data);
+            }
+          }
+        });
+      }
+
+      const listings = Array.from(vehicleMap.values()).map((vehicle: any) => {
+        const vehicleId = vehicle._id || vehicle.id;
+        const auction = auctionMap.get(vehicleId);
+        return {
+          id: vehicleId,
+          vehicle: {
+            id: vehicleId,
+            make: vehicle?.make,
+            model: vehicle?.model,
+            year: vehicle?.year,
+            price: vehicle?.price,
+            status: vehicle?.status,
+            images: vehicle?.images || []
+          },
+          auctionStatus: auction?.status
+        };
+      });
+
+      setSellerListings(listings);
+      if (auctionsResponse.error) {
+        setListingsError(auctionsResponse.error);
+      }
+      setListingsLoading(false);
+    };
+
+    loadSellerListings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   return (
-    <div className="bg-slate-50 min-h-screen py-12">
+    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards">
+      {isLightboxOpen && (
+        <ImageLightbox
+          src={displayAvatar}
+          alt={`${displayName} profile`}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -196,7 +342,7 @@ const ProfilePage: React.FC = () => {
 
                 {/* Location */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
+                  <label htmlFor="profile-location" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
                   {isEditing ? (
                     <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
                       placeholder="e.g. Cairo"
@@ -207,7 +353,116 @@ const ProfilePage: React.FC = () => {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
 
+            {/* My Listings Section */}
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-black text-slate-900">My Listings</h3>
+                {(user.role === 'SELLER' || user.role === 'DEALER') && (
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                    {sellerListings.length} total
+                  </span>
+                )}
+              </div>
+
+              {(user.role !== 'SELLER' && user.role !== 'DEALER') && (
+                <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
+                  Listings are available for sellers only.
+                </div>
+              )}
+
+              {(user.role === 'SELLER' || user.role === 'DEALER') && (
+                <>
+                  {listingsLoading && (
+                    <div className="text-sm text-slate-500">Loading your listings...</div>
+                  )}
+
+                  {!listingsLoading && listingsError && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
+                      {listingsError}
+                    </div>
+                  )}
+
+                  {!listingsLoading && !listingsError && sellerListings.length === 0 && (
+                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
+                      You have no listings yet.
+                    </div>
+                  )}
+
+                  {!listingsLoading && sellerListings.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {sellerListings.map((listing) => {
+                        const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
+                        const auctionBadge = getAuctionStatusBadge(listing.auctionStatus);
+                        const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
+                        const image = listing.vehicle.images?.[0];
+
+                        return (
+                          <div
+                            key={listing.id}
+                            className="p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-all"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+                                {image ? (
+                                  <img src={image} alt={title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{listing.vehicle.make?.slice(0, 2)?.toUpperCase() || 'CV'}</span>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <h4 className="font-bold text-slate-900">{title || 'Vehicle Listing'}</h4>
+                                    <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${vehicleBadge.className}`}>
+                                      Vehicle: {vehicleBadge.label}
+                                    </span>
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${auctionBadge.className}`}>
+                                      Auction: {auctionBadge.label}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Recent Activity Section */}
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
+              <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
+              <div className="space-y-4">
+                {[
+                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: 'EGP 95,000' },
+                  { action: 'Listing Created', target: '2022 Audi RS6', date: 'Yesterday', amount: 'N/A' },
+                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: 'EGP 68,500' }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                        <ExternalLink size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900">{item.action}: {item.target}</h4>
+                        <p className="text-xs text-slate-500">{item.date}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-slate-900">{item.amount}</p>
+                      <ChevronRight size={16} className="text-slate-300 ml-auto mt-1" />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -217,5 +472,4 @@ const ProfilePage: React.FC = () => {
     </div>
   );
 };
-
 export default ProfilePage;

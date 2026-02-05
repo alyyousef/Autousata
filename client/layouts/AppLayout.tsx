@@ -177,8 +177,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               </ul>
             </div>
           </div>
-          <div className="mt-12 pt-8 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-slate-300">
-            <p>&copy; 2026 AUTOUSATA, Inc. All rights reserved.</p>
+          <div className="mt-10 pt-6 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-slate-300">
             <div className="flex gap-6 text-slate-200">
               <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-500" /> SECURE PAYMENTS</span>
               <span>PCI DSS COMPLIANT</span>
