@@ -1,33 +1,43 @@
-const oracledb = require('oracledb');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const oracledb = require('oracledb'); // Keep for BIND_OUT constants
+const db = require('../config/db');   // <--- IMPORT OUR NEW DB MODULE
 const { generateToken } = require('../middleware/auth');
-const { uploadToS3 } = require('../middleware/uploadMiddleware'); // <--- Import S3 tool
+const { uploadToS3 } = require('../middleware/uploadMiddleware');
+const { sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
 // ==========================================
 // 1. SIGN UP
 // ==========================================
+// ==========================================
+// 1. SIGN UP (BREADCRUMB DEBUGGER)
+// ==========================================
 async function register(req, res) {
-    // 1. Accept text fields AND the file from the request
     const { firstName, lastName, email, phone, password } = req.body;
-    const file = req.file; // This comes from upload.single() in the route
-    
+    const file = req.file; 
     let connection;
 
     try {
-        // 2. Upload to S3 (Only if a file was actually sent)
+        console.log(`👉 Registering: ${email}`);
+
         let profilePicUrl = null;
         if (file) {
-            console.log("Uploading image to S3...");
+            console.log("📸 [1] Starting S3 Upload...");
             profilePicUrl = await uploadToS3(file, 'profiles'); 
+            console.log("✅ [2] S3 Upload Finished. URL generated.");
         }
 
+        console.log("🔑 [3] Hashing Password...");
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
 
-        connection = await oracledb.getConnection();
+        console.log("🔌 [4] Requesting Database Connection...");
+        // ⚠️ THIS IS THE SUSPECT LINE
+        connection = await db.getConnection(); 
+        console.log("✅ [5] Database Connected! Executing Procedure...");
 
-        // 3. Execute Procedure (Passing the new :img parameter)
         const result = await connection.execute(
             `BEGIN 
                 sp_register_user(:fn, :ln, :em, :ph, :pw, :img, :out_id, :out_status); 
@@ -38,7 +48,7 @@ async function register(req, res) {
                 em: email,
                 ph: phone,
                 pw: hashedPassword,
-                img: profilePicUrl, // <--- Passing the S3 URL (or null) to Oracle
+                img: profilePicUrl, 
                 out_id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
             }
@@ -48,29 +58,51 @@ async function register(req, res) {
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            const token = generateToken(newUserId);
+            console.log("✅ User created. ID:", newUserId);
+
+            await connection.execute(
+                `UPDATE users 
+                 SET email_verification_token = :token,
+                     email_token_expiry = CURRENT_TIMESTAMP + INTERVAL '1' DAY
+                 WHERE id = :u_id`, 
+                { 
+                    token: verificationToken, 
+                    u_id: newUserId 
+                },
+                { autoCommit: true }
+            );
+
+            // Send Email (Don't await, let it run in background)
+            sendVerificationEmail(email, verificationToken)
+                .then(success => {
+                    if(success) console.log(`✉️ Email sent to ${email}`);
+                });
+
+            const user = {
+            id: newUserId,
+            role: 'client'
+            };
+ 
+            const token = generateToken(user);
 
             res.status(201).json({ 
-                message: 'User registered successfully',
+                message: 'User registered successfully. Please verify your email.',
                 token,
-                user: {
-                    id: newUserId,
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    role: 'client',
-                    profileImage: profilePicUrl // Send the new URL back to the frontend
-                }
+                user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
         } else {
             res.status(400).json({ error: status });
         }
 
     } catch (err) {
-        console.error('Registration error:', err);
+        console.error('❌ Registration Error:', err);
         res.status(500).json({ error: 'Registration failed' });
     } finally {
-        if (connection) await connection.close();
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) { console.error("Error closing connection:", e); }
+        }
     }
 }
 
@@ -82,11 +114,12 @@ async function login(req, res) {
     let connection;
 
     try {
-        connection = await oracledb.getConnection();
+        // USE EXPLICIT POOL
+        connection = await db.getConnection();
 
         const result = await connection.execute(
             `BEGIN 
-                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :status); 
+                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); 
              END;`,
             {
                 em: email,
@@ -95,11 +128,19 @@ async function login(req, res) {
                 fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                img: { dir: oracledb.BIND_OUT, type: oracledb.STRING }, 
                 status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
             }
         );
 
         const userData = result.outBinds;
+
+        if (userData.status === 'UNVERIFIED') {
+            return res.status(403).json({ 
+                error: 'Please verify your email address to log in.',
+                needsVerification: true 
+            });
+        }
 
         if (userData.status !== 'FOUND') {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -110,8 +151,6 @@ async function login(req, res) {
         if (match) {
             const token = generateToken(userData.id);
 
-            // Note: We are currently NOT returning the profile_pic_url on login.
-            // We can add that later if you want the image to appear immediately after login.
             res.json({
                 message: 'Login successful',
                 token,
@@ -120,7 +159,8 @@ async function login(req, res) {
                     firstName: userData.fn,
                     lastName: userData.ln,
                     email: email,
-                    role: userData.role
+                    role: userData.role,
+                    profileImage: userData.img 
                 }
             });
         } else {
@@ -131,8 +171,64 @@ async function login(req, res) {
         console.error('Login error:', err);
         res.status(500).json({ error: 'Login failed' });
     } finally {
-        if (connection) await connection.close();
-    } 
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error("Error closing connection:", e);
+            }
+        }
+    }
 }
 
-module.exports = { register, login };
+// ==========================================
+// 3. VERIFY EMAIL
+// ==========================================
+async function verifyEmail(req, res) {
+    const { token } = req.body;
+    let connection;
+
+    try {
+        // USE EXPLICIT POOL
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `SELECT id FROM users 
+             WHERE email_verification_token = :token 
+             AND email_token_expiry > CURRENT_TIMESTAMP`,
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired verification link.' });
+        }
+
+        const userId = result.rows[0][0];
+
+        await connection.execute(
+            `UPDATE users 
+             SET email_verified = '1', 
+                 email_verification_token = NULL, 
+                 email_token_expiry = NULL 
+             WHERE id = :u_id`,
+            { u_id: userId },
+            { autoCommit: true }
+        );
+
+        res.json({ message: 'Email verified successfully! You can now log in.' });
+
+    } catch (err) {
+        console.error('Verification error:', err);
+        res.status(500).json({ error: 'Verification failed' });
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (e) {
+                console.error("Error closing connection:", e);
+            }
+        }
+    }
+}
+
+module.exports = { register, login, verifyEmail };

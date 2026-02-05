@@ -6,7 +6,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (firstName: string, lastName: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  // UPDATE 1: Added profileImage as an optional 6th parameter
+  register: (firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -52,9 +53,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (firstName: string, lastName: string, email: string, phone: string, password: string) => {
+  // UPDATE 2: Accepting the profileImage parameter
+  const register = async (firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) => {
     try {
-      const response = await apiService.register(firstName, lastName, email, phone, password);
+      // UPDATE 3: Passing it to the API service
+      const response = await apiService.register(firstName, lastName, email, phone, password, profileImage);
+      
       if (response.data?.user) {
         setUser(response.data.user);
         return { success: true };

@@ -16,5 +16,5 @@ router.post('/register', upload.single('profileImage'), (req, res, next) => {
 
 // POST http://localhost:5001/api/auth/login
 router.post('/login', authController.login);
-
+router.post('/verify-email', authController.verifyEmail);
 module.exports = router;
