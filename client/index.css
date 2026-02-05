@@ -1,4 +1,6 @@
-/* Minimal base styles; tailwind is loaded via CDN */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
   margin: 0;

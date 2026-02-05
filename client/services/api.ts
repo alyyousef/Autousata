@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -134,6 +134,15 @@ class ApiService {
 
   async getLoginHistory() {
     return this.request<{ loginHistory: any[] }>('/auth/login-history');
+  }
+
+  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+    });
+    return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
   }
 
   // Profile endpoints

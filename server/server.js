@@ -1,12 +1,11 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 require('dotenv').config();
 const oracleDb = require('./config/oracle');
 
 const app = express();
-// USE PORT 5005 (We verified this port works on your Mac)
-const PORT = process.env.PORT || 5005;
+// USE PORT 5000
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
@@ -18,11 +17,16 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- ROUTES ---
+// Routes
 const authRoutes = require('./routes/auth');
+const profileRoutes = require('./routes/profile');
+const vehicleRoutes = require('./routes/vehicles');
+const auctionRoutes = require('./routes/auctions');
 
-// Mount Auth Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', profileRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/auctions', auctionRoutes);
 
 // Test Route (Access this to prove server is alive)
 app.get('/', (req, res) => {
@@ -52,14 +56,6 @@ async function connectDatabases() {
         // We do NOT exit the process, so the server stays alive for debugging
     }
 
-    // 2. MongoDB Connection (Passive)
-    try {
-        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
-        await mongoose.connect(MONGO_URI);
-        console.log('✅ MongoDB connected (Passive Mode)');
-    } catch (err) {
-        console.error('⚠️ MongoDB Connection Failed (Ignored):', err.message);
-    }
 }
 
 // Graceful Shutdown
