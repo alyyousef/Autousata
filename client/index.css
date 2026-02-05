@@ -350,6 +350,91 @@ button.no-hover-rise:active {
   border-color: inherit;
 }
 
+/* Profile page dark mode overrides */
+.theme-dark .profile-page {
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+
+.theme-dark .profile-page .bg-white,
+.theme-dark .profile-page .bg-white\/95 {
+  background-color: rgba(15, 23, 42, 0.85);
+}
+
+.theme-dark .profile-page .bg-slate-50 {
+  background-color: rgba(15, 23, 42, 0.6);
+}
+
+.theme-dark .profile-page .bg-slate-100 {
+  background-color: rgba(30, 41, 59, 0.7);
+}
+
+.theme-dark .profile-page .bg-slate-200 {
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.theme-dark .profile-page .border-slate-100,
+.theme-dark .profile-page .border-slate-200,
+.theme-dark .profile-page .border-slate-200\/50 {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.theme-dark .profile-page .text-slate-900 {
+  color: #f8fafc;
+}
+
+.theme-dark .profile-page .text-slate-700 {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.theme-dark .profile-page .text-slate-600 {
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.theme-dark .profile-page .text-slate-500 {
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.theme-dark .profile-page .text-slate-400 {
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.theme-dark .profile-page .text-slate-300 {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.theme-dark .profile-page input::placeholder {
+  color: rgba(226, 232, 240, 0.6);
+}
+
+.theme-dark .profile-page .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.25);
+}
+
+.theme-dark .profile-page .border-red-200 {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.theme-dark .profile-page .bg-green-50 {
+  background-color: rgba(6, 78, 59, 0.25);
+}
+
+.theme-dark .profile-page .border-green-200 {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.theme-dark .profile-page .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.25);
+}
+
+.theme-dark .profile-page .border-amber-200 {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.theme-dark .profile-page .bg-indigo-100 {
+  background-color: rgba(30, 64, 175, 0.25);
+}
+
 /* Disable hover lift on sell page cards only */
 .sell-static-cards .premium-card-hover:hover {
   transform: none;
@@ -625,6 +710,93 @@ button.no-hover-rise:active {
 
 .theme-dark .section-divider {
   border-color: rgba(148, 163, 184, 0.2);
+}
+
+/* Global dark mode overrides for common light utility classes */
+.theme-dark .bg-white,
+.theme-dark .bg-white\/95,
+.theme-dark .bg-white\/90 {
+  background-color: rgba(12, 18, 30, 0.92);
+}
+
+.theme-dark .bg-slate-50 {
+  background-color: rgba(15, 23, 42, 0.65);
+}
+
+.theme-dark .bg-slate-100 {
+  background-color: rgba(30, 41, 59, 0.65);
+}
+
+.theme-dark .bg-slate-200 {
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.theme-dark .border-slate-100,
+.theme-dark .border-slate-200,
+.theme-dark .border-slate-200\/50,
+.theme-dark .border-slate-300 {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.theme-dark .text-slate-900 {
+  color: #f8fafc;
+}
+
+.theme-dark .text-slate-800 {
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.theme-dark .text-slate-700 {
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.theme-dark .text-slate-600 {
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.theme-dark .text-slate-500 {
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.theme-dark .text-slate-400 {
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.theme-dark .text-slate-300 {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: rgba(226, 232, 240, 0.6);
+}
+
+.theme-dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.25);
+}
+
+.theme-dark .border-red-200 {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.theme-dark .bg-green-50 {
+  background-color: rgba(6, 78, 59, 0.25);
+}
+
+.theme-dark .border-green-200 {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.theme-dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.25);
+}
+
+.theme-dark .border-amber-200 {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.theme-dark .bg-indigo-100 {
+  background-color: rgba(30, 64, 175, 0.25);
 }
 
 /* Utility: animated pill-style buttons */
