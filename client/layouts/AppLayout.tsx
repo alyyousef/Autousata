@@ -3,6 +3,7 @@ import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface AppLayoutProps {
   user: User | null;
@@ -10,9 +11,11 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
   const { user: authUser, loading, logout } = useAuth();
+  const { notifications, unreadCount, markAllRead, clearNotifications } = useNotifications();
   const user = userProp || authUser;
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   if (loading) {
     return (
@@ -46,7 +49,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2 group">
                 <div>
-                  <img src="/assests/frontendPictures/logoBlackA.png" alt="Autousata logo" className="h-16 w-16" />
+                  <img src="/assests/frontendPictures/logoBlackA.png" alt="AUTOUSATA logo" className="h-16 w-16" />
                 </div>
                 <span className="text-2xl font-bold text-slate-900 tracking-tight uppercase">AUTOUSATA</span>
               </Link>
@@ -64,10 +67,70 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
 
             <div className="hidden md:flex items-center gap-4">
-              <button className="p-2 text-slate-400 hover:text-slate-500 relative" aria-label="Notifications">
-                <Bell size={20} />
-                <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
-              </button>
+              <div className="relative">
+                <button
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full relative"
+                  aria-label="Notifications"
+                  onClick={() => {
+                    setIsNotifOpen(prev => !prev);
+                    markAllRead();
+                  }}
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 h-6 min-w-[24px] px-2 rounded-full bg-rose-500 text-white text-[11px] font-semibold flex items-center justify-center leading-none ring-2 ring-white shadow-[0_2px_6px_rgba(0,0,0,0.15)]">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                {isNotifOpen && (
+                  <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                      <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                      <button
+                        type="button"
+                        onClick={clearNotifications}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-sm text-slate-500">No notifications yet.</div>
+                      ) : (
+                        notifications.slice(0, 8).map(note => (
+                          <div key={note.id} className="px-4 py-3 border-b border-slate-100 last:border-b-0">
+                            <div
+                              className={`text-xs font-semibold uppercase tracking-[0.2em] ${
+                                note.tone === 'success'
+                                  ? 'text-emerald-600'
+                                  : note.tone === 'warn'
+                                    ? 'text-amber-600'
+                                    : note.tone === 'error'
+                                      ? 'text-rose-600'
+                                      : 'text-slate-500'
+                              }`}
+                            >
+                              {note.tone === 'success'
+                                ? 'Bid completed'
+                                : note.tone === 'warn'
+                                  ? 'Alert'
+                                  : note.tone === 'error'
+                                    ? 'Error'
+                                    : 'Update'}
+                            </div>
+                            <p className="text-sm text-slate-700 mt-1">{note.message}</p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              {new Date(note.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="h-6 w-[1px] bg-slate-200"></div>
               <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                 <div className="text-right">
@@ -143,7 +206,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
                 <div>
-                  <img src="/assests/frontendPictures/logoWhiteA.png" alt="Autousata logo" className="h-14 w-14" />
+                  <img src="/assests/frontendPictures/logoWhiteA.png" alt="AUTOUSATA logo" className="h-14 w-14" />
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
               </div>
@@ -157,23 +220,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/browse" className="hover:text-indigo-400">All Auctions</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-indigo-400">How it Works</Link></li>
-                <li><Link to="/about" className="hover:text-indigo-400">About</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Support</h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/about" className="hover:text-indigo-400">Help Center</Link></li>
-                <li><Link to="/about" className="hover:text-indigo-400">Contact Us</Link></li>
-                <li><Link to="/about" className="hover:text-indigo-400">Buyer Protections</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Legal</h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/about" className="hover:text-indigo-400">Privacy Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
-                <li><Link to="/about" className="hover:text-indigo-400">Cookie Policy</Link></li>
               </ul>
             </div>
           </div>

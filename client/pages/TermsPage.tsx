@@ -4,7 +4,7 @@ const sections = [
   {
     title: 'Introduction and Agreement',
     body:
-      'Welcome to Autousata. These Terms and Conditions of Use govern your access to and use of the Autousata website and services. By using the site, you acknowledge that you have read, understood, and agree to these terms and to comply with applicable laws. You must be at least 18 years old to use the site.'
+      'Welcome to AUTOUSATA. These Terms and Conditions of Use govern your access to and use of the AUTOUSATA website and services. By using the site, you acknowledge that you have read, understood, and agree to these terms and to comply with applicable laws. You must be at least 18 years old to use the site.'
   },
   {
     title: 'How We Use Your Information',
@@ -14,7 +14,7 @@ const sections = [
   {
     title: 'Site Provisions and Services',
     body:
-      'Autousata is a marketplace for vehicle listings and auctions. Autousata does not own vehicles or act as a party to buyer–seller transactions unless explicitly stated. Listing information is provided by sellers or third parties.'
+      'AUTOUSATA is a marketplace for vehicle listings and auctions. AUTOUSATA does not own vehicles or act as a party to buyer–seller transactions unless explicitly stated. Listing information is provided by sellers or third parties.'
   },
   {
     title: 'Access and Use',
@@ -24,17 +24,17 @@ const sections = [
   {
     title: 'User Materials',
     body:
-      'By submitting content (including photos, text, and listings), you grant Autousata a non-exclusive, worldwide, royalty-free license to display, distribute, and use that content to operate the site and services. You confirm you have the rights to submit such content.'
+      'By submitting content (including photos, text, and listings), you grant AUTOUSATA a non-exclusive, worldwide, royalty-free license to display, distribute, and use that content to operate the site and services. You confirm you have the rights to submit such content.'
   },
   {
     title: 'Trademarks and Intellectual Property',
     body:
-      'Autousata and its logos, trademarks, and content are protected by intellectual property laws. You may not use Autousata branding without prior written permission.'
+      'AUTOUSATA and its logos, trademarks, and content are protected by intellectual property laws. You may not use AUTOUSATA branding without prior written permission.'
   },
   {
     title: 'Copyright and Copyright Agents',
     body:
-      'Autousata respects intellectual property rights and responds to valid infringement notices. If you believe content infringes your rights, contact us with a detailed notice so we can investigate.'
+      'AUTOUSATA respects intellectual property rights and responds to valid infringement notices. If you believe content infringes your rights, contact us with a detailed notice so we can investigate.'
   },
   {
     title: 'Representation',
@@ -44,22 +44,22 @@ const sections = [
   {
     title: 'Warranty Disclaimer',
     body:
-      'The site and services are provided “as is” and “as available.” Autousata disclaims all warranties, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.'
+      'The site and services are provided “as is” and “as available.” AUTOUSATA disclaims all warranties, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.'
   },
   {
     title: 'Limitation of Liability',
     body:
-      'To the maximum extent permitted by law, Autousata will not be liable for indirect, incidental, or consequential damages arising from your use of the site or services.'
+      'To the maximum extent permitted by law, AUTOUSATA will not be liable for indirect, incidental, or consequential damages arising from your use of the site or services.'
   },
   {
     title: 'Third Party Service Providers',
     body:
-      'Certain services may be provided by third parties. Autousata is not responsible for the performance or policies of those providers.'
+      'Certain services may be provided by third parties. AUTOUSATA is not responsible for the performance or policies of those providers.'
   },
   {
     title: 'Indemnification',
     body:
-      'You agree to indemnify and hold Autousata harmless from claims arising from your use of the site, your content, or your violation of these terms.'
+      'You agree to indemnify and hold AUTOUSATA harmless from claims arising from your use of the site, your content, or your violation of these terms.'
   },
   {
     title: 'Security',
@@ -94,7 +94,7 @@ const sections = [
   {
     title: 'Governing Law; Jurisdiction',
     body:
-      'These terms are governed by applicable laws of the jurisdiction where Autousata operates, unless otherwise required by law.'
+      'These terms are governed by applicable laws of the jurisdiction where AUTOUSATA operates, unless otherwise required by law.'
   },
   {
     title: 'Class Action',
@@ -114,17 +114,17 @@ const sections = [
   {
     title: 'Third Party Links',
     body:
-      'The site may include links to third-party sites. Autousata is not responsible for third-party content, policies, or practices.'
+      'The site may include links to third-party sites. AUTOUSATA is not responsible for third-party content, policies, or practices.'
   },
   {
     title: 'Miscellaneous',
     body:
-      'If any part of these terms is unenforceable, the remaining sections remain in effect. These terms constitute the entire agreement between you and Autousata for site use.'
+      'If any part of these terms is unenforceable, the remaining sections remain in effect. These terms constitute the entire agreement between you and AUTOUSATA for site use.'
   },
   {
     title: 'Contact Information',
     body:
-      'For questions or concerns about these Terms, please contact our cofounders: Maya, Hala, Ali, Ahmed, and Kevin. You can reach us through the Autousata website contact channels.'
+      'For questions or concerns about these Terms, please contact our cofounders: Maya, Hala, Ali, Ahmed, and Kevin. You can reach us through the AUTOUSATA website contact channels.'
   }
 ];
 
@@ -135,9 +135,9 @@ const TermsPage: React.FC = () => (
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(148,163,184,0.2),_transparent_60%)]" />
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center hero-fade-in">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-4">Terms and Conditions of Use</p>
-        <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">Autousata Terms of Service</h1>
+        <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">AUTOUSATA Terms of Service</h1>
         <p className="text-sm md:text-base text-slate-200/90 mt-4 max-w-2xl mx-auto">
-          These terms explain how the Autousata website and services may be used, and the responsibilities of all users.
+          These terms explain how the AUTOUSATA website and services may be used, and the responsibilities of all users.
         </p>
         <p className="text-xs text-slate-400 mt-3">Last updated: February 3, 2026</p>
       </div>

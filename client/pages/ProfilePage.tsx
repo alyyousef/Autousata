@@ -232,7 +232,7 @@ const ProfilePage: React.FC = () => {
   }, [user]);
 
   return (
-    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards">
+    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page">
       {isLightboxOpen && (
         <ImageLightbox
           src={displayAvatar}

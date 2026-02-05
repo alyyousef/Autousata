@@ -15,10 +15,14 @@ import {
 } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 
-const DELISTED_STORAGE_KEY = 'autousata:delistedListings';
+const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
+const BID_STATE_KEY = 'AUTOUSATA:bidState';
+const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
+const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
 
 const readDelistedIds = () => {
   if (typeof window === 'undefined') return new Set<string>();
@@ -35,6 +39,66 @@ const readDelistedIds = () => {
 const updateDelistedIds = (ids: Set<string>) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(DELISTED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+};
+
+const readBidState = (auctionId: string) => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BID_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, { currentBid: number; bidCount: number }>;
+    return parsed?.[auctionId] ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const writeBidState = (auctionId: string, currentBid: number, bidCount: number) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(BID_STATE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, { currentBid: number; bidCount: number }>) : {};
+    parsed[auctionId] = { currentBid, bidCount };
+    localStorage.setItem(BID_STATE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage issues
+  }
+};
+
+const readPaymentNotice = (auctionId: string) => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(PAYMENT_NOTICE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, boolean>;
+    return Boolean(parsed?.[auctionId]);
+  } catch {
+    return false;
+  }
+};
+
+const writePaymentNotice = (auctionId: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(PAYMENT_NOTICE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    parsed[auctionId] = true;
+    localStorage.setItem(PAYMENT_NOTICE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage issues
+  }
+};
+
+const readPaymentStatus = (auctionId: string) => {
+  if (typeof window === 'undefined') return 'unpaid' as const;
+  try {
+    const raw = localStorage.getItem(PAYMENT_STATUS_KEY);
+    if (!raw) return 'unpaid' as const;
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return (parsed?.[auctionId] as 'paid' | 'unpaid') ?? 'unpaid';
+  } catch {
+    return 'unpaid' as const;
+  }
 };
 
 const formatTimeRemaining = (endTime: string, now: number) => {
@@ -84,6 +148,7 @@ const generateTimeStyles = (endTime: string, now: number) => {
 const ListingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => readDelistedIds());
   const [now, setNow] = useState(() => Date.now());
   const [isBidOpen, setIsBidOpen] = useState(false);
@@ -96,6 +161,8 @@ const ListingDetailPage: React.FC = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingBidAmount, setPendingBidAmount] = useState<number | null>(null);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [currentBid, setCurrentBid] = useState<number | null>(null);
+  const [currentBidCount, setCurrentBidCount] = useState<number | null>(null);
 
   const listing = useMemo(() => MOCK_AUCTIONS.find((auction) => auction.id === id), [id]);
 
@@ -106,6 +173,26 @@ const ListingDetailPage: React.FC = () => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!listing) return;
+    const stored = readBidState(listing.id);
+    setCurrentBid(stored?.currentBid ?? listing.currentBid);
+    setCurrentBidCount(stored?.bidCount ?? listing.bidCount);
+  }, [listing]);
+
+  useEffect(() => {
+    if (!listing) return;
+    const endTime = new Date(listing.endTime).getTime();
+    if (now < endTime) return;
+    if (readPaymentStatus(listing.id) === 'paid') return;
+    if (readPaymentNotice(listing.id)) return;
+    addNotification(
+      `Auction ended. Please complete payment for ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}.`,
+      'warn'
+    );
+    writePaymentNotice(listing.id);
+  }, [addNotification, listing, now]);
 
   if (!listing) {
     return (
@@ -130,6 +217,10 @@ const ListingDetailPage: React.FC = () => {
 
   const isDelisted = delistedIds.has(listing.id);
   const timeStyles = generateTimeStyles(listing.endTime, now);
+  const effectiveBid = currentBid ?? listing.currentBid;
+  const effectiveBidCount = currentBidCount ?? listing.bidCount;
+  const isEnded = new Date(listing.endTime).getTime() <= now;
+  const paymentStatus = readPaymentStatus(listing.id);
 
   const handleDelist = () => {
     const confirmed = window.confirm('Delist this vehicle from active listings?');
@@ -154,13 +245,17 @@ const ListingDetailPage: React.FC = () => {
   const handleBidSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(bidAmount);
-    const maxAllowed = listing.currentBid * 3;
+    if (new Date(listing.endTime).getTime() <= Date.now()) {
+      setBidError('Bidding has ended for this auction.');
+      return;
+    }
+    const maxAllowed = effectiveBid * 3;
     if (!amount || Number.isNaN(amount)) {
       setBidError('Enter a valid bid amount.');
       return;
     }
-    if (amount <= listing.currentBid) {
-      setBidError(`Bid must be higher than EGP ${listing.currentBid.toLocaleString()}.`);
+    if (amount <= effectiveBid) {
+      setBidError(`Bid must be higher than EGP ${effectiveBid.toLocaleString()}.`);
       return;
     }
     if (amount > maxAllowed) {
@@ -177,7 +272,17 @@ const ListingDetailPage: React.FC = () => {
     setIsConfirmOpen(false);
     setIsBidOpen(false);
     setBidAmount('');
+    setCurrentBid(pendingBidAmount);
+    setCurrentBidCount((prev) => {
+      const next = (prev ?? listing.bidCount) + 1;
+      writeBidState(listing.id, pendingBidAmount, next);
+      return next;
+    });
     setBidSuccess(pendingBidAmount);
+    addNotification(
+      `Your bidding on the ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} is completed at EGP ${pendingBidAmount.toLocaleString()}.`,
+      'success'
+    );
     setPendingBidAmount(null);
     window.setTimeout(() => setBidSuccess(null), 3000);
   };
@@ -187,7 +292,7 @@ const ListingDetailPage: React.FC = () => {
     setPendingBidAmount(null);
   };
 
-  const suggestedBids = [listing.currentBid * 1.1, listing.currentBid * 1.25, listing.currentBid * 1.5].map((amt) =>
+  const suggestedBids = [effectiveBid * 1.1, effectiveBid * 1.25, effectiveBid * 1.5].map((amt) =>
     Math.ceil(amt / 100) * 100
   );
 
@@ -303,9 +408,9 @@ const ListingDetailPage: React.FC = () => {
                     <span>Current Bid</span>
                   </div>
                   <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">
-                    EGP {listing.currentBid.toLocaleString()}
+                    EGP {effectiveBid.toLocaleString()}
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">{listing.bidCount} bids placed</div>
+                  <div className="text-xs text-slate-500 mt-2">{effectiveBidCount} bids placed</div>
                 </div>
 
                 <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm">
@@ -352,29 +457,52 @@ const ListingDetailPage: React.FC = () => {
 
                 {/* CTA */}
                 <div className="px-5 pb-5">
-                  <button
-                    onClick={() => setIsBidOpen(true)}
-                    className={[
-                      'w-full rounded-2xl px-6 py-4',
-                      'bg-emerald-600 text-white',
-                      'text-base font-semibold tracking-wide',
-                      'shadow-lg shadow-emerald-600/20',
-                      'ring-1 ring-emerald-600/25',
-                      'hover:bg-emerald-700 hover:shadow-emerald-600/30 hover:ring-emerald-600/35',
-                      'active:scale-[0.99]',
-                      'transition-all duration-200',
-                      'flex items-center justify-center gap-3',
-                      'focus:outline-none focus:ring-4 focus:ring-emerald-500/20',
-                    ].join(' ')}
-                  >
-                    <Gavel size={18} />
-                    Place your bid
-                    <span className="text-white/85 text-sm font-medium">(EGP {listing.currentBid.toLocaleString()}+)</span>
-                  </button>
+                  {isEnded ? (
+                    <div className="space-y-3">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                        Auction ended. Please complete payment to secure the vehicle.
+                      </div>
+                      {paymentStatus === 'paid' ? (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                          Payment confirmed. Our concierge will contact you for pickup.
+                        </div>
+                      ) : (
+                        <Link
+                          to={`/payment/${listing.id}`}
+                          className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
+                        >
+                          Complete payment
+                          <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()})</span>
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setIsBidOpen(true)}
+                        className={[
+                          'w-full rounded-2xl px-6 py-4',
+                          'bg-emerald-600 text-white',
+                          'text-base font-semibold tracking-wide',
+                          'shadow-lg shadow-emerald-600/20',
+                          'ring-1 ring-emerald-600/25',
+                          'hover:bg-emerald-700 hover:shadow-emerald-600/30 hover:ring-emerald-600/35',
+                          'active:scale-[0.99]',
+                          'transition-all duration-200',
+                          'flex items-center justify-center gap-3',
+                          'focus:outline-none focus:ring-4 focus:ring-emerald-500/20',
+                        ].join(' ')}
+                      >
+                        <Gavel size={18} />
+                        Place your bid
+                        <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()}+)</span>
+                      </button>
 
-                  <p className="text-center text-slate-700 text-sm font-semibold mt-3">
-                    Join {listing.bidCount} other bidders in this auction
-                  </p>
+                      <p className="text-center text-slate-700 text-sm font-semibold mt-3">
+                        Join {effectiveBidCount} other bidders in this auction
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -407,7 +535,7 @@ const ListingDetailPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsDescriptionOpen(true)}
-                    className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition-colors"
+                    className="px-4 py-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
                   >
                     View
                   </button>
@@ -448,11 +576,11 @@ const ListingDetailPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <div className="text-sm text-slate-500 mb-1">Current Bid</div>
-                      <div className="text-2xl font-bold text-blue-600">EGP {listing.currentBid.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-blue-600">EGP {effectiveBid.toLocaleString()}</div>
                     </div>
                     <div>
                       <div className="text-sm text-slate-500 mb-1">Maximum Bid</div>
-                      <div className="text-lg font-bold text-slate-900">EGP {(listing.currentBid * 3).toLocaleString()}</div>
+                      <div className="text-lg font-bold text-slate-900">EGP {(effectiveBid * 3).toLocaleString()}</div>
                     </div>
                   </div>
                 </div>
@@ -475,10 +603,10 @@ const ListingDetailPage: React.FC = () => {
                         type="number"
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
-                        min={listing.currentBid + 1}
-                        max={listing.currentBid * 3}
+                        min={effectiveBid + 1}
+                        max={effectiveBid * 3}
                         className="w-full pl-12 pr-4 py-4 text-lg font-semibold rounded-2xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
-                        placeholder={`${listing.currentBid.toLocaleString()}`}
+                        placeholder={`${effectiveBid.toLocaleString()}`}
                         autoFocus
                       />
                     </div>
@@ -576,7 +704,11 @@ const ListingDetailPage: React.FC = () => {
                     <Tag size={16} className="text-emerald-500" />
                     Full Description
                   </div>
-                  <button onClick={() => setIsDescriptionOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <button
+                    onClick={() => setIsDescriptionOpen(false)}
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                    aria-label="Close description"
+                  >
                     ✕
                   </button>
                 </div>
@@ -652,7 +784,7 @@ const ListingDetailPage: React.FC = () => {
             >
               <Gavel size={16} />
               Place bid
-              <span className="text-white/85">(EGP {listing.currentBid.toLocaleString()}+)</span>
+              <span className="text-white/85">(EGP {effectiveBid.toLocaleString()}+)</span>
             </button>
           </div>
         </div>
