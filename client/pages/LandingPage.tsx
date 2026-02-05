@@ -43,10 +43,10 @@ const LandingPage: React.FC = () => {
           <img
             src={landingHero}
             alt="Luxury vehicles on a showroom floor"
-            className="h-full w-full object-cover opacity-55"
+            className="h-full w-full object-cover opacity-70"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0B1117]/95 via-[#101826]/85 to-[#0B1117]/30" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_60%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0B1117]/80 via-[#101826]/60 to-[#0B1117]/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.2),_transparent_60%)]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
           <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-start">
@@ -79,15 +79,11 @@ const LandingPage: React.FC = () => {
               <div className="mt-10 grid gap-4 sm:grid-cols-3 text-xs md:text-sm text-slate-100/90">
                 <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
                   <CheckCircle2 size={16} className="text-emerald-300" />
-                  Verified sellers
+                  Escrow protection
                 </div>
                 <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
                   <CheckCircle2 size={16} className="text-emerald-300" />
-                  Transparent pricing
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-                  <CheckCircle2 size={16} className="text-emerald-300" />
-                  Concierge support
+                  Verified reports
                 </div>
               </div>
             </div>
@@ -105,8 +101,7 @@ const LandingPage: React.FC = () => {
                   {stats ? (
                     <>
                       <StatCard label="Active listings" value={stats.activeListings.toLocaleString()} />
-                      <StatCard label="Verified sellers" value={stats.verifiedSellers.toLocaleString()} />
-                      <StatCard label="Avg. time to sell" value={stats.avgTimeToSell} />
+                      <StatCard label="AVERAGE time to sell" value={stats.avgTimeToSell} />
                       <StatCard label="Escrow protected" value={stats.escrowProtected} />
                     </>
                   ) : (
@@ -120,32 +115,7 @@ const LandingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/12 bg-white/8 p-6 backdrop-blur-sm">
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-200 mb-4">How it works</p>
-                <div className="space-y-4 text-sm text-slate-200">
-                  <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">01</span>
-                    <div>
-                      <p className="font-semibold text-white">Browse verified listings</p>
-                      <p className="text-slate-200/80">Every vehicle is reviewed for history, title, and condition.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">02</span>
-                    <div>
-                      <p className="font-semibold text-white">Bid with full transparency</p>
-                      <p className="text-slate-200/80">Real-time bidding with clear pricing guidance.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="h-8 w-8 rounded-full bg-sky-400/20 text-sky-200 flex items-center justify-center text-xs font-semibold">03</span>
-                    <div>
-                      <p className="font-semibold text-white">Close with escrow support</p>
-                      <p className="text-slate-200/80">Payments, paperwork, and delivery handled by our team.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
             </div>
           </div>
         </div>
