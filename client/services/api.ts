@@ -6,6 +6,18 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+export interface KycItem {
+  id: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  documentType?: string;
+  status?: string;
+  submittedAt?: string;
+}
+
+
 class ApiService {
   private getAuthToken(): string | null {
     return localStorage.getItem('authToken');
@@ -173,6 +185,25 @@ async updateAvatar(file: File) {
     return this.request('/profile/verify-email', {
       method: 'POST',
       body: JSON.stringify({ token }),
+    });
+  }
+
+  // ===================== Admin Content =====================
+  async getPendingKYC() {
+    return this.request<KycItem[]>('/admin/kyc/pending', {
+      method: 'GET',
+    });
+  }
+
+  async getLiveAuctions() {
+    return this.request<unknown[]>('/admin/auctions/live', {
+      method: 'GET',
+    });
+  }
+
+  async getPendingPayments() {
+    return this.request<unknown[]>('/admin/payments/pending', {
+      method: 'GET',
     });
   }
 }
