@@ -1,176 +1,146 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
+const oracledb = require('oracledb');
 const { authenticate } = require('../middleware/auth');
-const crypto = require('crypto');
+const { upload, uploadToS3 } = require('../middleware/uploadMiddleware'); // <--- S3 Import
 
-// FRQAS-006: Update profile information
+// ==========================================
+// 1. UPDATE PROFILE INFO (Name & Location)
+// ==========================================
 router.put('/profile', authenticate, async (req, res) => {
-  try {
-    const user = req.user;
-    const { name, location } = req.body;
+    let connection;
+    try {
+        const { name, location } = req.body;
+        const userId = req.user.id; // From auth middleware
 
-    if (name) user.name = name;
-    if (location) {
-      user.location = {
-        city: location.city || user.location?.city,
-        country: location.country || user.location?.country || 'Egypt'
-      };
+        // Logic: Split "Ahmed Tamer" into First/Last name for Oracle
+        let firstName = '';
+        let lastName = '';
+        
+        if (name) {
+            const parts = name.trim().split(' ');
+            firstName = parts[0];
+            lastName = parts.slice(1).join(' ') || ''; // " " if no last name
+        }
+
+        const city = location?.city || '';
+
+        connection = await oracledb.getConnection();
+
+        // Update the User in Oracle
+        const sql = `
+            UPDATE users 
+            SET first_name = :fn, 
+                last_name = :ln, 
+                location_city = :city,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :uid
+        `;
+
+        await connection.execute(sql, {
+            fn: firstName,
+            ln: lastName,
+            city: city,
+            uid: userId
+        }, { autoCommit: true });
+
+        // Fetch the updated user to return to frontend
+        const result = await connection.execute(
+            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city 
+             FROM users WHERE id = :uid`,
+            [userId]
+        );
+
+        const updatedUser = result.rows[0];
+
+        // Map Oracle Array to JSON object
+        const userJson = {
+            id: updatedUser[0],
+            name: `${updatedUser[1]} ${updatedUser[2]}`, // Recombine Name
+            email: updatedUser[3],
+            phone: updatedUser[4],
+            role: updatedUser[5],
+            avatar: updatedUser[6], // profile_pic_url
+            location: { city: updatedUser[7] }
+        };
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: userJson
+        });
+
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    } finally {
+        if (connection) await connection.close();
     }
-
-    await user.save();
-
-    res.json({
-      message: 'Profile updated successfully',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        isKycVerified: user.isKycVerified,
-        avatar: user.avatar,
-        location: user.location,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified
-      }
-    });
-  } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ error: 'Failed to update profile' });
-  }
 });
 
-// FRQAS-007: Upload profile picture
-router.put('/profile/avatar', authenticate, async (req, res) => {
-  try {
-    const user = req.user;
-    const { avatarUrl } = req.body;
+// ==========================================
+// 2. UPDATE AVATAR (Image Upload)
+// ==========================================
+// Note: We use 'upload.single' to catch the file from the request
+router.put('/profile/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+    let connection;
+    try {
+        const userId = req.user.id;
+        const file = req.file; // This is the file sent from Frontend
 
-    if (!avatarUrl) {
-      return res.status(400).json({ error: 'Avatar URL is required' });
+        if (!file) {
+            return res.status(400).json({ error: 'No image file provided' });
+        }
+
+        // 1. Upload to S3
+        console.log("Uploading avatar to S3...");
+        const avatarUrl = await uploadToS3(file, 'avatars');
+
+        if (!avatarUrl) {
+            throw new Error('S3 Upload failed');
+        }
+
+        // 2. Update Oracle Database
+        connection = await oracledb.getConnection();
+        
+        const sql = `
+            UPDATE users 
+            SET profile_pic_url = :url,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :uid
+        `;
+
+        await connection.execute(sql, {
+            url: avatarUrl,
+            uid: userId
+        }, { autoCommit: true });
+
+        // 3. Return success
+        res.json({
+            message: 'Profile picture updated successfully',
+            avatar: avatarUrl
+        });
+
+    } catch (error) {
+        console.error('Update avatar error:', error);
+        res.status(500).json({ error: 'Failed to update profile picture' });
+    } finally {
+        if (connection) await connection.close();
     }
-
-    user.avatar = avatarUrl;
-    await user.save();
-
-    res.json({
-      message: 'Profile picture updated successfully',
-      avatar: user.avatar
-    });
-  } catch (error) {
-    console.error('Update avatar error:', error);
-    res.status(500).json({ error: 'Failed to update profile picture' });
-  }
 });
 
-// FRQAS-008: Set primary location (city)
-router.put('/profile/location', authenticate, async (req, res) => {
-  try {
-    const user = req.user;
-    const { city, country } = req.body;
+// ==========================================
+// 3. VERIFICATION ROUTES (Placeholders)
+// ==========================================
+// Note: These are paused because your current Oracle Schema 
+// does not have 'verification_code' columns in the USERS table.
+// We can add those columns later if you need SMS/Email verification.
 
-    if (!city) {
-      return res.status(400).json({ error: 'City is required' });
-    }
-
-    user.location = {
-      city,
-      country: country || 'Egypt'
-    };
-    await user.save();
-
-    res.json({
-      message: 'Location updated successfully',
-      location: user.location
-    });
-  } catch (error) {
-    console.error('Update location error:', error);
-    res.status(500).json({ error: 'Failed to update location' });
-  }
-});
-
-// FRQAS-009: Verify phone number
 router.post('/profile/verify-phone', authenticate, async (req, res) => {
-  try {
-    const user = req.user;
-    const { phone, code } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({ error: 'Phone number is required' });
-    }
-
-    // If code is provided, verify it
-    if (code) {
-      if (user.phoneVerificationCode !== code) {
-        return res.status(400).json({ error: 'Invalid verification code' });
-      }
-
-      if (user.phoneVerificationExpiry < Date.now()) {
-        return res.status(400).json({ error: 'Verification code expired' });
-      }
-
-      user.phone = phone;
-      user.phoneVerified = true;
-      user.phoneVerificationCode = undefined;
-      user.phoneVerificationExpiry = undefined;
-      await user.save();
-
-      return res.json({ message: 'Phone number verified successfully' });
-    }
-
-    // Generate verification code (in production, send via SMS)
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    user.phoneVerificationCode = verificationCode;
-    user.phoneVerificationExpiry = Date.now() + 600000; // 10 minutes
-    await user.save();
-
-    // In production, send SMS with code
-    // For now, return code (remove in production)
-    res.json({
-      message: 'Verification code sent',
-      code: verificationCode // Remove this in production
-    });
-  } catch (error) {
-    console.error('Verify phone error:', error);
-    res.status(500).json({ error: 'Phone verification failed' });
-  }
+    res.status(501).json({ message: "Phone verification pending database update." });
 });
 
-// FRQAS-010: Verify email address
 router.post('/profile/verify-email', authenticate, async (req, res) => {
-  try {
-    const user = req.user;
-    const { token } = req.body;
-
-    if (token) {
-      // Verify token
-      if (user.emailVerificationToken !== token) {
-        return res.status(400).json({ error: 'Invalid verification token' });
-      }
-
-      user.emailVerified = true;
-      user.emailVerificationToken = undefined;
-      await user.save();
-
-      return res.json({ message: 'Email verified successfully' });
-    }
-
-    // Generate verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = verificationToken;
-    await user.save();
-
-    // In production, send email with verification link
-    // For now, return token (remove in production)
-    res.json({
-      message: 'Verification email sent',
-      token: verificationToken // Remove this in production
-    });
-  } catch (error) {
-    console.error('Verify email error:', error);
-    res.status(500).json({ error: 'Email verification failed' });
-  }
+    res.status(501).json({ message: "Email verification pending database update." });
 });
 
 module.exports = router;

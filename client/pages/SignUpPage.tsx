@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Camera } from 'lucide-react'; // <--- Added Camera Icon
 
 const SignUpPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -12,11 +12,26 @@ const SignUpPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // New State for Image Upload
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  // Handle Image Selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      // Create a fake URL just to show a preview instantly
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +54,9 @@ const SignUpPage: React.FC = () => {
 
     setLoading(true);
 
-    const result = await register(firstName, lastName, email, phone, password);
+    // Pass the selectedFile (or undefined) to the register function
+    // NOTE: Ensure your AuthContext 'register' function accepts this 6th argument!
+    const result = await register(firstName, lastName, email, phone, password, selectedFile || undefined);
 
     if (result.success) {
       navigate('/browse');
@@ -67,6 +84,31 @@ const SignUpPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* === Profile Picture Upload Section === */}
+            <div className="flex flex-col items-center mb-2">
+                <div className="relative group">
+                    <div className="w-24 h-24 rounded-full overflow-hidden bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm">
+                        {previewUrl ? (
+                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <Camera className="text-slate-400 w-8 h-8" />
+                        )}
+                    </div>
+                    <label className="absolute bottom-0 right-0 bg-slate-900 text-white p-2 rounded-full cursor-pointer hover:bg-slate-700 transition-colors shadow-md">
+                        <Camera size={14} />
+                        <input 
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*" 
+                            onChange={handleFileChange} 
+                        />
+                    </label>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">Upload profile photo</p>
+            </div>
+            {/* ====================================== */}
+
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
