@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "uploads/*",
+    "profiles/*",
+    "temp/*",
+    "*.log"
+  ]
+}
