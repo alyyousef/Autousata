@@ -2,17 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
-const oracleDb = require('./config/oracle');
+
+// 1. Import the DB Module
+const db = require('./config/db'); 
 
 const app = express();
-// USE PORT 5005 (We verified this port works on your Mac)
-const PORT = process.env.PORT || 5005;
+const PORT = process.env.PORT || 5001; // Changed to 5001 to match your previous setup
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// 🕵️‍♂️ DEBUG SPY: Logs every request to the terminal
+// Request Logger
 app.use((req, res, next) => {
     console.log(`🔎 [${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
@@ -20,57 +21,51 @@ app.use((req, res, next) => {
 
 // --- ROUTES ---
 const authRoutes = require('./routes/auth');
-
-// Mount Auth Routes
 app.use('/api/auth', authRoutes);
 
-// Test Route (Access this to prove server is alive)
+// Test Route
 app.get('/', (req, res) => {
     res.json({ status: 'Online', message: 'Server is running on Port ' + PORT });
 });
 
 // =====================================================
-// 🚀 STARTUP SEQUENCE: Server First -> Then Databases
+// 🚀 STARTUP SEQUENCE: Initialize Pool -> Start Server
 // =====================================================
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n✅ SERVER STARTED SUCCESSFULLY!`);
-    console.log(`👉 Local:   http://127.0.0.1:${PORT}`);
-    console.log(`👉 Network: http://0.0.0.0:${PORT}`);
-    
-    // NOW connect to databases (So they don't block startup)
-    connectDatabases();
-});
-
-async function connectDatabases() {
-    // 1. Oracle Connection
+async function startServer() {
     try {
-        console.log('⏳ Initializing Oracle Pool...');
-        await oracleDb.initialize();
-        console.log('✅ Oracle Database connected!');
-    } catch (err) {
-        console.error('❌ Oracle Connection FAILED:', err.message);
-        // We do NOT exit the process, so the server stays alive for debugging
-    }
+        // 2. Initialize Oracle Pool FIRST (Blocking)
+        // The app will NOT start listening until this finishes
+        await db.initialize(); 
 
-    // 2. MongoDB Connection (Passive)
-    try {
+        // 3. Initialize MongoDB (Passive - Optional)
         const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/autousata';
-        await mongoose.connect(MONGO_URI);
-        console.log('✅ MongoDB connected (Passive Mode)');
+        try {
+            await mongoose.connect(MONGO_URI);
+            console.log('✅ MongoDB connected');
+        } catch (err) {
+            console.error('⚠️ MongoDB Failed (Ignored):', err.message);
+        }
+
+        // 4. Start Listening ONLY after DB is ready
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            console.log(`\n✅ SERVER STARTED SUCCESSFULLY!`);
+            console.log(`👉 Local:   http://127.0.0.1:${PORT}`);
+        });
+
+        // Graceful Shutdown Logic
+        process.on('SIGINT', async () => {
+            console.log('\n🛑 Shutting down...');
+            await db.close(); // Close Oracle Pool
+            server.close(() => {
+                console.log('Server closed.');
+                process.exit(0);
+            });
+        });
+
     } catch (err) {
-        console.error('⚠️ MongoDB Connection Failed (Ignored):', err.message);
+        console.error('❌ Failed to start server:', err);
+        process.exit(1);
     }
 }
 
-// Graceful Shutdown
-process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down...');
-    try {
-        await oracleDb.close(); 
-    } catch(e) { console.log('Oracle close error:', e.message); }
-    
-    server.close(() => {
-        console.log('Server closed.');
-        process.exit(0);
-    });
-});
+startServer();
