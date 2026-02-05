@@ -149,7 +149,7 @@ async function login(req, res) {
         const match = await bcrypt.compare(password, userData.hash);
 
         if (match) {
-            const token = generateToken(userData.id);
+            const token = generateToken({ id: userData.id, role: userData.role });
 
             res.json({
                 message: 'Login successful',

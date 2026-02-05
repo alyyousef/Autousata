@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UserRole } from './types';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -29,6 +30,15 @@ const ScrollToTop: React.FC = () => {
   }, [pathname]);
 
   return null;
+};
+
+const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== UserRole.ADMIN) return <Navigate to="/browse" replace />;
+  return children;
 };
 
 const AppRoutes: React.FC = () => {
@@ -60,7 +70,14 @@ const AppRoutes: React.FC = () => {
           {/* Protected Routes */}
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <RequireAdmin>
+                <AdminDashboard />
+              </RequireAdmin>
+            }
+          />
         </Route>
       </Routes>
     </HashRouter>
