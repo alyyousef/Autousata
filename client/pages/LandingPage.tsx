@@ -17,9 +17,18 @@ import mcLarenImage from '../../assests/carsPictures/McLaren.avif';
 import lamboOneImage from '../../assests/carsPictures/LamboOne.jpg';
 import bugattiOneImage from '../../assests/carsPictures/bugattiOne.jpg';
 import bmwI8Image from '../../assests/carsPictures/BmwI8.jpg';
+import ferrariGif from '../../assests/carsPictures/ferrariGIF.gif';
+import porscheGif from '../../assests/carsPictures/porscheGif.gif';
 import { MOCK_AUCTIONS } from '../constants';
 
 const heroSlides = [
+  {
+    image: ferrariGif,
+    headline: 'Engineered For Pure Emotion',
+    subhead: 'Experience iconic Ferrari motion and unmistakable performance.',
+    sponsor: 'Ferrari.',
+    sponsorLine: 'Race heritage, timeless design, and visceral sound.'
+  },
   {
     image: rrTwoImage,
     headline: 'Driving Luxury Since 1985',
@@ -47,6 +56,13 @@ const heroSlides = [
     subhead: 'Exclusive inventory built for collectors who expect excellence.',
     sponsor: 'Lamborghini.',
     sponsorLine: 'Bold lines, raw power, unmistakable character.'
+  },
+  {
+    image: porscheGif,
+    headline: 'Precision In Every Curve',
+    subhead: 'Porsche handling, speed, and control built for drivers.',
+    sponsor: 'Porsche.',
+    sponsorLine: 'Track-born confidence with everyday usability.'
   },
   {
     image: bugattiOneImage,
@@ -117,7 +133,7 @@ const LandingPage: React.FC = () => {
     <>
       <div className="landing-serif">
         <section className="relative overflow-hidden py-6">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-[118rem] mx-auto px-2 sm:px-4 lg:px-6">
             <div className="relative overflow-hidden rounded-[36px] border border-white/10 shadow-[0_35px_80px_rgba(4,10,20,0.55)]">
               <div className="absolute inset-0">
                 <img
@@ -131,7 +147,6 @@ const LandingPage: React.FC = () => {
               </div>
 
               <div className="relative z-10 px-6 md:px-14 pt-16 pb-20 text-center text-white">
-                <p className="text-[11px] uppercase tracking-[0.45em] text-white/70">AUTOUSATA</p>
                 <h1 className="mt-4 text-3xl md:text-5xl font-semibold leading-tight">
                   {currentSlide.headline}
                 </h1>
@@ -190,7 +205,6 @@ const LandingPage: React.FC = () => {
 
                 <div className="mt-12 flex flex-col md:flex-row md:items-end md:justify-between gap-8 text-left">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.35em] text-white/60">Sponsored</p>
                     <h3 className="mt-2 text-2xl md:text-3xl font-semibold text-white">
                       {currentSlide.sponsor}
                     </h3>
