@@ -71,6 +71,18 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const root = document.documentElement;
+    const storedTheme = window.localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      root.classList.add('theme-dark');
+      return;
+    }
+    if (storedTheme === 'light') {
+      root.classList.remove('theme-dark');
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <NotificationProvider>

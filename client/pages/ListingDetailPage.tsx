@@ -163,6 +163,29 @@ const ListingDetailPage: React.FC = () => {
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [currentBid, setCurrentBid] = useState<number | null>(null);
   const [currentBidCount, setCurrentBidCount] = useState<number | null>(null);
+  const confettiPieces = useMemo(() => {
+    if (bidSuccess === null) return [];
+    const colors = ['#22c55e', '#38bdf8', '#f59e0b', '#ef4444', '#a78bfa', '#f97316', '#eab308'];
+    return Array.from({ length: 360 }).map((_, idx) => {
+      const width = 6 + Math.random() * 8;
+      const height = 10 + Math.random() * 12;
+      const drift = (Math.random() > 0.5 ? 1 : -1) * (90 + Math.random() * 260);
+      const drop = 320 + Math.random() * 420;
+      return {
+        id: idx,
+        left: `${Math.random() * 100}%`,
+        top: `${-15 + Math.random() * 40}%`,
+        delay: `${Math.random() * 950}ms`,
+        duration: `${1400 + Math.random() * 1400}ms`,
+        drift: `${drift}px`,
+        drop: `${drop}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        radius: Math.random() > 0.5 ? '999px' : '2px',
+      };
+    });
+  }, [bidSuccess]);
 
   const listing = useMemo(() => MOCK_AUCTIONS.find((auction) => auction.id === id), [id]);
 
@@ -284,7 +307,7 @@ const ListingDetailPage: React.FC = () => {
       'success'
     );
     setPendingBidAmount(null);
-    window.setTimeout(() => setBidSuccess(null), 3000);
+    window.setTimeout(() => setBidSuccess(null), 4200);
   };
 
   const handleCancelConfirm = () => {
@@ -736,16 +759,22 @@ const ListingDetailPage: React.FC = () => {
         {bidSuccess !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-fade-in">
             <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" />
-            <div className="confetti-layer absolute inset-0 pointer-events-none">
-              {Array.from({ length: 140 }).map((_, idx) => (
+            <div className="confetti-layer fixed inset-0 pointer-events-none overflow-hidden">
+              {confettiPieces.map((piece) => (
                 <span
-                  key={`confetti-${idx}`}
+                  key={`confetti-${piece.id}`}
                   className="confetti-piece confetti-spray"
                   style={{
-                    left: `${(idx * 100) / 140}%`,
-                    animationDelay: `${idx * 10}ms`,
-                    animationDuration: `${1400 + (idx % 6) * 120}ms`,
-                    ['--confetti-drift' as string]: `${(idx % 2 === 0 ? 1 : -1) * (40 + (idx % 8) * 6)}px`,
+                    left: piece.left,
+                    top: piece.top,
+                    width: piece.width,
+                    height: piece.height,
+                    borderRadius: piece.radius,
+                    background: piece.color,
+                    animationDelay: piece.delay,
+                    animationDuration: piece.duration,
+                    ['--confetti-drift' as string]: piece.drift,
+                    ['--confetti-drop' as string]: piece.drop,
                   }}
                 />
               ))}

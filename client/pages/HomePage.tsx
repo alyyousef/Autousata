@@ -273,7 +273,7 @@ const HomePage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
+        <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
           <div className="mb-5 text-center">
             <h3 className="text-lg font-semibold text-slate-900">Bid history, notifications, and payments</h3>
           </div>
@@ -282,7 +282,7 @@ const HomePage: React.FC = () => {
               <h4 className="text-sm font-semibold text-slate-800 mb-3">Bid history</h4>
               <div className="space-y-3 text-sm">
                 {buyerBidHistory.map(entry => (
-                  <div key={entry.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                  <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                     <div>
                       <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
                       <span className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
@@ -293,7 +293,7 @@ const HomePage: React.FC = () => {
                         {entry.status}
                       </span>
                     </div>
-                    <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
                       EGP {entry.amount.toLocaleString()}
                     </span>
                   </div>
@@ -304,7 +304,7 @@ const HomePage: React.FC = () => {
               <h4 className="text-sm font-semibold text-slate-800 mb-3">Outbid notifications</h4>
               <div className="space-y-3 text-sm text-slate-600">
                 {buyerNotifications.map((note, index) => (
-                  <div key={index} className="inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
+                  <div key={index} className="buyer-insights-note inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
                     {note}
                   </div>
                 ))}
@@ -314,19 +314,19 @@ const HomePage: React.FC = () => {
               <h4 className="text-sm font-semibold text-slate-800 mb-3">Payment status</h4>
               <div className="space-y-3 text-sm">
                 {buyerPayments.map(payment => (
-                  <div key={payment.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                  <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                     <div>
                       <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
                       <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
                         {payment.status}
                       </span>
                     </div>
-                    <span className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
                       EGP {payment.amount.toLocaleString()}
                     </span>
                   </div>
                 ))}
-                <p className="text-xs text-slate-400 mt-3">
+                <p className="buyer-insights-helper text-xs text-slate-400 mt-3">
                   Payment methods and Stripe checkout are placeholders for API integration.
                 </p>
               </div>

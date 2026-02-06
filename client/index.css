@@ -251,7 +251,7 @@ body {
     opacity: 1;
   }
   100% {
-    transform: translate(var(--confetti-drift, 0px), 320px) rotate(320deg);
+    transform: translate(var(--confetti-drift, 0px), var(--confetti-drop, 320px)) rotate(320deg);
     opacity: 0;
   }
 }
@@ -822,6 +822,37 @@ button.no-hover-rise:active {
 
 .theme-dark .bg-indigo-100 {
   background-color: rgba(30, 64, 175, 0.25);
+}
+
+/* Home page buyer insights panel dark mode tuning */
+.theme-dark .buyer-insights-panel {
+  background:
+    radial-gradient(circle at top, rgba(56, 189, 248, 0.08), transparent 48%),
+    linear-gradient(165deg, rgba(7, 12, 23, 0.96), rgba(10, 18, 34, 0.92));
+  border-color: rgba(71, 85, 105, 0.55);
+  box-shadow:
+    0 22px 44px rgba(2, 6, 23, 0.5),
+    inset 0 1px 0 rgba(148, 163, 184, 0.14);
+}
+
+.theme-dark .buyer-insights-item {
+  background: linear-gradient(180deg, rgba(22, 31, 50, 0.92), rgba(17, 24, 39, 0.88));
+  border-color: rgba(100, 116, 139, 0.45);
+}
+
+.theme-dark .buyer-insights-note {
+  background: rgba(17, 24, 39, 0.86);
+  border-color: rgba(100, 116, 139, 0.4);
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.theme-dark .buyer-insights-amount {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.theme-dark .buyer-insights-helper {
+  color: rgba(203, 213, 225, 0.7);
 }
 
 /* Utility: animated pill-style buttons */

@@ -12,7 +12,12 @@ const PublicLayout: React.FC = () => {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
   const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const storedTheme = window.localStorage.getItem('theme');
+    if (storedTheme) return storedTheme === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   useEffect(() => {
     if (!isAuthPage) return;
@@ -25,12 +30,6 @@ const PublicLayout: React.FC = () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, [isAuthPage]);
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(storedTheme ? storedTheme === 'dark' : prefersDark);
-  }, []);
-
   useEffect(() => {
     const root = document.documentElement;
     if (isDarkMode) {
