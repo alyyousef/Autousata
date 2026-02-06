@@ -534,6 +534,26 @@ button.no-hover-rise:active {
   color: var(--nav-link-active);
 }
 
+.nav-link-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.8);
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.nav-link:hover .nav-link-glyph,
+.nav-link.nav-link-active .nav-link-glyph {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: rgba(15, 23, 42, 0.95);
+}
+
 .nav-pill {
   background: var(--nav-pill-bg);
   border-color: var(--nav-pill-border);
@@ -581,6 +601,19 @@ button.no-hover-rise:active {
 
 .theme-dark .nav-icon {
   color: rgba(226, 232, 240, 0.85);
+}
+
+.theme-dark .nav-link-glyph {
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.theme-dark .nav-link:hover .nav-link-glyph,
+.theme-dark .nav-link.nav-link-active .nav-link-glyph {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(129, 140, 248, 0.5);
+  color: #f8fafc;
 }
 
 .value-card {

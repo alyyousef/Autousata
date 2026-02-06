@@ -69,7 +69,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             <div className="hidden md:flex items-center gap-4">
               <div className="relative">
                 <button
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full relative"
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full relative overflow-visible"
                   aria-label="Notifications"
                   onClick={() => {
                     setIsNotifOpen(prev => !prev);

@@ -131,7 +131,7 @@ const LandingPage: React.FC = () => {
               </div>
 
               <div className="relative z-10 px-6 md:px-14 pt-16 pb-20 text-center text-white">
-                <p className="text-[11px] uppercase tracking-[0.45em] text-white/70">AUTOUSATA Registry</p>
+                <p className="text-[11px] uppercase tracking-[0.45em] text-white/70">AUTOUSATA</p>
                 <h1 className="mt-4 text-3xl md:text-5xl font-semibold leading-tight">
                   {currentSlide.headline}
                 </h1>

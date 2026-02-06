@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Menu, Moon, Sun, X, User as UserIcon } from 'lucide-react';
+import { Bell, CircleHelp, Gavel, HandCoins, Menu, Moon, SearchCheck, Sun, X, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
@@ -52,8 +52,15 @@ const PublicLayout: React.FC = () => {
     ? '/assests/frontendPictures/logoWhiteA.png'
     : '/assests/frontendPictures/logoBlackA.png';
 
+  const navItems = [
+    { to: '/browse', label: 'Buy', icon: SearchCheck },
+    { to: '/sell', label: 'Sell', icon: HandCoins },
+    { to: '/auctions', label: 'Auction', icon: Gavel },
+    { to: '/how-it-works', label: 'How it Works', icon: CircleHelp }
+  ] as const;
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `nav-link ${isActive ? 'nav-link-active' : ''}`;
+    `nav-link gap-2 ${isActive ? 'nav-link-active' : ''}`;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -66,17 +73,20 @@ const PublicLayout: React.FC = () => {
                 <img src={logoSrc} alt="AUTOUSATA logo" className="h-9 w-9" />
               </div>
               <div className="leading-none">
-                <span className="block text-xs uppercase tracking-[0.4em] text-slate-500 nav-logo-eyebrow">Registry</span>
                 <span className="block text-2xl font-semibold text-slate-900 tracking-tight nav-logo-title">AUTOUSATA</span>
               </div>
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8 px-6 py-2 rounded-full border nav-pill shadow-sm" aria-label="Primary">
-              <NavLink to="/browse" className={navLinkClass}>Buy</NavLink>
-              <NavLink to="/sell" className={navLinkClass}>Sell</NavLink>
-              <NavLink to="/auctions" className={navLinkClass}>Auction</NavLink>
-              <NavLink to="/how-it-works" className={navLinkClass}>How it Works</NavLink>
+              {navItems.map(item => (
+                <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                  <span className="nav-link-glyph">
+                    <item.icon size={14} />
+                  </span>
+                  {item.label}
+                </NavLink>
+              ))}
             </nav>
 
             {/* Desktop User Actions */}
@@ -106,7 +116,7 @@ const PublicLayout: React.FC = () => {
                     setIsNotifOpen(prev => !prev);
                     markAllRead();
                   }}
-                  className="relative p-2 rounded-full nav-icon hover:bg-slate-100 transition-colors"
+                  className="relative p-2 rounded-full nav-icon hover:bg-slate-100 transition-colors overflow-visible"
                   aria-label="Notifications"
                 >
                   <Bell size={20} />
@@ -228,10 +238,14 @@ const PublicLayout: React.FC = () => {
         {isMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white nav-mobile">
             <div className="px-4 py-4 space-y-3">
-              <NavLink to="/browse" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Buy</NavLink>
-              <NavLink to="/sell" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Sell</NavLink>
-              <NavLink to="/auctions" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>Auction</NavLink>
-              <NavLink to="/how-it-works" className={navLinkClass} onClick={() => setIsMenuOpen(false)}>How it Works</NavLink>
+              {navItems.map(item => (
+                <NavLink key={item.to} to={item.to} className={navLinkClass} onClick={() => setIsMenuOpen(false)}>
+                  <span className="nav-link-glyph">
+                    <item.icon size={14} />
+                  </span>
+                  {item.label}
+                </NavLink>
+              ))}
 
               <button
                 type="button"

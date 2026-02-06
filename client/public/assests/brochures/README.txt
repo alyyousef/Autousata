@@ -1,0 +1,1 @@
+Place brochure PDFs in this folder.\nExample filenames:\n- AUTOUSATA-Buyer-Guide.pdf\n- AUTOUSATA-Seller-Guide.pdf\n- AUTOUSATA-Auction-Rules.pdf\n\nThen set 'available: true' for each brochure item in client/pages/HowItWorksPage.tsx
