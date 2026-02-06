@@ -67,11 +67,6 @@ body {
   text-rendering: optimizeLegibility;
   background: var(--page-bg);
   color: var(--page-text);
-  cursor: url("/assests/logos/diamondCursor32.svg") 16 16, auto;
-}
-
-a, button, input, textarea, select, [role='button'] {
-  cursor: url("/assests/logos/diamondCursor32.svg") 16 16, pointer;
 }
 
 /* Landing page serif typography */
@@ -145,6 +140,36 @@ a, button, input, textarea, select, [role='button'] {
   -webkit-text-fill-color: #0f172a;
   box-shadow: 0 0 0 1000px #ffffff inset;
   transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Auth pages dark mode: replace light card glow with dark surface and preserve contrast */
+.theme-dark .auth-card {
+  background: linear-gradient(160deg, rgba(9, 14, 24, 0.96), rgba(15, 23, 42, 0.94));
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow:
+    0 30px 80px rgba(2, 6, 23, 0.75),
+    0 10px 30px rgba(15, 23, 42, 0.45);
+}
+
+.theme-dark .auth-card input,
+.theme-dark .auth-card textarea,
+.theme-dark .auth-card select {
+  background-color: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
+}
+
+.theme-dark .auth-card input:focus,
+.theme-dark .auth-card textarea:focus,
+.theme-dark .auth-card select:focus {
+  background-color: rgba(15, 23, 42, 0.92);
+}
+
+.theme-dark .auth-card input:-webkit-autofill,
+.theme-dark .auth-card input:-webkit-autofill:hover,
+.theme-dark .auth-card input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.92) inset;
 }
 
 .auth-bg-login {

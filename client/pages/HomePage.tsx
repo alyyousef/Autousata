@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
@@ -53,8 +53,10 @@ const formatTimeRemaining = (endTime: string, now: number) => {
 type SortOption = 'relevance' | 'priceAsc' | 'priceDesc' | 'endingSoon';
 
 const HomePage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const queryFromUrl = searchParams.get('q') ?? '';
   const { user } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(queryFromUrl);
   const [conditionFilter, setConditionFilter] = useState('All');
   const [showDelisted, setShowDelisted] = useState(false);
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => loadDelistedIds());
@@ -70,6 +72,10 @@ const HomePage: React.FC = () => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    setSearchTerm(queryFromUrl);
+  }, [queryFromUrl]);
 
   const canManageListings = user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
 

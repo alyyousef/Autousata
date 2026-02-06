@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
-  ChevronDown,
   ChevronRight,
   Search,
   ShieldCheck,
@@ -12,42 +11,68 @@ import {
 import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
 import placeholderImage from '../../assests/frontendPictures/placeHolder.jpg';
-import landingHero from '../../assests/frontendPictures/landingPageBackT.jpg';
-import landingHeroWide from '../../assests/frontendPictures/landingPageBack.jpg';
-import landingHeroAlt from '../../assests/frontendPictures/carPlaceHolder.jpg';
+import rrTwoImage from '../../assests/carsPictures/RRTwo.jpg';
+import rrOneImage from '../../assests/carsPictures/RROne.jpg';
+import mcLarenImage from '../../assests/carsPictures/McLaren.avif';
+import lamboOneImage from '../../assests/carsPictures/LamboOne.jpg';
+import bugattiOneImage from '../../assests/carsPictures/bugattiOne.jpg';
+import bmwI8Image from '../../assests/carsPictures/BmwI8.jpg';
 import { MOCK_AUCTIONS } from '../constants';
 
 const heroSlides = [
   {
-    image: landingHero,
+    image: rrTwoImage,
     headline: 'Driving Luxury Since 1985',
     subhead: 'Discover curated exotics and collector-grade vehicles with verified provenance.',
-    sponsor: 'McLaren 750S.',
+    sponsor: 'Rolls-Royce Cullinan.',
     sponsorLine: 'For those who drive to feel. Pure V8 power.'
   },
   {
-    image: landingHeroWide,
+    image: rrOneImage,
     headline: 'Built For Serious Collectors',
     subhead: 'Bid with confidence on concierge-verified listings and transparent auction terms.',
-    sponsor: 'Porsche 911 GT3 RS.',
+    sponsor: 'Rolls-Royce Ghost.',
     sponsorLine: 'Track-bred precision, road-ready composure.'
   },
   {
-    image: landingHeroAlt,
-    headline: 'The Registry For Rare Icons',
-    subhead: 'Handpicked inventory, expert inspections, and white-glove delivery support.',
-    sponsor: 'Aston Martin DB12.',
-    sponsorLine: 'A grand tourer with effortless power and presence.'
+    image: mcLarenImage,
+    headline: 'Performance Without Compromise',
+    subhead: 'Supercar engineering and verified listings in one premium marketplace.',
+    sponsor: 'McLaren.',
+    sponsorLine: 'Lightweight design meets race-bred acceleration.'
+  },
+  {
+    image: lamboOneImage,
+    headline: 'Where Icons Change Hands',
+    subhead: 'Exclusive inventory built for collectors who expect excellence.',
+    sponsor: 'Lamborghini.',
+    sponsorLine: 'Bold lines, raw power, unmistakable character.'
+  },
+  {
+    image: bugattiOneImage,
+    headline: 'Extraordinary Cars, Trusted Process',
+    subhead: 'From browsing to delivery, every step is transparent and secure.',
+    sponsor: 'Bugatti.',
+    sponsorLine: 'Engineering artistry at hypercar level.'
+  },
+  {
+    image: bmwI8Image,
+    headline: 'Modern Exotics, Curated Weekly',
+    subhead: 'Fresh featured cars and auction-ready listings updated every week.',
+    sponsor: 'BMW i8.',
+    sponsorLine: 'Futuristic design with hybrid supercar spirit.'
   }
 ];
 
 const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [stats, setStats] = useState<LandingStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   const [heroTab, setHeroTab] = useState<'buy' | 'sell'>('buy');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadLandingData = async () => {
     setIsLoading(true);
@@ -77,6 +102,14 @@ const LandingPage: React.FC = () => {
     }, 8000);
     return () => window.clearInterval(timer);
   }, []);
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const query = searchTerm.trim();
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    navigate(`/browse${params.toString() ? `?${params.toString()}` : ''}`);
+  };
 
   const currentSlide = heroSlides[activeSlide];
 
@@ -132,29 +165,27 @@ const LandingPage: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="hero-panel w-full max-w-3xl rounded-3xl border px-4 py-4 md:px-6 md:py-5 flex flex-col md:flex-row md:items-center gap-4">
-                    <button
-                      type="button"
-                      className="hero-select flex items-center justify-between gap-3 rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm"
-                    >
-                      Used
-                      <ChevronDown size={16} />
-                    </button>
+                  <form
+                    onSubmit={handleSearchSubmit}
+                    className="hero-panel w-full max-w-3xl rounded-3xl border px-4 py-4 md:px-6 md:py-5 flex flex-col md:flex-row md:items-center gap-4"
+                  >
                     <div className="hero-search flex-1 flex items-center gap-3 rounded-2xl px-4 py-2">
                       <Search size={18} />
                       <input
                         type="text"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
                         placeholder="Search for make and model"
                         className="hero-search-input w-full bg-transparent text-sm focus:outline-none"
                       />
                     </div>
                     <button
-                      type="button"
+                      type="submit"
                       className="hero-search-button px-6 py-3 rounded-2xl text-sm font-semibold transition-colors"
                     >
                       Search
                     </button>
-                  </div>
+                  </form>
                 </div>
 
                 <div className="mt-12 flex flex-col md:flex-row md:items-end md:justify-between gap-8 text-left">
