@@ -248,7 +248,7 @@ const LandingPage: React.FC = () => {
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
               <div>
                 <p className="section-eyebrow">Market snapshot</p>
-                <h2 className="section-title">Live marketplace signals</h2>
+                <h2 className="section-title">Marketplace signals</h2>
                 <p className="section-subtitle max-w-xl">
                   Weekly activity trends across bids, listings, and sell-through velocity.
                 </p>
@@ -274,7 +274,6 @@ const LandingPage: React.FC = () => {
                     <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Updated weekly</p>
                     <p className="text-lg font-semibold">Market snapshot</p>
                   </div>
-                  <span className="text-xs text-slate-400">Live</span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {stats ? (
@@ -282,6 +281,7 @@ const LandingPage: React.FC = () => {
                       <StatCard label="Active listings" value={stats.activeListings.toLocaleString()} />
                       <StatCard label="AVERAGE time to sell" value={stats.avgTimeToSell} />
                       <StatCard label="Escrow protected" value={stats.escrowProtected} />
+                      <StatCard label="Qualified buyers" value="86" />
                     </>
                   ) : (
                     Array.from({ length: 4 }).map((_, index) => (
@@ -393,23 +393,6 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="bg-slate-950">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div>
-                <h2 className="text-3xl font-semibold mb-3">Ready to list your car?</h2>
-                <p className="text-slate-300">Reach serious buyers with auction-grade exposure and white-glove support.</p>
-              </div>
-              <Link
-                to="/sell"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white text-slate-900 font-semibold hover:bg-slate-100 transition-colors"
-              >
-                Start selling
-                <ArrowRight size={18} />
-              </Link>
-            </div>
-          </div>
-        </section>
       </div>
     </>
   );

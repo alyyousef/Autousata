@@ -322,11 +322,11 @@ const ListingDetailPage: React.FC = () => {
   return (
     <>
       {/* Background Gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 -z-10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 -z-10 listing-detail-bg" />
 
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen pb-24 listing-detail-page">
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 listing-detail-topbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <Link to="/browse" className="group flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
@@ -351,7 +351,7 @@ const ListingDetailPage: React.FC = () => {
             {/* Left Column - Images */}
             <div className="lg:col-span-2 space-y-6">
               {/* Main Image */}
-              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group">
+              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group listing-detail-main-card">
                 <img
                   src={listing.vehicle.images[0]}
                   alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
@@ -425,7 +425,7 @@ const ListingDetailPage: React.FC = () => {
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm">
+                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
                   <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                     <TrendingUp size={14} />
                     <span>Current Bid</span>
@@ -436,7 +436,7 @@ const ListingDetailPage: React.FC = () => {
                   <div className="text-xs text-slate-500 mt-2">{effectiveBidCount} bids placed</div>
                 </div>
 
-                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm">
+                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
                   <div className="text-slate-500 text-sm mb-1">Mileage</div>
                   <div className="text-2xl font-bold text-slate-900">
                     {listing.vehicle.mileage.toLocaleString()}
@@ -447,7 +447,7 @@ const ListingDetailPage: React.FC = () => {
               </div>
 
               {/* Unified Time + Verification + Bid (with subtle glow, no blur spam) */}
-              <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
+              <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden listing-detail-bid-card">
                 {/* Time */}
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-2 text-slate-700">
@@ -549,7 +549,7 @@ const ListingDetailPage: React.FC = () => {
               )}
 
               {/* Detailed Description */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/70 shadow-sm">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200/70 shadow-sm listing-detail-desc-card">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Tag size={16} className="text-emerald-500" />
@@ -794,7 +794,7 @@ const ListingDetailPage: React.FC = () => {
         )}
 
         {/* Mobile Sticky Bid Bar */}
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/85 backdrop-blur-xl lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/85 backdrop-blur-xl lg:hidden listing-detail-mobilebar">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <button
               onClick={() => setIsBidOpen(true)}
