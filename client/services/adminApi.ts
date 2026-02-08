@@ -116,6 +116,9 @@ export interface LiveAuction {
   vehicleId: number;
   sellerId: string;
   sellerName?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: number;
   status: string;
   startTime?: Date;
   endTime?: Date;
@@ -536,6 +539,59 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
 
   const data = await response.json();
   return data.kycDocuments || data || [];
+};
+
+export const approveKYC = async (kycId: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/approve`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to approve KYC document' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const rejectKYC = async (kycId: string, reason: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/reject`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ reason }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to reject KYC document' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
 };
 
 export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
