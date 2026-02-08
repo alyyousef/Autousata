@@ -88,7 +88,10 @@ const App: React.FC = () => {
     }
     if (storedTheme === 'light') {
       root.classList.remove('theme-dark');
+      return;
     }
+    window.localStorage.setItem('theme', 'light');
+    root.classList.remove('theme-dark');
   }, []);
 
   return (

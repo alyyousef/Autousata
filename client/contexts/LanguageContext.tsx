@@ -22,7 +22,8 @@ const getInitialLanguage = (): Language => {
   const legacyDir = window.localStorage.getItem('textDirection');
   if (legacyDir === 'rtl') return 'ar';
   const rootLang = document.documentElement.getAttribute('lang');
-  return rootLang === 'ar' ? 'ar' : 'en';
+  if (rootLang === 'ar') return 'ar';
+  return 'ar';
 };
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,15 +38,17 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const value = useMemo<LanguageContextValue>(() => {
     const isArabic = language === 'ar';
+    const sanitizeArabic = (value: string) =>
+      value.replace(/[.,\u060C\u061F\u061B:\u2026!]/g, '').replace(/\s{2,}/g, ' ').trim();
     return {
       language,
       setLanguage,
       isArabic,
-      t: (en, ar) => (isArabic ? ar : en),
-      formatNumber: (value) => value.toLocaleString(isArabic ? 'ar-EG' : 'en-US'),
+      t: (en, ar) => (isArabic ? sanitizeArabic(ar) : en),
+      formatNumber: (value) => value.toLocaleString(isArabic ? 'ar-EG' : 'en-US', { useGrouping: !isArabic }),
       formatCurrencyEGP: (value) => {
-        const formatted = value.toLocaleString(isArabic ? 'ar-EG' : 'en-US');
-        return isArabic ? `ج.م ${formatted}` : `EGP ${formatted}`;
+        const formatted = value.toLocaleString(isArabic ? 'ar-EG' : 'en-US', { useGrouping: !isArabic });
+        return isArabic ? `\u062c \u0645 ${formatted}` : `EGP ${formatted}`;
       }
     };
   }, [language]);
