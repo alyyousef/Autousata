@@ -18,6 +18,11 @@ const PublicLayout: React.FC = () => {
     if (storedTheme) return storedTheme === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+  const [textDirection, setTextDirection] = useState<'ltr' | 'rtl'>(() => {
+    if (typeof window === 'undefined') return 'ltr';
+    const storedDir = window.localStorage.getItem('textDirection');
+    return storedDir === 'rtl' ? 'rtl' : 'ltr';
+  });
 
   useEffect(() => {
     if (!isAuthPage) return;
@@ -40,6 +45,12 @@ const PublicLayout: React.FC = () => {
       window.localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('dir', textDirection);
+    root.setAttribute('lang', textDirection === 'rtl' ? 'ar' : 'en');
+    window.localStorage.setItem('textDirection', textDirection);
+  }, [textDirection]);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
@@ -109,6 +120,22 @@ const PublicLayout: React.FC = () => {
                   }`}
                 />
               </button>
+              <div className="dir-toggle" role="group" aria-label="Language direction">
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('ltr')}
+                  className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('rtl')}
+                  className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  AR
+                </button>
+              </div>
               <div className="relative">
                 <button
                   type="button"
@@ -264,6 +291,22 @@ const PublicLayout: React.FC = () => {
                   />
                 </span>
               </button>
+              <div className="dir-toggle dir-toggle-mobile" role="group" aria-label="Language direction">
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('ltr')}
+                  className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('rtl')}
+                  className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  Arabic
+                </button>
+              </div>
               
               <div className="pt-2 border-t border-slate-200 flex gap-3">
                 {loading ? (
@@ -347,17 +390,18 @@ const PublicLayout: React.FC = () => {
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Explore</h3>
+                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
                 <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/browse" className="hover:text-indigo-400">Buy a car</Link></li>
                   <li><Link to="/how-it-works" className="hover:text-indigo-400">How it Works</Link></li>
-                  <li><Link to="/sell" className="hover:text-indigo-400">Sell a Car</Link></li>
+                  <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
                 </ul>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
+                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Explore</h3>
                 <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
+                  <li><Link to="/browse" className="hover:text-indigo-400">Buy a car</Link></li>
+                  <li><Link to="/auctions" className="hover:text-indigo-400">Live auctions</Link></li>
+                  <li><Link to="/sell" className="hover:text-indigo-400">Sell a Car</Link></li>
                 </ul>
               </div>
             </div>

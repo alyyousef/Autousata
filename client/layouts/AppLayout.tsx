@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
 import { User, UserRole } from '../types';
@@ -16,6 +16,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [textDirection, setTextDirection] = useState<'ltr' | 'rtl'>(() => {
+    if (typeof window === 'undefined') return 'ltr';
+    const storedDir = window.localStorage.getItem('textDirection');
+    return storedDir === 'rtl' ? 'rtl' : 'ltr';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('dir', textDirection);
+    root.setAttribute('lang', textDirection === 'rtl' ? 'ar' : 'en');
+    window.localStorage.setItem('textDirection', textDirection);
+  }, [textDirection]);
 
   if (loading) {
     return (
@@ -58,7 +70,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                   <Link
                     key={item.name}
                     to={item.href}
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-600 border-b-2 border-transparent transition-all"
+                    className="inline-flex items-center px-1 pt-1 text-base font-semibold text-slate-600 hover:text-indigo-600 hover:border-indigo-600 border-b-2 border-transparent transition-all"
                   >
                     {item.name}
                   </Link>
@@ -67,6 +79,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
 
             <div className="hidden md:flex items-center gap-4">
+              <div className="dir-toggle" role="group" aria-label="Language direction">
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('ltr')}
+                  className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTextDirection('rtl')}
+                  className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                >
+                  AR
+                </button>
+              </div>
               <div className="relative">
                 <button
                   className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full relative overflow-visible"
@@ -175,6 +203,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               ))}
             </div>
             <div className="pt-4 pb-3 border-t border-slate-200">
+              <div className="px-4 pb-3">
+                <div className="dir-toggle dir-toggle-mobile" role="group" aria-label="Language direction">
+                  <button
+                    type="button"
+                    onClick={() => setTextDirection('ltr')}
+                    className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTextDirection('rtl')}
+                    className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                  >
+                    Arabic
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center px-4">
                 <div className="flex-shrink-0">
                   <img className="h-10 w-10 rounded-full" src={user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)} alt="" />
@@ -216,16 +262,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               </p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Marketplace</h3>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/browse" className="hover:text-indigo-400">All Auctions</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-indigo-400">How it Works</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Support</h3>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Marketplace</h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
+                <li><Link to="/browse" className="hover:text-indigo-400">Browse listings</Link></li>
+                <li><Link to="/auctions" className="hover:text-indigo-400">Live auctions</Link></li>
+                <li><Link to="/sell" className="hover:text-indigo-400">Sell a car</Link></li>
               </ul>
             </div>
             <div>

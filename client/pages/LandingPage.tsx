@@ -6,7 +6,9 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
-  Trophy
+  Trophy,
+  Gavel,
+  Truck
 } from 'lucide-react';
 import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
@@ -134,7 +136,7 @@ const LandingPage: React.FC = () => {
       <div className="landing-serif">
         <section className="relative overflow-hidden py-6">
           <div className="max-w-[118rem] mx-auto px-2 sm:px-4 lg:px-6">
-            <div className="relative overflow-hidden rounded-[36px] border border-white/10 shadow-[0_35px_80px_rgba(4,10,20,0.55)]">
+            <div className="relative overflow-hidden rounded-[36px] border border-white/10 shadow-[0_35px_80px_rgba(4,10,20,0.55)] landing-hero-shell">
               <div className="absolute inset-0">
                 <img
                   key={currentSlide.image}
@@ -301,37 +303,6 @@ const LandingPage: React.FC = () => {
         </section>
 
         <section className="section-texture section-divider border-y border-slate-200/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-              <div className="text-center mx-auto">
-                <p className="section-eyebrow">Why AUTOUSATA</p>
-                <h2 className="section-title">A premium experience, end to end</h2>
-                <p className="section-subtitle max-w-2xl mx-auto">
-                  We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-6 md:grid-cols-3">
-              <ValueCard
-                icon={<ShieldCheck size={22} />}
-                title="Protected transactions"
-                description="Escrow protection and verified seller profiles keep every purchase secure."
-              />
-              <ValueCard
-                icon={<Sparkles size={22} />}
-                title="Curated inventory"
-                description="Each listing is reviewed for authenticity, condition, and total cost of ownership."
-              />
-              <ValueCard
-                icon={<Trophy size={22} />}
-                title="Concierge guidance"
-                description="Dedicated specialists help you bid, finance, and close with confidence."
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="section-texture section-divider border-y border-slate-200/70">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
               <div className="text-center mx-auto">
@@ -390,6 +361,75 @@ const LandingPage: React.FC = () => {
                 })}
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="section-texture section-divider border-y border-slate-200/70">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+              <div className="text-center mx-auto">
+                <p className="section-eyebrow">Why AUTOUSATA</p>
+                <h2 className="section-title">A premium experience, end to end</h2>
+                <p className="section-subtitle max-w-2xl mx-auto">
+                  We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              <ValueCard
+                icon={<ShieldCheck size={22} />}
+                title="Protected transactions"
+                description="Escrow protection and verified seller profiles keep every purchase secure."
+              />
+              <ValueCard
+                icon={<Sparkles size={22} />}
+                title="Curated inventory"
+                description="Each listing is reviewed for authenticity, condition, and total cost of ownership."
+              />
+              <ValueCard
+                icon={<Trophy size={22} />}
+                title="Concierge guidance"
+                description="Dedicated specialists help you bid, finance, and close with confidence."
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="section-texture section-divider border-y border-slate-200/70">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center mx-auto">
+              <p className="section-eyebrow">How it works</p>
+              <h2 className="section-title">A simple path from browse to delivery</h2>
+              <p className="section-subtitle max-w-2xl mx-auto">
+                Follow a clear, guided process whether you are buying or selling your next vehicle.
+              </p>
+            </div>
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
+              <ValueCard
+                icon={<Search size={22} />}
+                title="Browse and shortlist"
+                description="Filter verified listings and compare condition reports in one place."
+              />
+              <ValueCard
+                icon={<Gavel size={22} />}
+                title="Bid or list confidently"
+                description="Transparent bidding and instant status updates keep you in control."
+              />
+              <ValueCard
+                icon={<Truck size={22} />}
+                title="Close and deliver"
+                description="Secure payments and guided handover ensure a smooth finish."
+              />
+            </div>
+            <div className="mt-8 flex justify-center">
+              <Link
+                to="/how-it-works"
+                className="market-cta-primary inline-flex items-center gap-2 px-6 py-2 rounded-full text-sm font-semibold transition-colors"
+              >
+                Explore the full guide
+                <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
         </section>
 
