@@ -20,7 +20,7 @@ router.post(
 
 // 2. LOGIN
 router.post("/login", authController.login);
-router.post("/verify-email", authController.verifyEmail);
+// router.post("/verify-email", authController.verifyEmail);
 
 // GET http://localhost:5001/api/auth/me
 router.get("/me", authenticate, (req, res) => {
