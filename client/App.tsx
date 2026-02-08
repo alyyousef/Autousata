@@ -33,6 +33,7 @@ import PaymentConfirmationPage from "./pages/PaymentConfirmationPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
+import { UserRole } from "./types";
 //import AdminPayoutsPage from "./pages/"
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
