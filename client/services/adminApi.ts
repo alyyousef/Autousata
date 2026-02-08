@@ -57,6 +57,8 @@ export interface CreateInspectionPayload {
   mechanicalIssues?: string;
   requiredRepairs?: string;
   estimatedRepairCost?: number;
+  inspectorNotes?: string;
+  photosUrl?: string[];
   reportDocUrl?: string;
   status?: string;
 }
@@ -81,6 +83,83 @@ export const listUsers = async (
     }
   );
 };
+
+export interface KYCDocument {
+  userId: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  isActive?: number;
+  isBanned?: number;
+  kycStatus?: string;
+  kycId: string;
+  documentType?: string;
+  documentNumber?: string;
+  fullNameOnDoc?: string;
+  dateOfBirth?: Date;
+  issueDate?: Date;
+  expiryDate?: Date;
+  documentFrontUrl?: string;
+  documentBackUrl?: string;
+  selfieWithDocUrl?: string;
+  kycDocStatus?: string;
+  rejectionReason?: string;
+  verificationMethod?: string;
+  submittedAt?: Date;
+  reviewedAt?: Date;
+  reviewedByAdminId?: string;
+}
+
+export interface LiveAuction {
+  id: string;
+  vehicleId: number;
+  sellerId: string;
+  sellerName?: string;
+  status: string;
+  startTime?: Date;
+  endTime?: Date;
+  originalEndTime?: Date;
+  reservePrice?: number;
+  startingBid?: number;
+  currentBid?: number;
+  bidCount?: number;
+  minBidIncrement?: number;
+  autoExtendEnabled?: number;
+  autoExtendMinutes?: number;
+  maxAutoExtensions?: number;
+  autoExtCount?: number;
+  leadingBidderId?: string;
+  leadingBidderName?: string;
+  winnerId?: string;
+  winnerName?: string;
+  createdAt?: Date;
+  startedAt?: Date;
+}
+
+export interface PendingPayment {
+  id: string;
+  auctionId?: string;
+  buyerId?: string;
+  buyerName?: string;
+  sellerId?: string;
+  sellerName?: string;
+  amount?: number;
+  currency?: string;
+  processorFee?: number;
+  paymentMethod?: string;
+  gateway?: string;
+  gatewayOrderId?: string;
+  gatewayTransId?: string;
+  status: string;
+  failureReason?: string;
+  initiatedAt?: Date;
+  completedAt?: Date;
+  failedAt?: Date;
+  refundedAt?: Date;
+}
+
+
 
 
 export const searchUsers = async (
@@ -200,6 +279,64 @@ export const updateVehicleStatus = async (
   }
 };
 
+export const acceptVehicle = async (
+  vehicleId: number,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}/accept`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to accept vehicle' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const rejectVehicle = async (
+  vehicleId: number,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}/reject`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to reject vehicle' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
 export const createInspectionReport = async (
   payload: CreateInspectionPayload,
   token?: string
@@ -299,7 +436,7 @@ export interface ModerateUserResponse {
     isBanned?: string;
     banReason?: string | null;
   };
-}
+};
 
 export const suspendUser = async (
   userId: string,
@@ -323,4 +460,164 @@ export const banUser = async (
   const response = await apiService.adminBanUser(userId, payload);
   if (response.error) throw new Error(response.error);
   return response.data ?? { message: "User banned" };
+};
+export const acceptInspectionReport = async (
+  inspectionId: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/inspections/${inspectionId}/accept`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to accept inspection report' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const rejectInspectionReport = async (
+  inspectionId: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/inspections/${inspectionId}/reject`, {
+      method: 'PATCH',
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to reject inspection report' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin-content/kyc/pending', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch pending KYC documents');
+  }
+
+  const data = await response.json();
+  return data.kycDocuments || data || [];
+};
+
+export const getLiveAuctions = async (token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin-content/auctions/live', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch live auctions');
+  }
+
+  const data = await response.json();
+  return data.auctions || data || [];
+};
+
+export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin-content/payments/pending', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch pending payments');
+  }
+
+  const data = await response.json();
+  return data.payments || data || [];
+};
+
+
+export const getreport = async (reportId: string, token?: string): Promise<any> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`http://localhost:5000/api/admin/inspections/${reportId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch report');
+  }
+
+  const data = await response.json();
+  return data.report || null;
+};
+
+export const editreport = async (reportId: string, payload: Partial<CreateInspectionPayload>, token?: string): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+    if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    }
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/inspections/${reportId}/edit`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to edit report' };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
 };
