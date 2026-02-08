@@ -40,12 +40,14 @@ const readBidState = () => {
 };
 
 type SortOption = 'relevance' | 'priceAsc' | 'priceDesc' | 'endingSoon';
+type SearchFilter = 'all' | 'make' | 'model' | 'year' | 'location';
 
 const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const queryFromUrl = searchParams.get('q') ?? '';
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState(queryFromUrl);
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
   const [conditionFilter, setConditionFilter] = useState('All');
   const [showDelisted, setShowDelisted] = useState(false);
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => loadDelistedIds());
@@ -124,18 +126,56 @@ const HomePage: React.FC = () => {
     }));
   }, []);
 
+  const searchSuggestions = useMemo(() => {
+    const values = new Set<string>();
+    listings.forEach(listing => {
+      const { make, model, year, location } = listing.vehicle;
+      if (searchFilter === 'make') values.add(make);
+      else if (searchFilter === 'model') values.add(model);
+      else if (searchFilter === 'year') values.add(String(year));
+      else if (searchFilter === 'location') values.add(location);
+      else {
+        values.add(make);
+        values.add(model);
+        values.add(String(year));
+        values.add(location);
+      }
+    });
+    const query = searchTerm.trim().toLowerCase();
+    const allValues = Array.from(values);
+    const filtered = query
+      ? allValues.filter(value => value.toLowerCase().includes(query))
+      : allValues;
+    const sorted = filtered.sort((a, b) => {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      const aStarts = query ? aLower.startsWith(query) : false;
+      const bStarts = query ? bLower.startsWith(query) : false;
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      return aLower.localeCompare(bLower);
+    });
+    return sorted.slice(0, 40);
+  }, [listings, searchFilter, searchTerm]);
+
   const filteredListings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     const visible = listings.filter(listing => {
       const isDelisted = delistedIds.has(listing.id);
       if (!showDelisted && isDelisted) return false;
       const matchesCondition = conditionFilter === 'All' || listing.vehicle.condition === conditionFilter;
-      const matchesQuery = !query || [
-        listing.vehicle.make,
-        listing.vehicle.model,
-        listing.vehicle.year.toString(),
-        listing.vehicle.location
-      ].some(value => value.toLowerCase().includes(query));
+      const matchesQuery = !query || (() => {
+        if (searchFilter === 'make') return listing.vehicle.make.toLowerCase().includes(query);
+        if (searchFilter === 'model') return listing.vehicle.model.toLowerCase().includes(query);
+        if (searchFilter === 'year') return listing.vehicle.year.toString().toLowerCase().includes(query);
+        if (searchFilter === 'location') return listing.vehicle.location.toLowerCase().includes(query);
+        return [
+          listing.vehicle.make,
+          listing.vehicle.model,
+          listing.vehicle.year.toString(),
+          listing.vehicle.location
+        ].some(value => value.toLowerCase().includes(query));
+      })();
       return matchesCondition && matchesQuery;
     });
 
@@ -156,7 +196,7 @@ const HomePage: React.FC = () => {
     });
 
     return sorted;
-  }, [conditionFilter, delistedIds, listings, searchTerm, showDelisted, sortBy]);
+  }, [conditionFilter, delistedIds, listings, searchFilter, searchTerm, showDelisted, sortBy]);
 
   const activeCount = listings.filter(listing => !delistedIds.has(listing.id)).length;
   const delistedCount = listings.length - activeCount;
@@ -216,12 +256,12 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12">
-        <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-3xl p-8 md:p-10 shadow-lg premium-card-hover">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 relative z-10">
+        <div className="buyer-insights-panel mx-auto max-w-6xl bg-white/95 border border-slate-200 rounded-3xl p-6 md:p-8 shadow-lg premium-card-hover no-hover-rise">
           <div className="mb-6 text-center">
             <h3 className="text-xl font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
           </div>
-          <div className="grid gap-8 lg:grid-cols-3 text-left">
+          <div className="grid gap-6 lg:grid-cols-3 text-left">
             <div>
               <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Bid history', 'سجل المزايدات')}</h4>
               <div className="space-y-4 text-sm">
@@ -296,6 +336,13 @@ const HomePage: React.FC = () => {
                     type="text"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Tab' && searchSuggestions.length > 0) {
+                        setSearchTerm(searchSuggestions[0]);
+                        event.preventDefault();
+                      }
+                    }}
+                    list="buy-search-suggestions"
                     placeholder={t('Search by make, model, year, or location', 'ابحث بالمصنع او الموديل او السنة او الموقع')}
                     className="w-full pl-12 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   />
@@ -317,6 +364,33 @@ const HomePage: React.FC = () => {
                   {showFilters ? t('Hide filters', 'اخف الفلاتر') : t('Filters', 'فلاتر')}
                 </button>
               </div>
+            </div>
+            <datalist id="buy-search-suggestions">
+              {searchSuggestions.map(value => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
+              {[
+                { value: 'all', label: t('All', 'الكل') },
+                { value: 'make', label: t('Make', 'الماركة') },
+                { value: 'model', label: t('Model', 'الموديل') },
+                { value: 'year', label: t('Year', 'السنة') },
+                { value: 'location', label: t('Location', 'الموقع') }
+              ].map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSearchFilter(option.value as SearchFilter)}
+                  className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
+                    searchFilter === option.value
+                      ? 'bg-slate-900 text-white'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
