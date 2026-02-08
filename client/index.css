@@ -5,6 +5,8 @@
 :root {
   --font-body: "Manrope", "Instrument Sans", sans-serif;
   --font-display: "Cormorant Garamond", "Instrument Serif", serif;
+  --font-body-ar: "Tajawal", "Cairo", sans-serif;
+  --font-display-ar: "Cairo", "Tajawal", sans-serif;
   --page-bg: radial-gradient(circle at top left, #f8fafc 0, #eef2f7 45%, #f8fafc 100%);
   --page-text: #0f172a;
   --nav-bg: rgba(255, 255, 255, 0.92);
@@ -67,6 +69,11 @@ body {
   text-rendering: optimizeLegibility;
   background: var(--page-bg);
   color: var(--page-text);
+}
+
+html[lang="ar"] body {
+  font-family: var(--font-body-ar);
+  letter-spacing: 0;
 }
 
 /* Landing page serif typography */
@@ -264,6 +271,16 @@ h5,
 h6 {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
+}
+
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3,
+html[lang="ar"] h4,
+html[lang="ar"] h5,
+html[lang="ar"] h6 {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
 }
 
 /* Smooth scrolling for a more polished feel */
@@ -577,6 +594,22 @@ button.no-hover-rise:active {
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
+.dir-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.theme-dark .dir-toggle-icon {
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(226, 232, 240, 0.85);
+}
+
 .dir-toggle-btn {
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
@@ -637,6 +670,10 @@ button.no-hover-rise:active {
 
 html[dir="rtl"] body {
   direction: rtl;
+}
+
+html[dir="rtl"] .dir-toggle {
+  flex-direction: row-reverse;
 }
 
 html[dir="rtl"] .nav-link {

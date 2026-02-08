@@ -5,6 +5,7 @@ import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
@@ -63,6 +64,7 @@ const HomePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [now, setNow] = useState(() => Date.now());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const { t, formatNumber, formatCurrencyEGP } = useLanguage();
 
   useEffect(() => {
     saveDelistedIds(delistedIds);
@@ -165,16 +167,19 @@ const HomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="max-w-2xl mx-auto text-center relative hero-fade-in">
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
-              Buy a car from verified sellers
+              {t('Buy a car from verified sellers', 'اشتري عربية من باعة موثّقين')}
             </h1>
             <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl">
-              Explore our curated inventory, compare bids, and review condition details before you commit.
+              {t(
+                'Explore our curated inventory, compare bids, and review condition details before you commit.',
+                'استكشف العربيات المختارة بعناية، قارن المزايدات، وراجع تفاصيل الحالة قبل ما تقرر.'
+              )}
             </p>
           </div>
           <div className="mt-8 flex flex-wrap justify-center gap-4 text-xs md:text-sm text-slate-200/90 relative">
-            <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />Verified sellers</div>
-            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />Transparent pricing</div>
-            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />Clear time remaining</div>
+            <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'باعة موثّقين')}</div>
+            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'أسعار واضحة')}</div>
+            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبقي واضح')}</div>
           </div>
         </div>
       </section>
@@ -183,14 +188,16 @@ const HomePage: React.FC = () => {
         <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm hero-panel">
           <div className="space-y-6">
             <div>
-              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">Find your next car</p>
+              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
+                {t('Find your next car', 'دوّر على عربيتك الجاية')}
+              </p>
               <div className="relative">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search by make, model, year, or location"
+                  placeholder={t('Search by make, model, year, or location', 'دوّر بالمُصنّع، الموديل، السنة، أو المكان')}
                   className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 {searchTerm && (
@@ -206,15 +213,15 @@ const HomePage: React.FC = () => {
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                Active listings
+                {t('Active listings', 'قوائم شغالة')}
                 <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm">
-                  {activeCount}
+                  {formatNumber(activeCount)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
-                Delisted
+                {t('Delisted', 'موقوفة')}
                 <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 shadow-sm">
-                  {delistedCount}
+                  {formatNumber(delistedCount)}
                 </span>
               </span>
             </div>
@@ -223,7 +230,7 @@ const HomePage: React.FC = () => {
               <div>
                 <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
                   <SlidersHorizontal size={14} />
-                  Condition
+                  {t('Condition', 'الحالة')}
                 </label>
                 <div className="relative">
                   <select
@@ -231,8 +238,14 @@ const HomePage: React.FC = () => {
                     onChange={(event) => setConditionFilter(event.target.value)}
                     className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
-                    {['All', 'Mint', 'Excellent', 'Good', 'Fair'].map(option => (
-                      <option key={option} value={option}>{option}</option>
+                    {[
+                      { value: 'All', label: t('All', 'الكل') },
+                      { value: 'Mint', label: t('Mint', 'ممتاز جدًا') },
+                      { value: 'Excellent', label: t('Excellent', 'ممتاز') },
+                      { value: 'Good', label: t('Good', 'جيد') },
+                      { value: 'Fair', label: t('Fair', 'مقبول') }
+                    ].map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
                   <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -242,7 +255,7 @@ const HomePage: React.FC = () => {
               <div>
                 <label className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
                   <SlidersHorizontal size={14} />
-                  Sort by
+                  {t('Sort by', 'ترتيب حسب')}
                 </label>
                 <div className="relative">
                   <select
@@ -250,10 +263,10 @@ const HomePage: React.FC = () => {
                     onChange={(event) => setSortBy(event.target.value as SortOption)}
                     className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
-                    <option value="relevance">Relevance</option>
-                    <option value="priceAsc">Price: low to high</option>
-                    <option value="priceDesc">Price: high to low</option>
-                    <option value="endingSoon">Ending soon</option>
+                    <option value="relevance">{t('Relevance', 'الأقرب')}</option>
+                    <option value="priceAsc">{t('Price: low to high', 'السعر: من الأقل للأعلى')}</option>
+                    <option value="priceDesc">{t('Price: high to low', 'السعر: من الأعلى للأقل')}</option>
+                    <option value="endingSoon">{t('Ending soon', 'بينتهي قريب')}</option>
                   </select>
                   <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
@@ -264,7 +277,7 @@ const HomePage: React.FC = () => {
                   onClick={() => setShowDelisted(prev => !prev)}
                   className="md:col-span-2 w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
                 >
-                  {showDelisted ? 'Hide delisted' : 'Show delisted'}
+                  {showDelisted ? t('Hide delisted', 'اخفي الموقوف') : t('Show delisted', 'اظهر الموقوف')}
                 </button>
               )}
             </div>
@@ -275,11 +288,11 @@ const HomePage: React.FC = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
           <div className="mb-5 text-center">
-            <h3 className="text-lg font-semibold text-slate-900">Bid history, notifications, and payments</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والإشعارات والمدفوعات')}</h3>
           </div>
           <div className="grid gap-6 lg:grid-cols-3 text-center">
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">Bid history</h4>
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Bid history', 'سجل المزايدات')}</h4>
               <div className="space-y-3 text-sm">
                 {buyerBidHistory.map(entry => (
                   <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
@@ -290,44 +303,47 @@ const HomePage: React.FC = () => {
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-rose-100 text-rose-700'
                       }`}>
-                        {entry.status}
+                        {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'اتسبقّت')}
                       </span>
                     </div>
                     <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-                      EGP {entry.amount.toLocaleString()}
+                      {formatCurrencyEGP(entry.amount)}
                     </span>
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">Outbid notifications</h4>
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Outbid notifications', 'إشعارات خروجك من الصدارة')}</h4>
               <div className="space-y-3 text-sm text-slate-600">
                 {buyerNotifications.map((note, index) => (
                   <div key={index} className="buyer-insights-note inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
-                    {note}
+                    {t(note, 'اتسبقّت في المزايدة. زوّد الحد الأقصى عشان ترجع الأول.')}
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">Payment status</h4>
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Payment status', 'حالة الدفع')}</h4>
               <div className="space-y-3 text-sm">
                 {buyerPayments.map(payment => (
                   <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
                     <div>
                       <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
                       <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-                        {payment.status}
+                        {payment.status === 'Unpaid' ? t('Unpaid', 'غير مدفوع') : payment.status}
                       </span>
                     </div>
                     <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-                      EGP {payment.amount.toLocaleString()}
+                      {formatCurrencyEGP(payment.amount)}
                     </span>
                   </div>
                 ))}
                 <p className="buyer-insights-helper text-xs text-slate-400 mt-3">
-                  Payment methods and Stripe checkout are placeholders for API integration.
+                  {t(
+                    'Payment methods and Stripe checkout are placeholders for API integration.',
+                    'طرق الدفع وStripe دلوقتي مجرد شكل تجريبي لحد ما API يتوصل.'
+                  )}
                 </p>
               </div>
             </div>
@@ -338,8 +354,8 @@ const HomePage: React.FC = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         {filteredListings.length === 0 ? (
           <div className="bg-white/95 border border-slate-200 rounded-2xl p-8 text-center text-slate-600 premium-card-hover">
-            <p className="text-lg font-semibold text-slate-900 mb-2">No listings match your filters</p>
-            <p className="text-sm">Try adjusting the search or clearing filters.</p>
+            <p className="text-lg font-semibold text-slate-900 mb-2">{t('No listings match your filters', 'مفيش قوائم مطابقة للفلاتر')}</p>
+            <p className="text-sm">{t('Try adjusting the search or clearing filters.', 'جرّب تغيّر البحث أو تمسح الفلاتر.')}</p>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -361,7 +377,7 @@ const HomePage: React.FC = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         isDelisted ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>
-                        {isDelisted ? 'Delisted' : 'Active'}
+                        {isDelisted ? t('Delisted', 'موقوف') : t('Active', 'شغال')}
                       </span>
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
                         {listing.vehicle.condition}
@@ -380,8 +396,8 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider">Current bid</p>
-                        <p className="text-lg font-bold text-indigo-600">EGP {listing.currentBid.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Current bid', 'أعلى مزايدة')}</p>
+                        <p className="text-lg font-bold text-indigo-600">{formatCurrencyEGP(listing.currentBid)}</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
@@ -389,18 +405,18 @@ const HomePage: React.FC = () => {
                         <Clock size={14} />
                         {formatTimeRemaining(listing.endTime, now)}
                       </div>
-                      <span>{listing.bidCount} bids</span>
+                      <span>{formatNumber(listing.bidCount)} {t('bids', 'مزايدات')}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                      <span>Mileage: <strong className="text-slate-900">{listing.vehicle.mileage.toLocaleString()} km</strong></span>
-                      <span>Condition: <strong className="text-slate-900">{listing.vehicle.condition}</strong></span>
+                      <span>{t('Mileage', 'عداد')}: <strong className="text-slate-900">{formatNumber(listing.vehicle.mileage)} {t('km', 'كم')}</strong></span>
+                      <span>{t('Condition', 'الحالة')}: <strong className="text-slate-900">{listing.vehicle.condition}</strong></span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <Link
                         to={`/listing/${listing.id}`}
                         className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
                       >
-                        View details
+                        {t('View details', 'شوف التفاصيل')}
                       </Link>
                       {canManageListings && (
                         <button
@@ -411,7 +427,7 @@ const HomePage: React.FC = () => {
                               : 'border border-rose-200 text-rose-600 hover:bg-rose-50'
                           }`}
                         >
-                          {isDelisted ? 'Restore' : 'Delist'}
+                          {isDelisted ? t('Restore', 'رجّع') : t('Delist', 'أوقف')}
                         </button>
                       )}
                     </div>

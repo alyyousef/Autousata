@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
+import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X, Languages } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface AppLayoutProps {
   user: User | null;
@@ -16,23 +17,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [textDirection, setTextDirection] = useState<'ltr' | 'rtl'>(() => {
-    if (typeof window === 'undefined') return 'ltr';
-    const storedDir = window.localStorage.getItem('textDirection');
-    return storedDir === 'rtl' ? 'rtl' : 'ltr';
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute('dir', textDirection);
-    root.setAttribute('lang', textDirection === 'rtl' ? 'ar' : 'en');
-    window.localStorage.setItem('textDirection', textDirection);
-  }, [textDirection]);
+  const { language, setLanguage, t } = useLanguage();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">
-        Loading...
+        {t('Loading...', 'تحميل...')}
       </div>
     );
   }
@@ -47,10 +37,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
   };
 
   const navigation = [
-    { name: 'Browse', href: '/browse', icon: Car, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.ADMIN] },
-    { name: 'Sell Your Car', href: '/sell', icon: PlusCircle, roles: [UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
-    { name: 'My Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SELLER, UserRole.DEALER] },
-    { name: 'Admin', href: '/admin', icon: Shield, roles: [UserRole.ADMIN] }
+    { name: t('Browse', 'تصفح'), href: '/browse', icon: Car, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.ADMIN] },
+    { name: t('Sell Your Car', 'بيع عربيتك'), href: '/sell', icon: PlusCircle, roles: [UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
+    { name: t('My Dashboard', 'لوحة التحكم'), href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SELLER, UserRole.DEALER] },
+    { name: t('Admin', 'الإدارة'), href: '/admin', icon: Shield, roles: [UserRole.ADMIN] }
   ].filter(item => item.roles.includes(user.role));
 
   return (
@@ -79,18 +69,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
 
             <div className="hidden md:flex items-center gap-4">
-              <div className="dir-toggle" role="group" aria-label="Language direction">
+              <div className="dir-toggle" role="group" aria-label={t('Language', 'اللغة')}>
+                <span className="dir-toggle-icon">
+                  <Languages size={14} />
+                </span>
                 <button
                   type="button"
-                  onClick={() => setTextDirection('ltr')}
-                  className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                  onClick={() => setLanguage('en')}
+                  className={`dir-toggle-btn ${language === 'en' ? 'dir-toggle-btn-active' : ''}`}
                 >
                   EN
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTextDirection('rtl')}
-                  className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                  onClick={() => setLanguage('ar')}
+                  className={`dir-toggle-btn ${language === 'ar' ? 'dir-toggle-btn-active' : ''}`}
                 >
                   AR
                 </button>
@@ -114,18 +107,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 {isNotifOpen && (
                   <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                      <span className="text-sm font-semibold text-slate-900">Notifications</span>
+                      <span className="text-sm font-semibold text-slate-900">{t('Notifications', 'الإشعارات')}</span>
                       <button
                         type="button"
                         onClick={clearNotifications}
                         className="text-xs text-slate-500 hover:text-slate-700"
                       >
-                        Clear
+                        {t('Clear', 'امسح')}
                       </button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
-                        <div className="px-4 py-6 text-sm text-slate-500">No notifications yet.</div>
+                        <div className="px-4 py-6 text-sm text-slate-500">
+                          {t('No notifications yet.', 'لسه مفيش إشعارات.')}
+                        </div>
                       ) : (
                         notifications.slice(0, 8).map(note => (
                           <div key={note.id} className="px-4 py-3 border-b border-slate-100 last:border-b-0">
@@ -141,12 +136,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                               }`}
                             >
                               {note.tone === 'success'
-                                ? 'Bid completed'
+                                ? t('Bid completed', 'تم تأكيد المزايدة')
                                 : note.tone === 'warn'
-                                  ? 'Alert'
+                                  ? t('Alert', 'تنبيه')
                                   : note.tone === 'error'
-                                    ? 'Error'
-                                    : 'Update'}
+                                    ? t('Error', 'خطأ')
+                                    : t('Update', 'تحديث')}
                             </div>
                             <p className="text-sm text-slate-700 mt-1">{note.message}</p>
                             <p className="text-[11px] text-slate-400 mt-1">
@@ -163,7 +158,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
               <Link to="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                 <div className="text-right">
                   <p className="text-xs font-semibold text-slate-900 leading-none">{user.name}</p>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{user.role}</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{t(user.role, 'مستخدم')}</p>
                 </div>
                 <img
                   className="h-9 w-9 rounded-full ring-2 ring-indigo-50"
@@ -204,20 +199,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
             <div className="pt-4 pb-3 border-t border-slate-200">
               <div className="px-4 pb-3">
-                <div className="dir-toggle dir-toggle-mobile" role="group" aria-label="Language direction">
+                <div className="dir-toggle dir-toggle-mobile" role="group" aria-label={t('Language', 'اللغة')}>
                   <button
                     type="button"
-                    onClick={() => setTextDirection('ltr')}
-                    className={`dir-toggle-btn ${textDirection === 'ltr' ? 'dir-toggle-btn-active' : ''}`}
+                    onClick={() => setLanguage('en')}
+                    className={`dir-toggle-btn ${language === 'en' ? 'dir-toggle-btn-active' : ''}`}
                   >
                     English
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTextDirection('rtl')}
-                    className={`dir-toggle-btn ${textDirection === 'rtl' ? 'dir-toggle-btn-active' : ''}`}
+                    onClick={() => setLanguage('ar')}
+                    className={`dir-toggle-btn ${language === 'ar' ? 'dir-toggle-btn-active' : ''}`}
                   >
-                    Arabic
+                    عربي (مصري)
                   </button>
                 </div>
               </div>
@@ -231,10 +226,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 </div>
               </div>
               <div className="mt-3 px-2 space-y-1">
-                <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-indigo-600 hover:bg-indigo-50">Profile</Link>
+                <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:text-indigo-600 hover:bg-indigo-50">
+                  {t('Profile', 'الملف الشخصي')}
+                </Link>
                 <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 flex items-center gap-3">
                   <LogOut size={18} />
-                  Sign Out
+                  {t('Sign Out', 'تسجيل خروج')}
                 </button>
               </div>
             </div>
@@ -257,36 +254,44 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
               </div>
               <p className="text-sm leading-6 max-w-xs text-slate-200">
-                The world's most trusted online marketplace for buying and selling exceptional vehicles.
-                Secure, transparent, and built for enthusiasts.
+                {t(
+                  "The world's most trusted online marketplace for buying and selling exceptional vehicles. Secure, transparent, and built for enthusiasts.",
+                  'أكتر سوق أونلاين موثوق لبيع وشراء عربيات مميزة. آمن، واضح، ومتعمل لعشاق العربيات.'
+                )}
               </p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Company</h3>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
+                {t('Company', 'الشركة')}
+              </h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/how-it-works" className="hover:text-indigo-400">How it Works</Link></li>
-                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
+                <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'إزاي الشغل ماشي')}</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Marketplace</h3>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
+                {t('Marketplace', 'السوق')}
+              </h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/browse" className="hover:text-indigo-400">Browse listings</Link></li>
-                <li><Link to="/auctions" className="hover:text-indigo-400">Live auctions</Link></li>
-                <li><Link to="/sell" className="hover:text-indigo-400">Sell a car</Link></li>
+                <li><Link to="/browse" className="hover:text-indigo-400">{t('Browse listings', 'تصفح العربيات')}</Link></li>
+                <li><Link to="/auctions" className="hover:text-indigo-400">{t('Live auctions', 'مزادات مباشرة')}</Link></li>
+                <li><Link to="/sell" className="hover:text-indigo-400">{t('Sell a car', 'بيع عربية')}</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">Legal</h3>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
+                {t('Legal', 'قانوني')}
+              </h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/terms" className="hover:text-indigo-400">Terms of Service</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
               </ul>
             </div>
           </div>
           <div className="mt-10 pt-6 border-t border-slate-800 text-xs text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4 text-slate-300">
             <div className="flex gap-6 text-slate-200">
-              <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-500" /> SECURE PAYMENTS</span>
-              <span>PCI DSS COMPLIANT</span>
+              <span className="flex items-center gap-1.5"><Shield size={14} className="text-emerald-500" /> {t('SECURE PAYMENTS', 'مدفوعات آمنة')}</span>
+              <span>{t('PCI DSS COMPLIANT', 'متوافق مع PCI DSS')}</span>
             </div>
           </div>
         </div>

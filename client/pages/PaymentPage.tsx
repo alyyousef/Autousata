@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CreditCard, Lock, ShieldCheck } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
@@ -36,6 +37,7 @@ const PaymentPage: React.FC = () => {
   const auction = useMemo(() => MOCK_AUCTIONS.find(item => item.id === id), [id]);
   const bidState = auction ? readBidState(auction.id) : null;
   const amount = bidState?.currentBid ?? auction?.currentBid ?? 0;
+  const { t, formatCurrencyEGP } = useLanguage();
 
   const [nameOnCard, setNameOnCard] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -46,10 +48,10 @@ const PaymentPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center">
-          <h1 className="text-xl font-semibold text-slate-900 mb-2">Payment Not Found</h1>
-          <p className="text-sm text-slate-600 mb-4">We could not find this auction.</p>
+          <h1 className="text-xl font-semibold text-slate-900 mb-2">{t('Payment Not Found', 'الدفع مش موجود')}</h1>
+          <p className="text-sm text-slate-600 mb-4">{t('We could not find this auction.', 'مش قادرين نلاقي المزاد ده.')}</p>
           <Link to="/browse" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
-            Return to Browse
+            {t('Return to Browse', 'ارجع للتصفح')}
           </Link>
         </div>
       </div>
@@ -68,36 +70,36 @@ const PaymentPage: React.FC = () => {
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Secure payment</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Complete your purchase</h1>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{t('Secure payment', 'دفع آمن')}</p>
+              <h1 className="text-2xl font-semibold text-slate-900">{t('Complete your purchase', 'كمّل عملية الشراء')}</h1>
               <p className="text-sm text-slate-500 mt-1">
                 {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-400">Amount due</p>
-              <p className="text-2xl font-bold text-slate-900">EGP {amount.toLocaleString()}</p>
+              <p className="text-xs text-slate-400">{t('Amount due', 'المبلغ المستحق')}</p>
+              <p className="text-2xl font-bold text-slate-900">{formatCurrencyEGP(amount)}</p>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 flex items-center gap-3 text-sm text-slate-600 mb-6">
             <ShieldCheck size={18} className="text-emerald-500" />
-            Stripe checkout is a placeholder here. Replace with Stripe Elements for production.
+            {t('Stripe checkout is a placeholder here. Replace with Stripe Elements for production.', 'Stripe هنا تجريبي. بدّله بـ Stripe Elements للإنتاج.')}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-semibold text-slate-700">Name on card</label>
+              <label className="text-sm font-semibold text-slate-700">{t('Name on card', 'الاسم على الكارت')}</label>
               <input
                 value={nameOnCard}
                 onChange={(event) => setNameOnCard(event.target.value)}
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Ali Youssef"
+                placeholder={t('Ali Youssef', 'علي يوسف')}
                 required
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-slate-700">Card number</label>
+              <label className="text-sm font-semibold text-slate-700">{t('Card number', 'رقم الكارت')}</label>
               <div className="mt-2 relative">
                 <input
                   value={cardNumber}
@@ -111,7 +113,7 @@ const PaymentPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700">Expiry</label>
+                <label className="text-sm font-semibold text-slate-700">{t('Expiry', 'تاريخ الانتهاء')}</label>
                 <input
                   value={expiry}
                   onChange={(event) => setExpiry(event.target.value)}
@@ -121,7 +123,7 @@ const PaymentPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">CVC</label>
+                <label className="text-sm font-semibold text-slate-700">{t('CVC', 'رمز الأمان')}</label>
                 <div className="mt-2 relative">
                   <input
                     value={cvc}
@@ -138,11 +140,11 @@ const PaymentPage: React.FC = () => {
               type="submit"
               className="w-full rounded-2xl bg-indigo-600 text-white py-3.5 text-sm font-semibold hover:bg-indigo-700 transition-colors"
             >
-              Pay EGP {amount.toLocaleString()}
+              {t('Pay', 'ادفع')} {formatCurrencyEGP(amount)}
             </button>
             <div className="text-center">
               <Link to={`/listing/${auction.id}`} className="text-xs text-slate-500 hover:text-slate-700">
-                Back to listing
+                {t('Back to listing', 'ارجع للقائمة')}
               </Link>
             </div>
           </form>
