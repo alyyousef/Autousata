@@ -72,16 +72,12 @@ const SignUpPage: React.FC = () => {
         // Redirect to /verify-email and pass the email so the user doesn't have to type it again
         navigate('/verify-email', { state: { email: email } });
       } else {
-        setError(result.error || 'Registration failed');
+        setError(result.error || t('Registration failed', 'فشل إنشاء الحساب'));
       }
     } catch (err) {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
-    if (result.success) {
-      navigate('/browse');
-    } else {
-      setError(result.error || t('Registration failed', 'فشل إنشاء الحساب'));
     }
   };
 
@@ -265,6 +261,5 @@ const SignUpPage: React.FC = () => {
     </section>
   );
 };
-}
 
 export default SignUpPage;
