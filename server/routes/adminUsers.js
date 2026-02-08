@@ -4,6 +4,20 @@ const { authenticate, authorize } = require("../middleware/auth");
 const adminUsersController = require("../controllers/adminUsersController");
 
 router.get(
+  "/",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.listUsers,
+);
+
+router.get(
+  "/search",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.searchUsers,
+);
+
+router.get(
   "/search",
   authenticate,
   authorize("admin"),

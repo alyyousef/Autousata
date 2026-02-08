@@ -22,7 +22,7 @@ import ProfilePage from './pages/ProfilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
 import AuctionsPage from './pages/AuctionsPage';
 import VerifyEmailPage from './pages/VerifyEmailPage'; // <--- Import belongs here at the top!
-
+import AdminUserProfilePage from './pages/AdminUserProfilePage';
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
@@ -69,6 +69,9 @@ const AppRoutes: React.FC = () => {
 
         <Route element={<AppLayout user={user} />}>
           {/* Protected Routes */}
+
+          <Route path="/admin/users/:userId" element={<AdminUserProfilePage />} />
+
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
           <Route
@@ -87,6 +90,7 @@ const AppRoutes: React.FC = () => {
               </RequireAdmin>
             }
           />
+
         </Route>
       </Routes>
     </HashRouter>

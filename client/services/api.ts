@@ -5,6 +5,17 @@ interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+type TransactionsResponse = {
+  page: number;
+  limit: number;
+  items: any[];
+};
+
+
+
+
+
+
 
 export interface KycItem {
   id: string;
@@ -230,11 +241,70 @@ async updateAvatar(file: File) {
 
 
 
-  async adminSearchUsers(q: string) {
-  return this.request<any[]>(`/admin/users/search?q=${encodeURIComponent(q)}`);
+
+
+  // Inside ApiService class
+
+public adminListUsers(page = 1, limit = 20) {
+  return this.request<{
+    items: any[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
 }
 
+public adminSearchUsers(q: string, page = 1, limit = 20) {
+  return this.request<{
+    items: any[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(
+    `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+    { method: "GET" }
+  );
 }
+
+
+
+adminGetUserTransactions(userId: string, queryString: string) {
+  const qs = queryString ? `?${queryString}` : "";
+  return this.request<TransactionsResponse>(
+    `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
+    { method: "GET" }
+  );
+
+}
+
+
+adminSuspendUser(userId: string, body: { reason: string }) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+adminReactivateUser(userId: string) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
+    method: "PATCH",
+  });
+}
+
+adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+
+
+}
+
+
 
 
 
