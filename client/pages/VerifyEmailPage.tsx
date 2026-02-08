@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const VerifyEmailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -8,11 +9,12 @@ const VerifyEmailPage: React.FC = () => {
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Invalid verification link.');
+      setMessage(t('Invalid verification link.', 'لينك التفعيل غير صالح.'));
       return;
     }
 
@@ -32,11 +34,11 @@ const VerifyEmailPage: React.FC = () => {
           setMessage(data.message);
         } else {
           setStatus('error');
-          setMessage(data.error || 'Verification failed.');
+          setMessage(data.error || t('Verification failed.', 'فشل التفعيل.'));
         }
       } catch (error) {
         setStatus('error');
-        setMessage('Network error. Please try again.');
+        setMessage(t('Network error. Please try again.', 'حصل خطأ في الشبكة. جرب تاني.'));
       }
     };
 
@@ -50,8 +52,8 @@ const VerifyEmailPage: React.FC = () => {
         {status === 'loading' && (
           <div className="flex flex-col items-center">
             <Loader className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900">Verifying...</h2>
-            <p className="text-slate-500 mt-2">Please wait while we activate your account.</p>
+            <h2 className="text-2xl font-bold text-slate-900">{t('Verifying...', 'جاري التفعيل...')}</h2>
+            <p className="text-slate-500 mt-2">{t('Please wait while we activate your account.', 'استنى شوية وإحنا بنفعل حسابك.')}</p>
           </div>
         )}
 
@@ -60,13 +62,13 @@ const VerifyEmailPage: React.FC = () => {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Email Verified!</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{t('Email Verified!', 'تم تفعيل الإيميل!')}</h2>
             <p className="text-slate-600 mt-2 mb-6">{message}</p>
             <Link 
               to="/login" 
               className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all block"
             >
-              Go to Login
+              {t('Go to Login', 'روح لتسجيل الدخول')}
             </Link>
           </div>
         )}
@@ -76,13 +78,13 @@ const VerifyEmailPage: React.FC = () => {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
               <XCircle className="w-8 h-8 text-red-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Verification Failed</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{t('Verification Failed', 'فشل التفعيل')}</h2>
             <p className="text-slate-600 mt-2 mb-6">{message}</p>
             <Link 
               to="/login" 
               className="text-indigo-600 font-semibold hover:underline"
             >
-              Back to Login
+              {t('Back to Login', 'ارجع لتسجيل الدخول')}
             </Link>
           </div>
         )}

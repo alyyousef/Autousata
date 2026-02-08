@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { StripeProvider } from './contexts/StripeContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -92,12 +93,15 @@ const App: React.FC = () => {
 
   return (
     <StripeProvider>
+    <LanguageProvider>
       <AuthProvider>
         <NotificationProvider>
           <AppRoutes />
         </NotificationProvider>
       </AuthProvider>
+      </LanguageProvider>
     </StripeProvider>
+   
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +12,7 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,12 +20,12 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     if (!email.trim()) {
-      setError('Please fill in the user name field.');
+      setError(t('Please fill in the user name field.', 'من فضلك اكتب اسم المستخدم.'));
       setLoading(false);
       return;
     }
     if (!password.trim()) {
-      setError('Please fill in the password field.');
+      setError(t('Please fill in the password field.', 'من فضلك اكتب كلمة السر.'));
       setLoading(false);
       return;
     }
@@ -33,7 +35,7 @@ const LoginPage: React.FC = () => {
     if (result.success) {
       navigate('/browse');
     } else {
-      setError(result.error || 'Login failed');
+      setError(result.error || t('Login failed', 'فشل تسجيل الدخول'));
     }
 
     setLoading(false);
@@ -46,8 +48,10 @@ const LoginPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-lg my-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Welcome!</h1>
-          <p className="text-sm text-slate-600 mb-5">Log in to track bids, saved searches, and your garage!</p>
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">{t('Welcome!', 'أهلا بيك!')}</h1>
+          <p className="text-sm text-slate-600 mb-5">
+            {t('Log in to track bids, saved searches, and your garage!', 'سجل عشان تتابع المزايدات والبحث المحفوظ والجراج بتاعك.')}
+          </p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -58,11 +62,11 @@ const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">Email address</label>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">{t('Email address', 'البريد الإلكتروني')}</label>
                 <input
                   id="email"
                   type="email"
-                  placeholder="you@email.com"
+                  placeholder={t('you@email.com', 'you@email.com')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -70,12 +74,12 @@ const LoginPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">{t('Password', 'كلمة السر')}</label>
                 <div className="relative">
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
+                    placeholder={t('Enter your password', 'اكتب كلمة السر')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -85,7 +89,7 @@ const LoginPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(prev => !prev)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors no-hover-rise"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('Hide password', 'اخفي كلمة السر') : t('Show password', 'اظهر كلمة السر')}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -96,9 +100,9 @@ const LoginPage: React.FC = () => {
             <div className="flex items-center justify-between text-sm">
               <label className="inline-flex items-center gap-2 text-slate-600 cursor-pointer">
                 <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
-                <span>Remember me</span>
+                <span>{t('Remember me', 'افتكرني')}</span>
               </label>
-              <Link to="/forgot-password" className="text-slate-900 font-medium hover:text-slate-700">Forgot password?</Link>
+              <Link to="/forgot-password" className="text-slate-900 font-medium hover:text-slate-700">{t('Forgot password?', 'نسيت كلمة السر؟')}</Link>
             </div>
 
             <button
@@ -106,13 +110,13 @@ const LoginPage: React.FC = () => {
               disabled={loading}
               className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-lg shadow-slate-900/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Logging in...' : 'Continue'}
+              {loading ? t('Logging in...', 'جاري تسجيل الدخول...') : t('Continue', 'كمل')}
             </button>
 
             <p className="text-center text-sm text-slate-600">
-              Don't have an account?{' '}
+              {t("Don't have an account?", 'معندكش حساب؟')}{' '}
               <Link to="/signup" className="font-semibold text-slate-900 hover:underline">
-                Sign up
+                {t('Sign up', 'اعمل حساب')}
               </Link>
             </p>
           </form>

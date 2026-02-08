@@ -5,6 +5,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { apiService } from '../services/api';
 import { useStripe as useStripeContext } from '../contexts/StripeContext';
 import { MOCK_AUCTIONS } from '../constants';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Inner payment form component that uses Stripe hooks
 const PaymentForm: React.FC<{
@@ -16,6 +17,7 @@ const PaymentForm: React.FC<{
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -40,7 +42,7 @@ const PaymentForm: React.FC<{
       });
 
       if (error) {
-        setErrorMessage(error.message || 'Payment failed');
+        setErrorMessage(error.message || t('Payment failed', 'فشل الدفع'));
         setIsProcessing(false);
         return;
       }
@@ -58,11 +60,11 @@ const PaymentForm: React.FC<{
         // Navigate to confirmation page
         navigate(`/payment/${auction.id}/confirmation`);
       } else {
-        setErrorMessage('Payment processing incomplete');
+        setErrorMessage(t('Payment processing incomplete', 'معالجة الدفع غير مكتملة'));
         setIsProcessing(false);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setErrorMessage(err instanceof Error ? err.message : t('An unexpected error occurred', 'حدث خطأ غير متوقع'));
       setIsProcessing(false);
     }
   };
@@ -84,7 +86,7 @@ const PaymentForm: React.FC<{
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
           <AlertCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-red-800">
-            <p className="font-semibold">Payment Failed</p>
+            <p className="font-semibold">{t('Payment Failed', 'فشل الدفع')}</p>
             <p className="mt-1">{errorMessage}</p>
           </div>
         </div>
@@ -92,35 +94,35 @@ const PaymentForm: React.FC<{
 
       {/* Payment Breakdown */}
       <div className="rounded-2xl border border-slate-100 bg-slate-50 p-6 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700">Payment Breakdown</h3>
+        <h3 className="text-sm font-semibold text-slate-700">{t('Payment Breakdown', 'تفاصيل الدفع')}</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-600">Winning Bid</span>
+            <span className="text-slate-600">{t('Winning Bid', 'المزايدة الفائزة')}</span>
             <span className="font-medium text-slate-900">
               EGP {breakdown.bidAmount.toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-600">Platform Commission (5%)</span>
+            <span className="text-slate-600">{t('Platform Commission (5%)', 'عمولة المنصة (5%)')}</span>
             <span className="font-medium text-slate-900">
               EGP {breakdown.platformCommission.toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-600">Payment Processing Fee</span>
+            <span className="text-slate-600">{t('Payment Processing Fee', 'رسوم معالجة الدفع')}</span>
             <span className="font-medium text-slate-900">
               EGP {breakdown.stripeFee.toLocaleString()}
             </span>
           </div>
           <div className="border-t border-slate-200 my-2 pt-2 flex justify-between">
-            <span className="font-semibold text-slate-900">Total Amount</span>
+            <span className="font-semibold text-slate-900">{t('Total Amount', 'المبلغ الإجمالي')}</span>
             <span className="font-bold text-lg text-indigo-600">
               EGP {breakdown.totalAmount.toLocaleString()}
             </span>
           </div>
         </div>
         <p className="text-xs text-slate-500 mt-4">
-          Funds will be held in escrow until you confirm vehicle receipt
+          {t('Funds will be held in escrow until you confirm vehicle receipt', 'الأموال ستُحفظ في الضمان حتى تأكد استلام العربية')}
         </p>
       </div>
 
@@ -133,12 +135,12 @@ const PaymentForm: React.FC<{
         {isProcessing ? (
           <>
             <Loader2 size={18} className="animate-spin" />
-            Processing Payment...
+            {t('Processing Payment...', 'جاري معالجة الدفع...')}
           </>
         ) : (
           <>
             <Lock size={18} />
-            Pay EGP {breakdown.totalAmount.toLocaleString()}
+            {t('Pay', 'ادفع')} EGP {breakdown.totalAmount.toLocaleString()}
           </>
         )}
       </button>
@@ -148,7 +150,7 @@ const PaymentForm: React.FC<{
           to={`/listing/${auction.id}`}
           className="text-xs text-slate-500 hover:text-slate-700"
         >
-          Back to listing
+          {t('Back to listing', 'ارجع للقائمة')}
         </Link>
       </div>
     </form>
@@ -159,6 +161,7 @@ const PaymentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { stripe: stripeInstance, isLoading: stripeLoading } = useStripeContext();
+  const { t } = useLanguage();
   
   const auction = useMemo(() => MOCK_AUCTIONS.find(item => item.id === id), [id]);
 
@@ -171,7 +174,7 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     const initializePayment = async () => {
       if (!auction) {
-        setError('Auction not found');
+        setError(t('Auction not found', 'المزاد مش موجود'));
         setIsLoading(false);
         return;
       }
@@ -193,7 +196,7 @@ const PaymentPage: React.FC = () => {
 
         setIsLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to initialize payment');
+        setError(err instanceof Error ? err.message : t('Failed to initialize payment', 'فشل تهيئة الدفع'));
         setIsLoading(false);
       }
     };
@@ -207,7 +210,7 @@ const PaymentPage: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center">
           <Loader2 size={32} className="animate-spin mx-auto text-indigo-600 mb-4" />
-          <p className="text-sm text-slate-600">Initializing secure payment...</p>
+          <p className="text-sm text-slate-600">{t('Initializing secure payment...', 'جاري تهيئة الدفع الآمن...')}</p>
         </div>
       </div>
     );
@@ -219,15 +222,15 @@ const PaymentPage: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-md">
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-          <h1 className="text-xl font-semibold text-slate-900 mb-2">Payment Error</h1>
+          <h1 className="text-xl font-semibold text-slate-900 mb-2">{t('Payment Error', 'خطأ في الدفع')}</h1>
           <p className="text-sm text-slate-600 mb-4">
-            {error || 'We could not find this auction.'}
+            {error || t('We could not find this auction.', 'مش قادرين نلاقي المزاد ده.')}
           </p>
           <Link
             to="/browse"
             className="inline-block px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700"
           >
-            Return to Browse
+            {t('Return to Browse', 'ارجع للتصفح')}
           </Link>
         </div>
       </div>
@@ -240,7 +243,7 @@ const PaymentPage: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center">
           <AlertCircle size={48} className="mx-auto text-amber-500 mb-4" />
-          <p className="text-sm text-slate-600">Unable to create payment session</p>
+          <p className="text-sm text-slate-600">{t('Unable to create payment session', 'مش قادرين نعمل جلسة دفع')}</p>
         </div>
       </div>
     );
@@ -254,14 +257,14 @@ const PaymentPage: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Secure payment</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Complete your purchase</h1>
+              <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{t('Secure payment', 'دفع آمن')}</p>
+              <h1 className="text-2xl font-semibold text-slate-900">{t('Complete your purchase', 'كمل عملية الشراء')}</h1>
               <p className="text-sm text-slate-500 mt-1">
                 {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-400">Amount due</p>
+              <p className="text-xs text-slate-400">{t('Amount due', 'المبلغ المستحق')}</p>
               <p className="text-2xl font-bold text-slate-900">
                 EGP {breakdown.totalAmount.toLocaleString()}
               </p>
@@ -272,9 +275,9 @@ const PaymentPage: React.FC = () => {
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center gap-3 text-sm text-emerald-800 mb-6">
             <ShieldCheck size={18} className="text-emerald-600 flex-shrink-0" />
             <div>
-              <p className="font-semibold">Secure Payment with Stripe</p>
+              <p className="font-semibold">{t('Secure Payment with Stripe', 'دفع آمن مع Stripe')}</p>
               <p className="text-xs text-emerald-700 mt-1">
-                Your payment information is encrypted and never stored on our servers
+                {t('Your payment information is encrypted and never stored on our servers', 'معلومات الدفع مشفرة ومش بنخزنها على السيرفرات بتاعتنا')}
               </p>
             </div>
           </div>
@@ -311,11 +314,11 @@ const PaymentPage: React.FC = () => {
           <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-center gap-6">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Lock size={14} />
-              <span>256-bit SSL Encryption</span>
+              <span>{t('256-bit SSL Encryption', 'تشفير SSL 256-bit')}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <CreditCard size={14} />
-              <span>PCI DSS Compliant</span>
+              <span>{t('PCI DSS Compliant', 'متوافق مع PCI DSS')}</span>
             </div>
           </div>
         </div>
