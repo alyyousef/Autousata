@@ -10,6 +10,8 @@ import { MOCK_AUCTIONS } from '../constants';
 import { useNotifications } from '../contexts/NotificationContext';
 import { geminiService } from '../geminiService';
 import ImageLightbox from '../components/ImageLightbox';
+import RealTimeBidHistory, { RealTimeBid } from '../components/RealTimeBidHistory';
+import * as socketService from '../services/socketService';
 
 const MIN_BID = 10000;
 const MIN_INCREMENT = 500;
@@ -19,14 +21,6 @@ const PLATFORM_FEE_RATE = 0.05;
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
-
-type BidEntry = {
-  id: string;
-  amount: number;
-  by: 'you' | 'competitor';
-  time: number;
-  note?: string;
-};
 
 type Notification = {
   id: string;
@@ -114,22 +108,7 @@ const AuctionDetailPage: React.FC = () => {
     return Math.max(base + MIN_INCREMENT, MIN_BID);
   });
   const [proxyMax, setProxyMax] = useState<number | ''>('');
-  const [bidHistory, setBidHistory] = useState<BidEntry[]>(() => [
-    {
-      id: 'seed-1',
-      amount: Math.max(auction.currentBid - 2000, MIN_BID),
-      by: 'competitor',
-      time: Date.now() - 1000 * 60 * 18,
-      note: 'Opening bid'
-    },
-    {
-      id: 'seed-2',
-      amount: auction.currentBid,
-      by: 'competitor',
-      time: Date.now() - 1000 * 60 * 7,
-      note: 'Latest bid'
-    }
-  ]);
+  const [bidHistory, setBidHistory] = useState<RealTimeBid[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [bidError, setBidError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
@@ -165,6 +144,97 @@ const AuctionDetailPage: React.FC = () => {
     );
     writePaymentNotice(auction.id);
   }, [auction, auctionEndsAt, pushNotification]);
+
+  // Socket.IO Integration - Real-time auction updates
+  useEffect(() => {
+    if (!id) return;
+
+    // Initialize Socket.IO connection
+    socketService.initializeSocket();
+
+    // Join the auction room
+    socketService.joinAuction(id);
+
+    // Listen for bid placed events
+    const handleBidPlaced = (data: socketService.BidPlacedEvent) => {
+      setCurrentBid(data.auction.currentBid);
+      setBidCount(data.auction.bidCount);
+      
+      // Add bid to history
+      const newBid: RealTimeBid = {
+        id: data.bid.id,
+        bidderId: data.bid.bidderId,
+        amount: data.bid.amount,
+        timestamp: data.bid.timestamp,
+        isYou: false // Will be set by bidder ID comparison
+      };
+      setBidHistory(prev => [newBid, ...prev]);
+
+      // Update suggested bid amount
+      setBidAmount(data.auction.currentBid + MIN_INCREMENT);
+
+      // Show notification
+      addLocalNotification(
+        `New bid: EGP ${data.auction.currentBid.toLocaleString()}`,
+        'info'
+      );
+    };
+
+    // Listen for user outbid notifications
+    const handleUserOutbid = (data: socketService.UserOutbidEvent) => {
+      pushNotification(
+        `You've been outbid! New leading bid: EGP ${data.newBid.toLocaleString()}`,
+        'warn'
+      );
+      addLocalNotification(
+        `You've been outbid! Your bid: EGP ${data.yourBid.toLocaleString()} → New bid: EGP ${data.newBid.toLocaleString()}`,
+        'warn'
+      );
+    };
+
+    // Listen for auction ended events
+    const handleAuctionEnded = (data: socketService.AuctionEndedEvent) => {
+      setIsCancelled(true);
+      pushNotification(
+        data.reserveMet 
+          ? `Auction ended. ${data.winnerId ? 'Winner declared!' : 'No winner.'}` 
+          : 'Auction ended. Reserve price not met.',
+        data.reserveMet ? 'success' : 'info'
+      );
+      addLocalNotification('Auction has ended. Bidding is closed.', 'warn');
+    };
+
+    // Listen for auction ending soon notifications
+    const handleAuctionEndingSoon = (data: { auctionId: string; minutesLeft: number }) => {
+      addLocalNotification(
+        `Auction ending in ${data.minutesLeft} minute${data.minutesLeft === 1 ? '' : 's'}!`,
+        'warn'
+      );
+    };
+
+    // Listen for bid errors
+    const handleBidError = (error: { message: string }) => {
+      setBidError(error.message);
+      addLocalNotification(error.message, 'warn');
+    };
+
+    // Register event listeners
+    socketService.onBidPlaced(handleBidPlaced);
+    socketService.onUserOutbid(handleUserOutbid);
+    socketService.onAuctionEnded(handleAuctionEnded);
+    socketService.onAuctionEndingSoon(handleAuctionEndingSoon);
+    socketService.onBidError(handleBidError);
+
+    // Cleanup on unmount
+    return () => {
+      socketService.offBidPlaced(handleBidPlaced);
+      socketService.offUserOutbid(handleUserOutbid);
+      socketService.offAuctionEnded(handleAuctionEnded);
+      socketService.offAuctionEndingSoon(handleAuctionEndingSoon);
+      socketService.offBidError(handleBidError);
+      socketService.leaveAuction(id);
+    };
+  }, [id, pushNotification]);
 
   const addLocalNotification = (message: string, tone: Notification['tone']) => {
     setNotifications(prev => [
@@ -246,8 +316,20 @@ const AuctionDetailPage: React.FC = () => {
       return;
     }
     setBidError(null);
-    addBid(bidAmount, 'you', 'Manual bid');
-    addLocalNotification(`Your bid of EGP ${bidAmount.toLocaleString()} is now live.`, 'success');
+
+    // Place bid via Socket.IO
+    if (!id) {
+      setBidError('Invalid auction ID.');
+      return;
+    }
+
+    socketService.placeBid(id, bidAmount);
+    
+    // Optimistic UI update (will be corrected by server response)
+    addLocalNotification(
+      `Placing bid of EGP ${bidAmount.toLocaleString()}...`,
+      'info'
+    );
   };
 
   const handleSetProxy = () => {
@@ -560,29 +642,11 @@ const AuctionDetailPage: React.FC = () => {
               </div>
 
               <div className="space-y-5">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      <History size={16} className="text-slate-400" />
-                      Bid history
-                    </div>
-                    <span className="text-xs text-slate-400">{bidCount} total</span>
-                  </div>
-                  <div className="space-y-3 max-h-44 overflow-y-auto pr-1">
-                    {bidHistory.slice(-6).map(entry => (
-                      <div key={entry.id} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${entry.by === 'you' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                          <span className="font-semibold text-slate-700">
-                            {entry.by === 'you' ? 'You' : 'Bidder'}
-                          </span>
-                          {entry.note && <span className="text-xs text-slate-400">{entry.note}</span>}
-                        </div>
-                        <span className="font-bold text-slate-900">EGP {entry.amount.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* Real-Time Bid History Component */}
+                <RealTimeBidHistory 
+                  bids={bidHistory as RealTimeBid[]} 
+                  currentUserId={localStorage.getItem('userId') || undefined}
+                />
 
                 <div className="h-px bg-slate-100" />
 

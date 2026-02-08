@@ -3,6 +3,9 @@ const router = express.Router();
 const oracledb = require('oracledb');
 const { randomUUID } = require('crypto');
 const { authenticate: auth } = require('../middleware/auth');
+const { rateLimitBid } = require('../middleware/rateLimiter');
+const bidProcessingService = require('../services/bidProcessingService');
+const { getIO } = require('../server');
 
 // POST /api/auctions - Create a new auction
 router.post('/', auth, async (req, res) => {
@@ -481,134 +484,74 @@ router.get('/:id/bids', async (req, res) => {
 });
 
 // POST /api/auctions/:id/bids - Place a manual bid
-router.post('/:id/bids', auth, async (req, res) => {
-  let connection;
+router.post('/:id/bids', auth, rateLimitBid, async (req, res) => {
   try {
     const amount = Number(req.body.amount);
     if (!amount || Number.isNaN(amount) || amount <= 0) {
       return res.status(400).json({ msg: 'Invalid bid amount' });
     }
 
-    connection = await oracledb.getConnection();
+    // Use bidProcessingService to handle all bid logic
+    const result = await bidProcessingService.processBid({
+      auctionId: req.params.id,
+      bidderId: req.user.id,
+      amount,
+      bidSource: 'manual'
+    });
 
-    const auctionResult = await connection.execute(
-      `SELECT
-        id,
-        seller_id,
-        status,
-        end_time,
-        current_bid_egp,
-        starting_bid_egp,
-        min_bid_increment
-      FROM auctions
-      WHERE id = :auctionId
-      FOR UPDATE`,
-      { auctionId: req.params.id },
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
-
-    if (!auctionResult.rows || auctionResult.rows.length === 0) {
-      return res.status(404).json({ msg: 'Auction not found' });
-    }
-
-    const auction = auctionResult.rows[0];
-    if (auction.SELLER_ID === req.user.id) {
-      return res.status(403).json({ msg: 'Sellers cannot bid on their own auctions' });
-    }
-
-    const statusValue = typeof auction.STATUS === 'string' ? auction.STATUS.toLowerCase() : '';
-    if (statusValue !== 'live') {
-      return res.status(400).json({ msg: 'Auction is not open for bidding' });
-    }
-
-    if (auction.END_TIME && new Date(auction.END_TIME).getTime() <= Date.now()) {
-      return res.status(400).json({ msg: 'Auction has ended' });
-    }
-
-    const currentBid = Number(auction.CURRENT_BID_EGP) || Number(auction.STARTING_BID_EGP) || 0;
-    const minIncrement = Number(auction.MIN_BID_INCREMENT) || 50;
-    const minAllowed = currentBid + minIncrement;
-
-    if (amount < minAllowed) {
-      return res.status(400).json({ msg: `Minimum bid is EGP ${minAllowed.toLocaleString()}.` });
-    }
-
-    const bidId = randomUUID();
-
-    await connection.execute(
-      `INSERT INTO bids (
-        id,
-        auction_id,
-        bidder_id,
-        amount_egp,
-        status,
-        bid_source,
-        created_at,
-        updated_at
-      ) VALUES (
-        :id,
-        :auctionId,
-        :bidderId,
-        :amount,
-        :status,
-        :bidSource,
-        CURRENT_TIMESTAMP,
-        CURRENT_TIMESTAMP
-      )`,
-      {
-        id: bidId,
-        auctionId: req.params.id,
-        bidderId: req.user.id,
-        amount,
-        status: 'accepted',
-        bidSource: 'manual'
-      },
-      { autoCommit: false }
-    );
-
-    await connection.execute(
-      `UPDATE auctions
-       SET current_bid_egp = :amount,
-           bid_count = NVL(bid_count, 0) + 1,
-           leading_bidder_id = :bidderId
-       WHERE id = :auctionId`,
-      {
-        amount,
-        bidderId: req.user.id,
-        auctionId: req.params.id
-      },
-      { autoCommit: false }
-    );
-
-    await connection.commit();
-
-    res.json({
+    // Emit real-time update to all clients watching this auction
+    const io = getIO();
+    io.to(`auction:${req.params.id}`).emit('bid_placed', {
+      auctionId: req.params.id,
       bid: {
-        id: bidId,
-        userId: req.user.id,
-        amount,
+        id: result.bidId,
+        bidderId: result.anonymizedBidder,
+        amount: result.newCurrentBid,
         timestamp: new Date().toISOString()
       },
-      currentBid: amount
+      auction: {
+        currentBid: result.newCurrentBid,
+        bidCount: result.bidCount,
+        endTime: result.newEndTime || result.originalEndTime
+      }
+    });
+
+    // If there was a previous bidder, notify them
+    if (result.previousLeadingBidderId && result.previousLeadingBidderId !== req.user.id) {
+      io.to(`user:${result.previousLeadingBidderId}`).emit('user_outbid', {
+        auctionId: req.params.id,
+        newBid: result.newCurrentBid,
+        yourBid: result.previousBid
+      });
+    }
+
+    res.json({
+      success: true,
+      bid: {
+        id: result.bidId,
+        userId: req.user.id,
+        amount: result.newCurrentBid,
+        timestamp: new Date().toISOString()
+      },
+      currentBid: result.newCurrentBid,
+      extended: result.wasExtended,
+      newEndTime: result.newEndTime
     });
   } catch (err) {
-    if (connection) {
-      try {
-        await connection.rollback();
-      } catch (rollbackErr) {
-        console.error('Oracle rollback error:', rollbackErr.message);
-      }
+    console.error('[Auction Routes] Bid error:', err.message);
+    
+    // Handle specific error messages from bidProcessingService
+    if (err.message.includes('not found')) {
+      return res.status(404).json({ msg: err.message });
     }
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (closeErr) {
-        console.error('Oracle connection close error:', closeErr.message);
-      }
+    if (err.message.includes('cannot bid') || err.message.includes('not open') || err.message.includes('Minimum bid')) {
+      return res.status(400).json({ msg: err.message });
     }
+    if (err.message.includes('not authorized')) {
+      return res.status(403).json({ msg: err.message });
+    }
+    
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 

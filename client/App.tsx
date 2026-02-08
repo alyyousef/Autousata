@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { StripeProvider } from './contexts/StripeContext';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -90,11 +91,13 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <AppRoutes />
-      </NotificationProvider>
-    </AuthProvider>
+    <StripeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
+      </AuthProvider>
+    </StripeProvider>
   );
 };
 
