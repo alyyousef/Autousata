@@ -81,7 +81,7 @@ async function register(req, res) {
         role: "client",
       };
 
-      const token = generateToken(user);
+      //  const token = generateToken(user);
       // G. Generate Tokens (So user is logged in, but unverified)
       const { accessToken, refreshToken } = generateTokens(newUserId);
 
@@ -160,7 +160,7 @@ async function login(req, res) {
     const match = await bcrypt.compare(password, userData.hash);
 
     if (match) {
-      const token = generateToken({ id: userData.id, role: userData.role });
+      //  const token = generateToken({ id: userData.id, role: userData.role });
       const { accessToken, refreshToken } = generateTokens(userData.id);
 
       res.json({
