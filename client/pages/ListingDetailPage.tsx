@@ -12,9 +12,11 @@ import {
   Eye,
   Award,
   Zap,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
@@ -26,6 +28,30 @@ const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
+
+const ARABIC_LISTING_COPY: Record<
+  string,
+  { description: string; longDescription: string; location: string }
+> = {
+  'auc-1': {
+    description: 'بورشه 911 لون طباشيري بداخلية نبيتي باقة سبورت كرونو',
+    longDescription:
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين',
+    location: 'القاهرة مصر'
+  },
+  'auc-2': {
+    description: 'تسلا موديل اس بلايد دفع رباعي شامل القيادة الذاتية حالة شبه جديدة',
+    longDescription:
+      'موديل بلايد ببطاريات قوية وتسارع عالي مقصورة نظيفة وتجهيزات حديثة مع حالة شبه جديدة',
+    location: 'الجيزة مصر'
+  },
+  'auc-3': {
+    description: 'فورد برونكو اصدار خاص باقة سكواتش اربعة ابواب لون ازرق كهربائي',
+    longDescription:
+      'اصدار محدود مع تجهيزات للطرق الوعرة وتجربة قيادة قوية مع عناية ممتازة بالمقصورة والهيكل',
+    location: 'الاسكندرية مصر'
+  }
+};
 
 const readDelistedIds = () => {
   if (typeof window === 'undefined') return new Set<string>();
@@ -104,21 +130,6 @@ const readPaymentStatus = (auctionId: string) => {
   }
 };
 
-const formatTimeRemaining = (endTime: string, now: number) => {
-  const end = new Date(endTime).getTime();
-  const diff = end - now;
-  if (diff <= 0) return 'Ended';
-  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-};
-
 const generateTimeStyles = (endTime: string, now: number) => {
   const end = new Date(endTime).getTime();
   const diff = end - now;
@@ -152,6 +163,7 @@ const ListingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { addNotification } = useNotifications();
+  const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [auction, setAuction] = useState<any | null>(null);
@@ -194,6 +206,42 @@ const ListingDetailPage: React.FC = () => {
   }, [bidSuccess]);
 
   const fallbackImages = useMemo(() => [porsche911Image, teslaModelSPlaidImage, fordBroncoImage], []);
+  const arabicCopy = auction ? ARABIC_LISTING_COPY[auction.id] : undefined;
+
+  const conditionLabel = (condition: string) => {
+    const key = condition.toLowerCase();
+    if (key === 'mint') return t('Mint', 'ممتازة جدا');
+    if (key === 'excellent') return t('Excellent', 'ممتازة');
+    if (key === 'good') return t('Good', 'جيدة');
+    if (key === 'fair') return t('Fair', 'مقبولة');
+    if (key === 'poor') return t('Poor', 'ضعيفة');
+    return condition;
+  };
+
+  const formatTimeRemaining = (endTime: string) => {
+    const end = new Date(endTime).getTime();
+    const diff = end - now;
+    if (diff <= 0) return t('Ended', 'انتهى');
+    const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) {
+      return isArabic
+        ? `${formatNumber(days)} يوم ${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة`
+        : `${days}d ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return isArabic
+        ? `${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+        : `${hours}h ${minutes}m ${seconds}s`;
+    }
+    return isArabic
+      ? `${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+      : `${minutes}m ${seconds}s`;
+  };
 
   const canManageListings =
     user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
@@ -264,7 +312,7 @@ const ListingDetailPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [fallbackImages, id]);
+  }, [fallbackImages, id, t]);
 
   useEffect(() => {
     if (!auction) return;
@@ -280,7 +328,10 @@ const ListingDetailPage: React.FC = () => {
     if (readPaymentStatus(auction.id) === 'paid') return;
     if (readPaymentNotice(auction.id)) return;
     addNotification(
-      `Auction ended. Please complete payment for ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}.`,
+      t(
+        `Auction ended. Please complete payment for ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}.`,
+        `انتهى المزاد يرجى اكمال الدفع لسيارة ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`
+      ),
       'warn'
     );
     writePaymentNotice(auction.id);
@@ -322,14 +373,16 @@ const ListingDetailPage: React.FC = () => {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
             <Zap className="w-10 h-10 text-slate-400" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">Listing Not Found</h1>
-          <p className="text-slate-600 mb-8 leading-relaxed">This vehicle may have been sold or is no longer available.</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">{t('Listing Not Found', 'الاعلان غير موجود')}</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            {t('This vehicle may have been sold or is no longer available.', 'قد تكون السيارة بيعت او لم تعد متاحة')}
+          </p>
           <Link
             to="/auctions"
             className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40"
           >
             <ChevronLeft size={18} />
-            Back to Auctions
+            {t('Discover More Listings', 'اكتشف اعلانات اخرى')}
           </Link>
         </div>
       </div>
@@ -342,9 +395,22 @@ const ListingDetailPage: React.FC = () => {
   const effectiveBidCount = currentBidCount ?? auction.bidCount;
   const isEnded = new Date(auction.endTime).getTime() <= now;
   const paymentStatus = readPaymentStatus(auction.id);
+  const descriptionText = t(
+    auction.vehicle.description,
+    arabicCopy?.description ?? auction.vehicle.description
+  );
+  const longDescriptionText = t(
+    auction.vehicle.longDescription ||
+      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
+    arabicCopy?.longDescription ||
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
+  );
+  const locationText = t(auction.vehicle.location, arabicCopy?.location ?? auction.vehicle.location);
 
   const handleDelist = () => {
-    const confirmed = window.confirm('Delist this vehicle from active listings?');
+    const confirmed = window.confirm(
+      t('Delist this vehicle from active listings?', 'هل تريد ازالة هذه السيارة من الاعلانات النشطة')
+    );
     if (!confirmed) return;
     setDelistedIds((prev) => {
       const next = new Set<string>(prev);
@@ -367,21 +433,26 @@ const ListingDetailPage: React.FC = () => {
     event.preventDefault();
     const amount = Number(bidAmount);
     if (new Date(auction.endTime).getTime() <= Date.now()) {
-      setBidError('Bidding has ended for this auction.');
+      setBidError(t('Bidding has ended for this auction.', 'انتهت المزايدة لهذا المزاد'));
       return;
     }
     const maxAllowed = effectiveBid * 3;
     if (!amount || Number.isNaN(amount)) {
-      setBidError('Enter a valid bid amount.');
+      setBidError(t('Enter a valid bid amount.', 'ادخل قيمة مزايدة صحيحة'));
       return;
     }
     const minAllowed = effectiveBid + (auction.minBidIncrement || 50);
     if (amount < minAllowed) {
-      setBidError(`Minimum bid is EGP ${minAllowed.toLocaleString()}.`);
+      setBidError(t(`Minimum bid is EGP ${formatNumber(minAllowed)}.`, `الحد الادنى ${formatCurrencyEGP(minAllowed)}`));
       return;
     }
     if (amount > maxAllowed) {
-      setBidError(`Max bid is EGP ${maxAllowed.toLocaleString()} (3x current bid).`);
+      setBidError(
+        t(
+          `Max bid is EGP ${formatNumber(maxAllowed)} (3x current bid).`,
+          `الحد الاقصى ${formatCurrencyEGP(maxAllowed)} ثلاثة اضعاف السعر الحالي`
+        )
+      );
       return;
     }
     setBidError('');
@@ -414,12 +485,15 @@ const ListingDetailPage: React.FC = () => {
         bidCount: prev.bidCount + 1
       } : prev);
       addNotification(
-        `Your bidding on the ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} is completed at EGP ${pendingBidAmount.toLocaleString()}.`,
+        t(
+          `Your bidding on the ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} is completed at EGP ${formatNumber(pendingBidAmount)}.`,
+          `تم تسجيل مزايدتك على ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} بقيمة ${formatCurrencyEGP(pendingBidAmount)}`
+        ),
         'success'
       );
       window.setTimeout(() => setBidSuccess(null), 4200);
     } catch (err) {
-      setBidError('Failed to place bid. Please try again.');
+      setBidError(t('Failed to place bid. Please try again.', 'فشل تقديم المزايدة، حاول مرة اخرى'));
     }
   };
 
@@ -446,12 +520,12 @@ const ListingDetailPage: React.FC = () => {
                 <div className="p-1.5 rounded-xl bg-white border border-slate-200 group-hover:border-slate-300 group-hover:shadow-sm transition-all">
                   <ChevronLeft size={16} />
                 </div>
-                <span className="font-medium">Back to Auctions</span>
+                <span className="font-medium">{t('Back to Browse', 'العودة للتصفح')}</span>
               </Link>
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
                   <Eye size={12} />
-                  {Math.floor(Math.random() * 100) + 50} watching
+                  {formatNumber(Math.floor(Math.random() * 100) + 50)} {t('watching', 'مشاهد')}
                 </span>
               </div>
             </div>
@@ -485,10 +559,10 @@ const ListingDetailPage: React.FC = () => {
                         : 'bg-emerald-600 text-white border border-emerald-500/60'
                     }`}
                   >
-                    {isDelisted ? 'Delisted' : 'Live Auction'}
+                    {isDelisted ? t('Delisted', 'تم ازالة الاعلان') : t('Live Auction', 'مزاد مباشر')}
                   </span>
                   <span className="px-4 py-2.5 rounded-full text-xs font-black uppercase tracking-wider shadow-lg bg-blue-600 text-white border border-blue-500/60">
-                    {auction.vehicle.condition}
+                    {conditionLabel(auction.vehicle.condition)}
                   </span>
                 </div>
                 <div className="absolute bottom-5 right-5">
@@ -497,7 +571,7 @@ const ListingDetailPage: React.FC = () => {
                     disabled={!auction.vehicle.images?.length}
                     className="px-4 py-2.5 rounded-xl backdrop-blur-md bg-white/95 border border-white/70 text-slate-800 text-sm font-semibold hover:bg-white transition-all duration-300 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:shadow-slate-300/50"
                   >
-                    View All Photos
+                    {t('View All Photos', 'عرض كل الصور')}
                   </button>
                 </div>
               </div>
@@ -533,14 +607,14 @@ const ListingDetailPage: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-2 text-slate-600 text-sm">
                     <MapPin size={14} />
-                    {auction.vehicle.location}
+                    {locationText}
                   </div>
                 </div>
 
                 <h1 className="text-3xl font-bold text-slate-900 leading-tight">
                   {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
                 </h1>
-                <p className="text-slate-600 leading-relaxed">{auction.vehicle.description}</p>
+                <p className="text-slate-600 leading-relaxed">{descriptionText}</p>
               </div>
 
               {/* Stats Grid */}
@@ -548,21 +622,23 @@ const ListingDetailPage: React.FC = () => {
                 <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
                   <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                     <TrendingUp size={14} />
-                    <span>Current Bid</span>
+                    <span>{t('Current Bid', 'السعر الحالي')}</span>
                   </div>
                   <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">
-                    EGP {effectiveBid.toLocaleString()}
+                    {formatCurrencyEGP(effectiveBid)}
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">{effectiveBidCount} bids placed</div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {formatNumber(effectiveBidCount)} {t('bids placed', 'مزايدات')}
+                  </div>
                 </div>
 
                 <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
-                  <div className="text-slate-500 text-sm mb-1">Mileage</div>
+                  <div className="text-slate-500 text-sm mb-1">{t('Mileage', 'المسافة')}</div>
                   <div className="text-2xl font-bold text-slate-900">
-                    {auction.vehicle.mileage?.toLocaleString?.()}
-                    <span className="text-sm font-normal text-slate-500 ml-1">mi</span>
+                    {formatNumber(auction.vehicle.mileage)}
+                    <span className="text-sm font-normal text-slate-500 ml-1">{t('mi', 'ميل')}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">Low mileage</div>
+                  <div className="text-xs text-slate-500 mt-2">{t('Low mileage', 'مسافة قليلة')}</div>
                 </div>
               </div>
 
@@ -572,7 +648,7 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-2 text-slate-700">
                     <Clock size={16} className={timeStyles.iconText} />
-                    <span className="text-sm font-medium">Time Remaining</span>
+                    <span className="text-sm font-medium">{t('Time Remaining', 'الوقت المتبقي')}</span>
                   </div>
                   <span
                     className={[
@@ -580,7 +656,7 @@ const ListingDetailPage: React.FC = () => {
                       timeStyles.badgeBg,
                     ].join(' ')}
                   >
-                    {formatTimeRemaining(auction.endTime, now)}
+                    {formatTimeRemaining(auction.endTime)}
                   </span>
                 </div>
 
@@ -590,11 +666,11 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-emerald-600" />
-                    <span className="text-sm font-medium text-slate-700">Verified Listing</span>
+                    <span className="text-sm font-medium text-slate-700">{t('Verified Listing', 'اعلان موثق')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Award size={14} className="text-amber-600" />
-                    <span className="text-xs text-slate-600">Premium Seller</span>
+                    <span className="text-xs text-slate-600">{t('Premium Seller', 'بائع مميز')}</span>
                   </div>
                 </div>
 
@@ -626,19 +702,21 @@ const ListingDetailPage: React.FC = () => {
                   {isEnded ? (
                     <div className="space-y-3">
                       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                        Auction ended. Please complete payment to secure the vehicle.
+                        {t('Auction ended. Please complete payment to secure the vehicle.', 'انتهى المزاد يرجى اكمال الدفع لتاكيد السيارة')}
                       </div>
                       {paymentStatus === 'paid' ? (
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                          Payment confirmed. Our concierge will contact you for pickup.
+                          {t('Payment confirmed. Our concierge will contact you for pickup.', 'تم تاكيد الدفع وسيتم التواصل معك لاستلام السيارة')}
                         </div>
                       ) : (
                         <Link
                           to={`/payment/${auction.id}`}
                           className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
                         >
-                          Complete payment
-                          <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()})</span>
+                          {t('Complete payment', 'اكمل الدفع')}
+                          <span className="text-white/85 text-sm font-medium">
+                            {isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)})`}
+                          </span>
                         </Link>
                       )}
                     </div>
@@ -660,12 +738,14 @@ const ListingDetailPage: React.FC = () => {
                         ].join(' ')}
                       >
                         <Gavel size={18} />
-                        Place your bid
-                        <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()}+)</span>
+                        {t('Place your bid', 'قدم مزايدتك')}
+                        <span className="text-white/85 text-sm font-medium">
+                          {isArabic ? `${formatCurrencyEGP(effectiveBid)}` : `(EGP ${formatNumber(effectiveBid)}+)`}
+                        </span>
                       </button>
 
                       <p className="text-center text-slate-700 text-sm font-semibold mt-3">
-                        Join {effectiveBidCount} other bidders in this auction
+                        {t('Join', 'انضم')} {formatNumber(effectiveBidCount)} {t('other bidders in this auction', 'مزايد اخر في هذا المزاد')}
                       </p>
                     </>
                   )}
@@ -683,10 +763,10 @@ const ListingDetailPage: React.FC = () => {
                         : 'bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 text-rose-700 hover:from-rose-100 hover:to-pink-100 hover:shadow-md'
                     }`}
                   >
-                    {isDelisted ? '✨ Restore Listing' : 'Delist Listing'}
+                    {isDelisted ? t('Restore Listing', 'استرجاع الاعلان') : t('Delist Listing', 'ازالة الاعلان')}
                   </button>
                   <button className="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 text-slate-700 text-sm font-semibold hover:from-slate-100 hover:to-slate-200 hover:shadow-md transition-all">
-                    Save
+                    {t('Save', 'حفظ')}
                   </button>
                 </div>
               )}
@@ -696,19 +776,18 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Tag size={16} className="text-emerald-500" />
-                    Detailed Description
+                    {t('Detailed Description', 'الوصف التفصيلي')}
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsDescriptionOpen(true)}
                     className="px-4 py-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
                   >
-                    View
+                    {t('View', 'عرض')}
                   </button>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
-                  {auction.vehicle.longDescription ||
-                    'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                  {longDescriptionText}
                 </p>
               </div>
             </div>
@@ -729,11 +808,15 @@ const ListingDetailPage: React.FC = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Place Your Bid</h2>
-                    <p className="text-slate-600 mt-2">Enter your offer for this premium vehicle</p>
+                    <h2 className="text-2xl font-bold text-slate-900">{t('Place Your Bid', 'قدم مزايدتك')}</h2>
+                    <p className="text-slate-600 mt-2">{t('Enter your offer for this premium vehicle', 'اكتب قيمة المزايدة للسيارة المميزة')}</p>
                   </div>
-                  <button onClick={() => setIsBidOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                    ✕
+                  <button
+                    onClick={() => setIsBidOpen(false)}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                    aria-label={t('Close', 'اغلاق')}
+                  >
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -741,12 +824,12 @@ const ListingDetailPage: React.FC = () => {
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 rounded-2xl p-6 mb-6 border border-slate-200">
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <div className="text-sm text-slate-500 mb-1">Current Bid</div>
-                      <div className="text-2xl font-bold text-blue-600">EGP {effectiveBid.toLocaleString()}</div>
+                      <div className="text-sm text-slate-500 mb-1">{t('Current Bid', 'السعر الحالي')}</div>
+                      <div className="text-2xl font-bold text-blue-600">{formatCurrencyEGP(effectiveBid)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-slate-500 mb-1">Maximum Bid</div>
-                      <div className="text-lg font-bold text-slate-900">EGP {(effectiveBid * 3).toLocaleString()}</div>
+                      <div className="text-sm text-slate-500 mb-1">{t('Maximum Bid', 'الحد الاقصى')}</div>
+                      <div className="text-lg font-bold text-slate-900">{formatCurrencyEGP(effectiveBid * 3)}</div>
                     </div>
                   </div>
                 </div>
@@ -762,9 +845,11 @@ const ListingDetailPage: React.FC = () => {
 
                 <form onSubmit={handleBidSubmit}>
                   <div className="mb-6">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">Your Bid Amount (EGP)</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">
+                      {t('Your Bid Amount', 'قيمة المزايدة')} {isArabic ? '' : '(EGP)'}
+                    </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">EGP</span>
+                      <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input
                         type="number"
                         value={bidAmount}
@@ -772,7 +857,7 @@ const ListingDetailPage: React.FC = () => {
                         min={effectiveBid + (auction.minBidIncrement || 50)}
                         max={effectiveBid * 3}
                         className="w-full pl-12 pr-4 py-4 text-lg font-semibold rounded-2xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
-                        placeholder={`${effectiveBid.toLocaleString()}`}
+                        placeholder={`${formatNumber(effectiveBid)}`}
                         autoFocus
                       />
                     </div>
@@ -791,7 +876,7 @@ const ListingDetailPage: React.FC = () => {
                               : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
                           }`}
                         >
-                          EGP {suggested.toLocaleString()}
+                          {formatCurrencyEGP(suggested)}
                         </button>
                       ))}
                     </div>
@@ -803,13 +888,13 @@ const ListingDetailPage: React.FC = () => {
                       onClick={() => setIsBidOpen(false)}
                       className="flex-1 py-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors shadow-md shadow-rose-500/30"
                     >
-                      Cancel
+                      {t('Cancel', 'الغاء')}
                     </button>
                     <button
                       type="submit"
                       className="flex-1 py-4 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg shadow-emerald-500/30"
                     >
-                      Submit Bid
+                      {t('Submit Bid', 'ارسال المزايدة')}
                     </button>
                   </div>
                 </form>
@@ -827,14 +912,19 @@ const ListingDetailPage: React.FC = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Confirm Your Bid</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{t('Confirm Your Bid', 'تاكيد المزايدة')}</h2>
                     <p className="text-slate-600 mt-2">
-                      Are you sure you want to bid{' '}
-                      <span className="font-semibold text-slate-900">EGP {pendingBidAmount.toLocaleString()}</span>? This action cannot be undone.
+                      {t('Are you sure you want to bid', 'هل تريد تاكيد المزايدة')}{' '}
+                      <span className="font-semibold text-slate-900">{formatCurrencyEGP(pendingBidAmount)}</span>{' '}
+                      {t('This action cannot be undone', 'لا يمكن التراجع عن هذه الخطوة')}
                     </p>
                   </div>
-                  <button onClick={handleCancelConfirm} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                    ✕
+                  <button
+                    onClick={handleCancelConfirm}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                    aria-label={t('Close', 'اغلاق')}
+                  >
+                    <X size={18} />
                   </button>
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -843,14 +933,14 @@ const ListingDetailPage: React.FC = () => {
                     onClick={handleCancelConfirm}
                     className="flex-1 py-3.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors"
                   >
-                    Cancel
+                    {t('Cancel', 'الغاء')}
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirmBid}
                     className="flex-1 py-3.5 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg shadow-emerald-500/30"
                   >
-                    Confirm Bid
+                    {t('Confirm Bid', 'تاكيد المزايدة')}
                   </button>
                 </div>
               </div>
@@ -868,20 +958,19 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Tag size={16} className="text-emerald-500" />
-                    Full Description
+                    {t('Full Description', 'الوصف الكامل')}
                   </div>
                   <button
                     onClick={() => setIsDescriptionOpen(false)}
                     className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                    aria-label="Close description"
+                    aria-label={t('Close description', 'اغلاق الوصف')}
                   >
-                    ✕
+                    <X size={16} />
                   </button>
                 </div>
                 <div className="max-h-[60vh] overflow-auto pr-2 text-sm text-slate-600 leading-relaxed space-y-4">
                   <p>
-                    {auction.vehicle.longDescription ||
-                      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                    {longDescriptionText}
                   </p>
                 </div>
                 <div className="mt-6 flex justify-end">
@@ -928,8 +1017,10 @@ const ListingDetailPage: React.FC = () => {
                   <CheckCircle2 size={28} className="text-white" />
                 </div>
                 <div>
-                  <div className="text-lg font-bold">Bid Placed Successfully!</div>
-                  <div className="text-sm opacity-90">EGP {bidSuccess.toLocaleString()} is now live</div>
+                  <div className="text-lg font-bold">{t('Bid Placed Successfully', 'تمت المزايدة بنجاح')}</div>
+                  <div className="text-sm opacity-90">
+                    {t('Your bid is now live', 'تم تفعيل المزايدة')} {formatCurrencyEGP(bidSuccess)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -955,8 +1046,8 @@ const ListingDetailPage: React.FC = () => {
               ].join(' ')}
             >
               <Gavel size={16} />
-              Place bid
-              <span className="text-white/85">(EGP {effectiveBid.toLocaleString()}+)</span>
+              {t('Place bid', 'قدم مزايدة')}
+              <span className="text-white/85">{isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)}+)`}</span>
             </button>
           </div>
         </div>

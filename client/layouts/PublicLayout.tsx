@@ -17,7 +17,7 @@ const PublicLayout: React.FC = () => {
     if (typeof window === 'undefined') return false;
     const storedTheme = window.localStorage.getItem('theme');
     if (storedTheme) return storedTheme === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return false;
   });
   const { language, setLanguage, t } = useLanguage();
 

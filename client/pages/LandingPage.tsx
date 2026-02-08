@@ -124,7 +124,7 @@ const LandingPage: React.FC = () => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [heroTab, setHeroTab] = useState<'buy' | 'sell'>('buy');
   const [searchTerm, setSearchTerm] = useState('');
-  const { t, formatNumber } = useLanguage();
+  const { t, formatNumber, isArabic } = useLanguage();
 
   const loadLandingData = async () => {
     setIsLoading(true);
@@ -164,6 +164,15 @@ const LandingPage: React.FC = () => {
   };
 
   const currentSlide = heroSlides[activeSlide];
+
+  const formatAvgTimeToSell = (value: string) => {
+    if (!isArabic) return value;
+    const match = value.match(/(\d+)/);
+    if (!match) return value;
+    const num = Number(match[1]);
+    const arabicNumber = formatNumber(num);
+    return `${arabicNumber} ايام`;
+  };
 
   return (
     <>
@@ -318,7 +327,7 @@ const LandingPage: React.FC = () => {
                   {stats ? (
                     <>
                       <StatCard label={t('Active listings', 'قوائم نشطة')} value={formatNumber(stats.activeListings)} />
-                      <StatCard label={t('AVERAGE time to sell', 'متوسط وقت البيع')} value={stats.avgTimeToSell} />
+                      <StatCard label={t('AVERAGE time to sell', 'متوسط وقت البيع')} value={formatAvgTimeToSell(stats.avgTimeToSell)} />
                       <StatCard label={t('Escrow protected', 'حماية الاسكرو')} value={stats.escrowProtected} />
                       <StatCard label={t('Qualified buyers', 'مشترون مؤهلون')} value={formatNumber(86)} />
                     </>

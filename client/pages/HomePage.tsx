@@ -39,18 +39,6 @@ const readBidState = () => {
   }
 };
 
-const formatTimeRemaining = (endTime: string, now: number) => {
-  const end = new Date(endTime).getTime();
-  const diff = end - now;
-  if (diff <= 0) return 'Ended';
-  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-};
-
 type SortOption = 'relevance' | 'priceAsc' | 'priceDesc' | 'endingSoon';
 
 const HomePage: React.FC = () => {
@@ -64,7 +52,50 @@ const HomePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [now, setNow] = useState(() => Date.now());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const { t, formatNumber, formatCurrencyEGP } = useLanguage();
+  const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
+
+  const formatTimeRemaining = (endTime: string) => {
+    const end = new Date(endTime).getTime();
+    const diff = end - now;
+    if (diff <= 0) return t('Ended', 'انتهى');
+    const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (days > 0) {
+      return isArabic
+        ? `${formatNumber(days)} يوم ${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة`
+        : `${days}d ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return isArabic
+        ? `${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+        : `${hours}h ${minutes}m ${seconds}s`;
+    }
+    return isArabic
+      ? `${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+      : `${minutes}m ${seconds}s`;
+  };
+
+  const conditionLabel = (condition: string) => {
+    const key = condition.toLowerCase();
+    if (key === 'mint') return t('Mint', 'ممتازة جدا');
+    if (key === 'excellent') return t('Excellent', 'ممتازة');
+    if (key === 'good') return t('Good', 'جيدة');
+    if (key === 'fair') return t('Fair', 'مقبولة');
+    if (key === 'poor') return t('Poor', 'ضعيفة');
+    return condition;
+  };
+
+  const locationLabel = (location: string) => {
+    const map: Record<string, string> = {
+      'Cairo, Egypt': 'القاهرة مصر',
+      'Giza, Egypt': 'الجيزة مصر',
+      'Alexandria, Egypt': 'الاسكندرية مصر'
+    };
+    return t(location, map[location] ?? location);
+  };
 
   useEffect(() => {
     saveDelistedIds(delistedIds);
@@ -355,7 +386,7 @@ const HomePage: React.FC = () => {
         {filteredListings.length === 0 ? (
           <div className="bg-white/95 border border-slate-200 rounded-2xl p-8 text-center text-slate-600 premium-card-hover">
             <p className="text-lg font-semibold text-slate-900 mb-2">{t('No listings match your filters', 'لا توجد قوائم مطابقة للفلاتر')}</p>
-            <p className="text-sm">{t('Try adjusting the search or clearing filters.', 'جرب تعديل البحث او مسح الفلاتر.')}</p>
+            <p className="text-sm">{t('Try adjusting the search or clearing filters.', 'جرب تعديل البحث او مسح الفلاتر')}</p>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -377,10 +408,10 @@ const HomePage: React.FC = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         isDelisted ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>
-                        {isDelisted ? t('Delisted', 'قوائم موقوفة') : t('Active', 'نشط')}
+                        {isDelisted ? t('Delisted', 'موقوف') : t('Active', 'نشط')}
                       </span>
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
-                        {listing.vehicle.condition}
+                        {conditionLabel(listing.vehicle.condition)}
                       </span>
                     </div>
                   </div>
@@ -392,7 +423,7 @@ const HomePage: React.FC = () => {
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
                           <MapPin size={14} />
-                          {listing.vehicle.location}
+                          {locationLabel(listing.vehicle.location)}
                         </div>
                       </div>
                       <div className="text-right">
@@ -403,13 +434,13 @@ const HomePage: React.FC = () => {
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
                       <div className="flex items-center gap-2">
                         <Clock size={14} />
-                        {formatTimeRemaining(listing.endTime, now)}
+                        {formatTimeRemaining(listing.endTime)}
                       </div>
                       <span>{formatNumber(listing.bidCount)} {t('bids', 'مزايدات')}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                      <span>{t('Mileage', 'عداد المسافة')}: <strong className="text-slate-900">{formatNumber(listing.vehicle.mileage)} {t('km', 'كم')}</strong></span>
-                      <span>{t('Condition', 'الحالة')}: <strong className="text-slate-900">{listing.vehicle.condition}</strong></span>
+                      <span>{t('Mileage', 'المسافة')}: <strong className="text-slate-900">{formatNumber(listing.vehicle.mileage)} {t('km', 'كم')}</strong></span>
+                      <span>{t('Condition', 'الحالة')}: <strong className="text-slate-900">{conditionLabel(listing.vehicle.condition)}</strong></span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <Link
