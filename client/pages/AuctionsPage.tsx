@@ -209,7 +209,7 @@ const AuctionsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <Link
-                        to={`/listing/${auction.id}`}
+                        to={`/auction/${auction.id}`}
                         className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-2"
                       >
                         Enter auction

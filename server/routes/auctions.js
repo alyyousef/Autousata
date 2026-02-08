@@ -197,10 +197,13 @@ router.get('/', async (req, res) => {
         v.make,
         v.model,
         v.year_mfg,
+        v.mileage_km,
         v.car_condition,
         v.price_egp,
         v.vin,
         v.plate_number,
+        v.description,
+        v.location_city,
         v.features,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
@@ -245,12 +248,12 @@ router.get('/', async (req, res) => {
           make: row.MAKE,
           model: row.MODEL,
           year: Number(row.YEAR_MFG) || 0,
-          mileage: 0,
+          mileage: Number(row.MILEAGE_KM) || 0,
           vin: row.VIN,
           condition: conditionMap[conditionValue] || 'Good',
-          description: '',
+          description: row.DESCRIPTION || '',
           images: [],
-          location: '',
+          location: row.LOCATION_CITY || '',
           features
         },
         sellerId: row.SELLER_ID,
@@ -346,13 +349,17 @@ router.get('/:id', async (req, res) => {
         a.start_time,
         a.end_time,
         a.current_bid_egp,
+        a.min_bid_increment,
         v.make,
         v.model,
         v.year_mfg,
+        v.mileage_km,
         v.car_condition,
         v.price_egp,
         v.vin,
         v.plate_number,
+        v.description,
+        v.location_city,
         v.features,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
@@ -395,12 +402,12 @@ router.get('/:id', async (req, res) => {
         make: row.MAKE,
         model: row.MODEL,
         year: Number(row.YEAR_MFG) || 0,
-        mileage: 0,
+        mileage: Number(row.MILEAGE_KM) || 0,
         vin: row.VIN,
         condition: conditionMap[conditionValue] || 'Good',
-        description: '',
+        description: row.DESCRIPTION || '',
         images: [],
-        location: '',
+        location: row.LOCATION_CITY || '',
         features
       },
       sellerId: row.SELLER_ID,
@@ -408,10 +415,190 @@ router.get('/:id', async (req, res) => {
       startPrice: Number(row.PRICE_EGP) || 0,
       reservePrice: Number(row.PRICE_EGP) || 0,
       bidCount: Number(row.BID_COUNT) || 0,
+      minBidIncrement: Number(row.MIN_BID_INCREMENT) || 50,
       endTime: row.END_TIME,
       status: row.STATUS
     });
   } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error('Oracle connection close error:', closeErr.message);
+      }
+    }
+  }
+});
+
+// GET /api/auctions/:id/bids - List recent bids for an auction
+router.get('/:id/bids', async (req, res) => {
+  let connection;
+  try {
+    const limitNum = Math.max(1, parseInt(req.query.limit, 10) || 20);
+    connection = await oracledb.getConnection();
+
+    const result = await connection.execute(
+      `SELECT
+        b.id,
+        b.bidder_id,
+        b.amount_egp,
+        b.created_at,
+        u.first_name,
+        u.last_name
+      FROM bids b
+      JOIN users u ON u.id = b.bidder_id
+      WHERE b.auction_id = :auctionId
+      ORDER BY b.created_at DESC
+      FETCH FIRST :limit ROWS ONLY`,
+      { auctionId: req.params.id, limit: limitNum },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const bids = (result.rows || []).map((row) => ({
+      id: row.ID,
+      userId: row.BIDDER_ID,
+      userName: `${row.FIRST_NAME || ''} ${row.LAST_NAME || ''}`.trim() || 'Bidder',
+      amount: Number(row.AMOUNT_EGP) || 0,
+      timestamp: row.CREATED_AT
+    }));
+
+    res.json({ bids });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error('Oracle connection close error:', closeErr.message);
+      }
+    }
+  }
+});
+
+// POST /api/auctions/:id/bids - Place a manual bid
+router.post('/:id/bids', auth, async (req, res) => {
+  let connection;
+  try {
+    const amount = Number(req.body.amount);
+    if (!amount || Number.isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ msg: 'Invalid bid amount' });
+    }
+
+    connection = await oracledb.getConnection();
+
+    const auctionResult = await connection.execute(
+      `SELECT
+        id,
+        seller_id,
+        status,
+        end_time,
+        current_bid_egp,
+        starting_bid_egp,
+        min_bid_increment
+      FROM auctions
+      WHERE id = :auctionId
+      FOR UPDATE`,
+      { auctionId: req.params.id },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (!auctionResult.rows || auctionResult.rows.length === 0) {
+      return res.status(404).json({ msg: 'Auction not found' });
+    }
+
+    const auction = auctionResult.rows[0];
+    if (auction.SELLER_ID === req.user.id) {
+      return res.status(403).json({ msg: 'Sellers cannot bid on their own auctions' });
+    }
+
+    const statusValue = typeof auction.STATUS === 'string' ? auction.STATUS.toLowerCase() : '';
+    if (statusValue !== 'live') {
+      return res.status(400).json({ msg: 'Auction is not open for bidding' });
+    }
+
+    if (auction.END_TIME && new Date(auction.END_TIME).getTime() <= Date.now()) {
+      return res.status(400).json({ msg: 'Auction has ended' });
+    }
+
+    const currentBid = Number(auction.CURRENT_BID_EGP) || Number(auction.STARTING_BID_EGP) || 0;
+    const minIncrement = Number(auction.MIN_BID_INCREMENT) || 50;
+    const minAllowed = currentBid + minIncrement;
+
+    if (amount < minAllowed) {
+      return res.status(400).json({ msg: `Minimum bid is EGP ${minAllowed.toLocaleString()}.` });
+    }
+
+    const bidId = randomUUID();
+
+    await connection.execute(
+      `INSERT INTO bids (
+        id,
+        auction_id,
+        bidder_id,
+        amount_egp,
+        status,
+        bid_source,
+        created_at,
+        updated_at
+      ) VALUES (
+        :id,
+        :auctionId,
+        :bidderId,
+        :amount,
+        :status,
+        :bidSource,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )`,
+      {
+        id: bidId,
+        auctionId: req.params.id,
+        bidderId: req.user.id,
+        amount,
+        status: 'accepted',
+        bidSource: 'manual'
+      },
+      { autoCommit: false }
+    );
+
+    await connection.execute(
+      `UPDATE auctions
+       SET current_bid_egp = :amount,
+           bid_count = NVL(bid_count, 0) + 1,
+           leading_bidder_id = :bidderId
+       WHERE id = :auctionId`,
+      {
+        amount,
+        bidderId: req.user.id,
+        auctionId: req.params.id
+      },
+      { autoCommit: false }
+    );
+
+    await connection.commit();
+
+    res.json({
+      bid: {
+        id: bidId,
+        userId: req.user.id,
+        amount,
+        timestamp: new Date().toISOString()
+      },
+      currentBid: amount
+    });
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackErr) {
+        console.error('Oracle rollback error:', rollbackErr.message);
+      }
+    }
     console.error(err.message);
     res.status(500).send('Server Error');
   } finally {

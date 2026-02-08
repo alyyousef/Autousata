@@ -46,7 +46,8 @@ const listingSchema = z.object({
   aiNotes: z.string().optional(),
 });
 
-type ListingFormData = z.infer<typeof listingSchema>;
+type ListingFormInput = z.input<typeof listingSchema>;
+type ListingFormData = z.output<typeof listingSchema>;
 
 const CreateListingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ const CreateListingPage: React.FC = () => {
     trigger,
     getValues,
     formState: { errors, isValid }
-  } = useForm<ListingFormData>({
+  } = useForm<ListingFormInput, unknown, ListingFormData>({
     resolver: zodResolver(listingSchema),
     mode: 'onChange',
     defaultValues: {
@@ -92,9 +93,9 @@ const CreateListingPage: React.FC = () => {
       const basicInfo = {
         make: getValues('make'),
         model: getValues('model'),
-        year: getValues('year'),
+        year: Number(getValues('year')) || new Date().getFullYear(),
         condition: getValues('condition'),
-        notes: notes
+        notes: notes || ''
       };
       
       const generatedDescription = await geminiService.enhanceDescription(basicInfo);

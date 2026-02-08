@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -165,6 +165,22 @@ class ApiService {
       sortBy,
     });
     return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
+  }
+
+  async getAuctionById(auctionId: string) {
+    return this.request<any>(`/auctions/${auctionId}`);
+  }
+
+  async getAuctionBids(auctionId: string, limit = 20) {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    return this.request<{ bids: any[] }>(`/auctions/${auctionId}/bids?${queryParams.toString()}`);
+  }
+
+  async placeBid(auctionId: string, amount: number) {
+    return this.request<{ bid: any; currentBid: number }>(`/auctions/${auctionId}/bids`, {
+      method: 'POST',
+      body: JSON.stringify({ amount })
+    });
   }
 
   async getSellerVehicles() {
