@@ -48,9 +48,9 @@ const LoginPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-lg my-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">{t('Welcome!', 'أهلًا بيك!')}</h1>
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">{t('Welcome!', 'أهلا بيك!')}</h1>
           <p className="text-sm text-slate-600 mb-5">
-            {t('Log in to track bids, saved searches, and your garage!', 'سجّل عشان تتابع المزايدات والبحث المحفوظ والجراج بتاعك.')}
+            {t('Log in to track bids, saved searches, and your garage!', 'سجل عشان تتابع المزايدات والبحث المحفوظ والجراج بتاعك.')}
           </p>
 
           {error && (
@@ -110,7 +110,7 @@ const LoginPage: React.FC = () => {
               disabled={loading}
               className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-lg shadow-slate-900/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? t('Logging in...', 'جاري تسجيل الدخول...') : t('Continue', 'كمّل')}
+              {loading ? t('Logging in...', 'جاري تسجيل الدخول...') : t('Continue', 'كمل')}
             </button>
 
             <p className="text-center text-sm text-slate-600">

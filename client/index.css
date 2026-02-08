@@ -594,21 +594,6 @@ button.no-hover-rise:active {
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
-.dir-toggle-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.08);
-  color: rgba(15, 23, 42, 0.7);
-}
-
-.theme-dark .dir-toggle-icon {
-  background: rgba(148, 163, 184, 0.2);
-  color: rgba(226, 232, 240, 0.85);
-}
 
 .dir-toggle-btn {
   border-radius: 999px;

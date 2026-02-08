@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CircleHelp, Gavel, HandCoins, Languages, Menu, Moon, SearchCheck, Sun, X, User as UserIcon } from 'lucide-react';
+import { Bell, CircleHelp, Gavel, HandCoins, Menu, Moon, SearchCheck, Sun, X, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -55,10 +55,10 @@ const PublicLayout: React.FC = () => {
     : '/assests/frontendPictures/logoBlackA.png';
 
   const navItems = [
-    { to: '/browse', label: t('Buy', 'اشتري'), icon: SearchCheck },
+    { to: '/browse', label: t('Buy', 'شراء'), icon: SearchCheck },
     { to: '/sell', label: t('Sell', 'بيع'), icon: HandCoins },
-    { to: '/auctions', label: t('Auction', 'مزاد'), icon: Gavel },
-    { to: '/how-it-works', label: t('How it Works', 'إزاي الشغل ماشي'), icon: CircleHelp }
+    { to: '/auctions', label: t('Auction', 'المزادات'), icon: Gavel },
+    { to: '/how-it-works', label: t('How it Works', 'الية العمل'), icon: CircleHelp }
   ] as const;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -112,9 +112,6 @@ const PublicLayout: React.FC = () => {
                 />
               </button>
               <div className="dir-toggle" role="group" aria-label={t('Language', 'اللغة')}>
-                <span className="dir-toggle-icon">
-                  <Languages size={14} />
-                </span>
                 <button
                   type="button"
                   onClick={() => setLanguage('en')}
@@ -380,10 +377,13 @@ const PublicLayout: React.FC = () => {
                   </div>
                   <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
                 </div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-3">
+                  {t('Since 2026', 'منذ 2026')}
+                </p>
                 <p className="text-sm leading-6 max-w-sm text-slate-200">
                   {t(
                     'A premium marketplace built for collectors and daily drivers alike. Transparent auctions, verified sellers, and concierge support from first click to final handover.',
-                    'سوق فاخر لعشاق العربيات ولمستخدمينها يوميًا. مزادات واضحة، باعة موثوقين، ودعم مخصص من أول ضغطة لحد التسليم.'
+                    'سوق فاخر لهواة الاقتناء والمستخدمين اليوميين. مزادات واضحة، بائعون موثقون، ودعم متخصص من أول خطوة حتى التسليم.'
                   )}
                 </p>
               </div>
@@ -392,7 +392,7 @@ const PublicLayout: React.FC = () => {
                   {t('Company', 'الشركة')}
                 </h3>
                 <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'إزاي الشغل ماشي')}</Link></li>
+                  <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
                   <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
                 </ul>
               </div>

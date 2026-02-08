@@ -38,7 +38,7 @@ const VerifyEmailPage: React.FC = () => {
         }
       } catch (error) {
         setStatus('error');
-        setMessage(t('Network error. Please try again.', 'حصل خطأ في الشبكة. جرّب تاني.'));
+        setMessage(t('Network error. Please try again.', 'حصل خطأ في الشبكة. جرب تاني.'));
       }
     };
 
@@ -53,7 +53,7 @@ const VerifyEmailPage: React.FC = () => {
           <div className="flex flex-col items-center">
             <Loader className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
             <h2 className="text-2xl font-bold text-slate-900">{t('Verifying...', 'جاري التفعيل...')}</h2>
-            <p className="text-slate-500 mt-2">{t('Please wait while we activate your account.', 'استنى شوية وإحنا بنفعّل حسابك.')}</p>
+            <p className="text-slate-500 mt-2">{t('Please wait while we activate your account.', 'استنى شوية وإحنا بنفعل حسابك.')}</p>
           </div>
         )}
 

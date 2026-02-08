@@ -167,7 +167,7 @@ const HomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="max-w-2xl mx-auto text-center relative hero-fade-in">
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
-              {t('Buy a car from verified sellers', 'اشتري عربية من باعة موثّقين')}
+              {t('Buy a car from verified sellers', 'اشتر سيارة من بائعين موثقين')}
             </h1>
             <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl">
               {t(
@@ -177,9 +177,9 @@ const HomePage: React.FC = () => {
             </p>
           </div>
           <div className="mt-8 flex flex-wrap justify-center gap-4 text-xs md:text-sm text-slate-200/90 relative">
-            <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'باعة موثّقين')}</div>
-            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'أسعار واضحة')}</div>
-            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبقي واضح')}</div>
+            <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'بائعون موثقون')}</div>
+            <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'اسعار واضحة')}</div>
+            <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبق واضح')}</div>
           </div>
         </div>
       </section>
@@ -189,7 +189,7 @@ const HomePage: React.FC = () => {
           <div className="space-y-6">
             <div>
               <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
-                {t('Find your next car', 'دوّر على عربيتك الجاية')}
+                {t('Find your next car', 'ابحث عن سيارتك القادمة')}
               </p>
               <div className="relative">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -197,7 +197,7 @@ const HomePage: React.FC = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder={t('Search by make, model, year, or location', 'دوّر بالمُصنّع، الموديل، السنة، أو المكان')}
+                  placeholder={t('Search by make, model, year, or location', 'ابحث بالمصنع او الموديل او السنة او الموقع')}
                   className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 {searchTerm && (
@@ -213,13 +213,13 @@ const HomePage: React.FC = () => {
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                {t('Active listings', 'قوائم شغالة')}
+                {t('Active listings', 'قوائم نشطة')}
                 <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm">
                   {formatNumber(activeCount)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
-                {t('Delisted', 'موقوفة')}
+                {t('Delisted', 'قوائم موقوفة')}
                 <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 shadow-sm">
                   {formatNumber(delistedCount)}
                 </span>
@@ -240,7 +240,7 @@ const HomePage: React.FC = () => {
                   >
                     {[
                       { value: 'All', label: t('All', 'الكل') },
-                      { value: 'Mint', label: t('Mint', 'ممتاز جدًا') },
+                      { value: 'Mint', label: t('Mint', 'ممتاز جدا') },
                       { value: 'Excellent', label: t('Excellent', 'ممتاز') },
                       { value: 'Good', label: t('Good', 'جيد') },
                       { value: 'Fair', label: t('Fair', 'مقبول') }
@@ -263,10 +263,10 @@ const HomePage: React.FC = () => {
                     onChange={(event) => setSortBy(event.target.value as SortOption)}
                     className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
-                    <option value="relevance">{t('Relevance', 'الأقرب')}</option>
-                    <option value="priceAsc">{t('Price: low to high', 'السعر: من الأقل للأعلى')}</option>
-                    <option value="priceDesc">{t('Price: high to low', 'السعر: من الأعلى للأقل')}</option>
-                    <option value="endingSoon">{t('Ending soon', 'بينتهي قريب')}</option>
+                    <option value="relevance">{t('Relevance', 'الاكثر صلة')}</option>
+                    <option value="priceAsc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
+                    <option value="priceDesc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
+                    <option value="endingSoon">{t('Ending soon', 'ينتهي قريبا')}</option>
                   </select>
                   <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
@@ -277,7 +277,7 @@ const HomePage: React.FC = () => {
                   onClick={() => setShowDelisted(prev => !prev)}
                   className="md:col-span-2 w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
                 >
-                  {showDelisted ? t('Hide delisted', 'اخفي الموقوف') : t('Show delisted', 'اظهر الموقوف')}
+                  {showDelisted ? t('Hide delisted', 'اخف القوائم الموقوفة') : t('Show delisted', 'اظهر القوائم الموقوفة')}
                 </button>
               )}
             </div>
@@ -288,7 +288,7 @@ const HomePage: React.FC = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
           <div className="mb-5 text-center">
-            <h3 className="text-lg font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والإشعارات والمدفوعات')}</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
           </div>
           <div className="grid gap-6 lg:grid-cols-3 text-center">
             <div>
@@ -303,7 +303,7 @@ const HomePage: React.FC = () => {
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-rose-100 text-rose-700'
                       }`}>
-                        {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'اتسبقّت')}
+                        {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'تم تجاوزك')}
                       </span>
                     </div>
                     <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
@@ -314,11 +314,11 @@ const HomePage: React.FC = () => {
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Outbid notifications', 'إشعارات خروجك من الصدارة')}</h4>
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Outbid notifications', 'اشعارات تجاوز المزايدة')}</h4>
               <div className="space-y-3 text-sm text-slate-600">
                 {buyerNotifications.map((note, index) => (
                   <div key={index} className="buyer-insights-note inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
-                    {t(note, 'اتسبقّت في المزايدة. زوّد الحد الأقصى عشان ترجع الأول.')}
+                    {t(note, 'اتسبقت في المزايدة. زود الحد الأقصى عشان ترجع الأول.')}
                   </div>
                 ))}
               </div>
@@ -354,8 +354,8 @@ const HomePage: React.FC = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         {filteredListings.length === 0 ? (
           <div className="bg-white/95 border border-slate-200 rounded-2xl p-8 text-center text-slate-600 premium-card-hover">
-            <p className="text-lg font-semibold text-slate-900 mb-2">{t('No listings match your filters', 'مفيش قوائم مطابقة للفلاتر')}</p>
-            <p className="text-sm">{t('Try adjusting the search or clearing filters.', 'جرّب تغيّر البحث أو تمسح الفلاتر.')}</p>
+            <p className="text-lg font-semibold text-slate-900 mb-2">{t('No listings match your filters', 'لا توجد قوائم مطابقة للفلاتر')}</p>
+            <p className="text-sm">{t('Try adjusting the search or clearing filters.', 'جرب تعديل البحث او مسح الفلاتر.')}</p>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -377,7 +377,7 @@ const HomePage: React.FC = () => {
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         isDelisted ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>
-                        {isDelisted ? t('Delisted', 'موقوف') : t('Active', 'شغال')}
+                        {isDelisted ? t('Delisted', 'قوائم موقوفة') : t('Active', 'نشط')}
                       </span>
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
                         {listing.vehicle.condition}
@@ -396,7 +396,7 @@ const HomePage: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Current bid', 'أعلى مزايدة')}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Current bid', 'اعلى مزايدة')}</p>
                         <p className="text-lg font-bold text-indigo-600">{formatCurrencyEGP(listing.currentBid)}</p>
                       </div>
                     </div>
@@ -408,7 +408,7 @@ const HomePage: React.FC = () => {
                       <span>{formatNumber(listing.bidCount)} {t('bids', 'مزايدات')}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                      <span>{t('Mileage', 'عداد')}: <strong className="text-slate-900">{formatNumber(listing.vehicle.mileage)} {t('km', 'كم')}</strong></span>
+                      <span>{t('Mileage', 'عداد المسافة')}: <strong className="text-slate-900">{formatNumber(listing.vehicle.mileage)} {t('km', 'كم')}</strong></span>
                       <span>{t('Condition', 'الحالة')}: <strong className="text-slate-900">{listing.vehicle.condition}</strong></span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -416,7 +416,7 @@ const HomePage: React.FC = () => {
                         to={`/listing/${listing.id}`}
                         className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
                       >
-                        {t('View details', 'شوف التفاصيل')}
+                        {t('View details', 'عرض التفاصيل')}
                       </Link>
                       {canManageListings && (
                         <button
@@ -427,7 +427,7 @@ const HomePage: React.FC = () => {
                               : 'border border-rose-200 text-rose-600 hover:bg-rose-50'
                           }`}
                         >
-                          {isDelisted ? t('Restore', 'رجّع') : t('Delist', 'أوقف')}
+                          {isDelisted ? t('Restore', 'استعادة') : t('Delist', 'ايقاف')}
                         </button>
                       )}
                     </div>

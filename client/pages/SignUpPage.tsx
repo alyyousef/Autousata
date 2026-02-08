@@ -78,7 +78,7 @@ const SignUpPage: React.FC = () => {
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-5 md:p-7 w-full max-w-lg my-auto max-h-[calc(100vh-140px)] overflow-y-auto">
           <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">{t('Become a AUTOUSATA Member!', 'انضم لـ AUTOUSATA دلوقتي!')}</h1>
           <p className="text-sm text-slate-600 mb-4">
-            {t('Get access to verified listings, transparent bids, and concierge support!', 'احصل على قوائم موثّقة، مزايدات واضحة، ودعم مخصص.')}
+            {t('Get access to verified listings, transparent bids, and concierge support!', 'احصل على قوائم موثقة، مزايدات واضحة، ودعم مخصص.')}
           </p>
 
           {error && (
@@ -236,7 +236,7 @@ const SignUpPage: React.FC = () => {
             <p className="text-center text-sm text-slate-600">
               {t('Already have an account?', 'عندك حساب بالفعل؟')}{' '}
               <Link to="/login" className="font-semibold text-slate-900 hover:underline">
-                {t('Log in', 'سجّل دخول')}
+                {t('Log in', 'سجل دخول')}
               </Link>
             </p>
           </form>

@@ -20,28 +20,28 @@ const buyerFlow = [
     title: 'Find the right car',
     titleAr: 'اختار العربية المناسبة',
     detail: 'Search by make, model, year, location, and condition. Open each listing to review photos, history, and current bid activity.',
-    detailAr: 'دوّر بالمُصنّع والموديل والسنة والمكان والحالة. افتح كل قائمة وشوف الصور والتاريخ والمزايدات.',
+    detailAr: 'دور بالمصنع والموديل والسنة والمكان والحالة. افتح كل قائمة وشوف الصور والتاريخ والمزايدات.',
     icon: FileText
   },
   {
     title: 'Place your bid',
-    titleAr: 'قدّم مزايدتك',
+    titleAr: 'قدم مزايدتك',
     detail: 'Submit a bid above the current amount. You will immediately see confirmation and the latest live bid value.',
-    detailAr: 'قدّم مزايدة أعلى من الحالي. هتشوف التأكيد وآخر مزايدة مباشرة.',
+    detailAr: 'قدم مزايدة أعلى من الحالي. هتشوف التأكيد وآخر مزايدة مباشرة.',
     icon: Gavel
   },
   {
     title: 'Win and pay securely',
     titleAr: 'اكسب وادفع بأمان',
     detail: 'When the auction ends, complete payment through the secure payment flow. Status is tracked in your account.',
-    detailAr: 'لما المزاد يخلص، كمّل الدفع بشكل آمن. الحالة بتظهر في حسابك.',
+    detailAr: 'لما المزاد يخلص، كمل الدفع بشكل آمن. الحالة بتظهر في حسابك.',
     icon: Wallet
   },
   {
     title: 'Receive your vehicle',
     titleAr: 'استلم عربيتك',
     detail: 'Coordinate delivery or pickup with support guidance and final handoff details.',
-    detailAr: 'نسّق الاستلام أو التوصيل مع الدعم وكل تفاصيل التسليم.',
+    detailAr: 'نسق الاستلام أو التوصيل مع الدعم وكل تفاصيل التسليم.',
     icon: Truck
   }
 ];
@@ -51,7 +51,7 @@ const sellerFlow = [
     title: 'Create your listing',
     titleAr: 'اعمل قائمتك',
     detail: 'Add specs, mileage, condition, photos, and a strong description so buyers can evaluate confidently.',
-    detailAr: 'ضيف المواصفات والعداد والحالة والصور ووصف قوي عشان المشتري يقيّم بثقة.',
+    detailAr: 'ضيف المواصفات والعداد والحالة والصور ووصف قوي عشان المشتري يقيم بثقة.',
     icon: UploadCloud
   },
   {
@@ -190,7 +190,7 @@ const HowItWorksPage: React.FC = () => {
                     className="brochure-download-btn mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors"
                   >
                     <Download size={16} />
-                    {t('Download PDF', 'حمّل PDF')}
+                    {t('Download PDF', 'حمل PDF')}
                   </a>
                 ) : (
                   <button
@@ -199,7 +199,7 @@ const HowItWorksPage: React.FC = () => {
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-700 text-slate-300 px-4 py-2 text-sm font-semibold cursor-not-allowed"
                   >
                     <Download size={16} />
-                    {t('Coming soon', 'قريبًا')}
+                    {t('Coming soon', 'قريبا')}
                   </button>
                 )}
               </div>

@@ -99,7 +99,7 @@ const AuctionsPage: React.FC = () => {
             <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl mx-auto">
               {t(
                 'Watch bids in real time and follow the most in-demand cars on the platform. Sort by ending soon, highest bid, or most competitive auctions.',
-                'تابع المزايدات لحظة بلحظة وشوف العربيات الأكثر طلبًا. رتّب حسب الأقرب انتهاء أو أعلى مزايدة أو أكتر مزايدات.'
+                'تابع المزايدات لحظة بلحظة وشوف العربيات الأكثر طلبا. رتب حسب الأقرب انتهاء أو أعلى مزايدة أو أكتر مزايدات.'
               )}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs md:text-sm text-slate-200/90">
@@ -113,7 +113,7 @@ const AuctionsPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
                 <Trophy size={16} className="text-emerald-300" />
-                {t('Verified sellers only', 'باعة موثّقين فقط')}
+                {t('Verified sellers only', 'باعة موثقين فقط')}
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@ const AuctionsPage: React.FC = () => {
         <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <SlidersHorizontal size={18} className="text-slate-400" />
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('Sort auctions by', 'رتّب المزادات حسب')}</span>
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('Sort auctions by', 'رتب المزادات حسب')}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {[

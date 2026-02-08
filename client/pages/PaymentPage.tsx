@@ -71,7 +71,7 @@ const PaymentPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-slate-400">{t('Secure payment', 'دفع آمن')}</p>
-              <h1 className="text-2xl font-semibold text-slate-900">{t('Complete your purchase', 'كمّل عملية الشراء')}</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">{t('Complete your purchase', 'كمل عملية الشراء')}</h1>
               <p className="text-sm text-slate-500 mt-1">
                 {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
               </p>
@@ -84,7 +84,7 @@ const PaymentPage: React.FC = () => {
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 flex items-center gap-3 text-sm text-slate-600 mb-6">
             <ShieldCheck size={18} className="text-emerald-500" />
-            {t('Stripe checkout is a placeholder here. Replace with Stripe Elements for production.', 'Stripe هنا تجريبي. بدّله بـ Stripe Elements للإنتاج.')}
+            {t('Stripe checkout is a placeholder here. Replace with Stripe Elements for production.', 'Stripe هنا تجريبي. بدله بـ Stripe Elements للإنتاج.')}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

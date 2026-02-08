@@ -8,7 +8,7 @@ const sections = [
     body:
       'Welcome to AUTOUSATA. These Terms and Conditions of Use govern your access to and use of the AUTOUSATA website and services. By using the site, you acknowledge that you have read, understood, and agree to these terms and to comply with applicable laws. You must be at least 18 years old to use the site.',
     bodyAr:
-      'أهلًا بيك في AUTOUSATA. شروط الاستخدام دي بتنظم دخولك واستخدامك للموقع والخدمات. باستخدامك للموقع، إنت بتقر إنك قريت وفهمت وموافق على الشروط وملتزم بالقوانين. لازم يكون سنك 18 سنة أو أكتر.'
+      'أهلا بيك في AUTOUSATA. شروط الاستخدام دي بتنظم دخولك واستخدامك للموقع والخدمات. باستخدامك للموقع، إنت بتقر إنك قريت وفهمت وموافق على الشروط وملتزم بالقوانين. لازم يكون سنك 18 سنة أو أكتر.'
   },
   {
     title: 'How We Use Your Information',
@@ -16,7 +16,7 @@ const sections = [
     body:
       'We may collect personal and non-personal information to operate and improve the site, provide services, and meet legal or security obligations. Personal information may include contact details and account data you submit. We process data in accordance with our Privacy Notice.',
     bodyAr:
-      'ممكن نجمع بيانات شخصية وغير شخصية عشان نشغّل الموقع ونطوره ونقدم الخدمات ونلتزم بالمتطلبات القانونية والأمنية. البيانات الشخصية ممكن تشمل بيانات التواصل وبيانات حسابك. بنعالج البيانات طبقًا لسياسة الخصوصية.'
+      'ممكن نجمع بيانات شخصية وغير شخصية عشان نشغل الموقع ونطوره ونقدم الخدمات ونلتزم بالمتطلبات القانونية والأمنية. البيانات الشخصية ممكن تشمل بيانات التواصل وبيانات حسابك. بنعالج البيانات طبقا لسياسة الخصوصية.'
   },
   {
     title: 'Site Provisions and Services',
@@ -96,7 +96,7 @@ const sections = [
     body:
       'You agree to indemnify and hold AUTOUSATA harmless from claims arising from your use of the site, your content, or your violation of these terms.',
     bodyAr:
-      'إنت موافق تعوّض وتحمي AUTOUSATA من أي مطالبات ناتجة عن استخدامك للموقع أو محتواك أو مخالفتك للشروط.'
+      'إنت موافق تعوض وتحمي AUTOUSATA من أي مطالبات ناتجة عن استخدامك للموقع أو محتواك أو مخالفتك للشروط.'
   },
   {
     title: 'Security',
@@ -168,7 +168,7 @@ const sections = [
     body:
       'We encourage resolving disputes informally first. If a dispute cannot be resolved, it will be handled through the applicable legal process in accordance with these terms.',
     bodyAr:
-      'بنشجع حل أي نزاع بشكل ودي الأول. لو ما اتحلش، هيتم التعامل معاه بالإجراءات القانونية وفقًا للشروط.'
+      'بنشجع حل أي نزاع بشكل ودي الأول. لو ما اتحلش، هيتم التعامل معاه بالإجراءات القانونية وفقا للشروط.'
   },
   {
     title: 'Changes to These Terms and Conditions',

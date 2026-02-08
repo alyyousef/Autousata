@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X, Languages } from 'lucide-react';
+import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -38,7 +38,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
 
   const navigation = [
     { name: t('Browse', 'تصفح'), href: '/browse', icon: Car, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.ADMIN] },
-    { name: t('Sell Your Car', 'بيع عربيتك'), href: '/sell', icon: PlusCircle, roles: [UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
+    { name: t('Sell Your Car', 'بيع سيارتك'), href: '/sell', icon: PlusCircle, roles: [UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
     { name: t('My Dashboard', 'لوحة التحكم'), href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SELLER, UserRole.DEALER] },
     { name: t('Admin', 'الإدارة'), href: '/admin', icon: Shield, roles: [UserRole.ADMIN] }
   ].filter(item => item.roles.includes(user.role));
@@ -70,9 +70,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
 
             <div className="hidden md:flex items-center gap-4">
               <div className="dir-toggle" role="group" aria-label={t('Language', 'اللغة')}>
-                <span className="dir-toggle-icon">
-                  <Languages size={14} />
-                </span>
                 <button
                   type="button"
                   onClick={() => setLanguage('en')}
@@ -253,6 +250,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
               </div>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-3">
+                {t('Since 2026', 'منذ 2026')}
+              </p>
               <p className="text-sm leading-6 max-w-xs text-slate-200">
                 {t(
                   "The world's most trusted online marketplace for buying and selling exceptional vehicles. Secure, transparent, and built for enthusiasts.",
@@ -265,7 +265,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 {t('Company', 'الشركة')}
               </h3>
               <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'إزاي الشغل ماشي')}</Link></li>
+                <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
                 <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
               </ul>
             </div>

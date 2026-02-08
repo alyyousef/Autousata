@@ -28,75 +28,75 @@ const heroSlides = [
   {
     image: ferrariGif,
     headline: 'Engineered For Pure Emotion',
-    headlineAr: 'مصممة لإحساس خالص',
+    headlineAr: 'مصممة لاحساس خالص',
     subhead: 'Experience iconic Ferrari motion and unmistakable performance.',
-    subheadAr: 'عيش إحساس فيراري الأيقوني وأداء ما يتنساش.',
+    subheadAr: 'استمتع بتجربة فيراري الايقونية واداء لا ينسى.',
     sponsor: 'Ferrari.',
     sponsorAr: 'فيراري.',
     sponsorLine: 'Race heritage, timeless design, and visceral sound.',
-    sponsorLineAr: 'تاريخ سباقات، تصميم خالد، وصوت يدوّب.'
+    sponsorLineAr: 'ارث سباقات وتصميم خالد وصوت مؤثر.'
   },
   {
     image: rrTwoImage,
     headline: 'Driving Luxury Since 1985',
-    headlineAr: 'رفاهية على الطريق من ١٩٨٥',
+    headlineAr: 'رفاهية على الطريق منذ 1985',
     subhead: 'Discover curated exotics and collector-grade vehicles with verified provenance.',
-    subheadAr: 'اكتشف عربيات نادرة بعناية وبأصل موثّق.',
+    subheadAr: 'اكتشف سيارات نادرة مختارة بعناية وباصل موثق.',
     sponsor: 'Rolls-Royce Cullinan.',
     sponsorAr: 'رولز رويس كولينان.',
     sponsorLine: 'For those who drive to feel. Pure V8 power.',
-    sponsorLineAr: 'للي بيحب الإحساس في السواقة. قوة V8 صافية.'
+    sponsorLineAr: 'لعشاق الاحساس في القيادة. قوة V8 خالصة.'
   },
   {
     image: rrOneImage,
     headline: 'Built For Serious Collectors',
     headlineAr: 'مصممة لهواة الاقتناء الحقيقيين',
     subhead: 'Bid with confidence on concierge-verified listings and transparent auction terms.',
-    subheadAr: 'زايد بثقة على عربيات متراجعة ومضمونة وبشروط واضحة.',
+    subheadAr: 'زايد بثقة على سيارات موثقة وبشروط مزادات واضحة.',
     sponsor: 'Rolls-Royce Ghost.',
     sponsorAr: 'رولز رويس جوست.',
     sponsorLine: 'Track-bred precision, road-ready composure.',
-    sponsorLineAr: 'دقة من سباقات، وثبات على الطريق.'
+    sponsorLineAr: 'دقة مستمدة من الحلبات وثبات على الطريق.'
   },
   {
     image: mcLarenImage,
     headline: 'Performance Without Compromise',
-    headlineAr: 'أداء من غير تنازلات',
+    headlineAr: 'اداء بلا تنازلات',
     subhead: 'Supercar engineering and verified listings in one premium marketplace.',
-    subheadAr: 'هندسة سوبركار وعربيات موثّقة في مكان واحد.',
+    subheadAr: 'هندسة سوبركار وسيارات موثقة في سوق فاخر واحد.',
     sponsor: 'McLaren.',
     sponsorAr: 'مكلارين.',
     sponsorLine: 'Lightweight design meets race-bred acceleration.',
-    sponsorLineAr: 'تصميم خفيف وتسارع من قلب السباقات.'
+    sponsorLineAr: 'تصميم خفيف وتسارع مستمد من السباقات.'
   },
   {
     image: lamboOneImage,
     headline: 'Where Icons Change Hands',
-    headlineAr: 'مكان أيقونات بتغيّر مالكها',
+    headlineAr: 'حيث تنتقل الايقونات',
     subhead: 'Exclusive inventory built for collectors who expect excellence.',
-    subheadAr: 'مخزون حصري لهواة القمة في كل حاجة.',
+    subheadAr: 'مخزون حصري لهواة التميز.',
     sponsor: 'Lamborghini.',
     sponsorAr: 'لامبورجيني.',
     sponsorLine: 'Bold lines, raw power, unmistakable character.',
-    sponsorLineAr: 'خطوط جريئة، قوة خام، وشخصية ما تتوهش.'
+    sponsorLineAr: 'خطوط جريئة وقوة خام وشخصية لا تخطئها العين.'
   },
   {
     image: porscheGif,
     headline: 'Precision In Every Curve',
-    headlineAr: 'دقة في كل منحنى',
+    headlineAr: 'دقة في كل منعطف',
     subhead: 'Porsche handling, speed, and control built for drivers.',
-    subheadAr: 'ثبات وسرعة وتحكم بورشه مصممين للسواقين الحقيقيين.',
+    subheadAr: 'ثبات وسرعة وتحكم من بورشه لعشاق القيادة.',
     sponsor: 'Porsche.',
     sponsorAr: 'بورشه.',
     sponsorLine: 'Track-born confidence with everyday usability.',
-    sponsorLineAr: 'ثقة السباقات مع استخدام يومي سهل.'
+    sponsorLineAr: 'ثقة مستمدة من الحلبات مع استخدام يومي سهل.'
   },
   {
     image: bugattiOneImage,
     headline: 'Extraordinary Cars, Trusted Process',
-    headlineAr: 'عربيات استثنائية وخطوات موثوقة',
+    headlineAr: 'سيارات استثنائية وخطوات موثوقة',
     subhead: 'From browsing to delivery, every step is transparent and secure.',
-    subheadAr: 'من التصفح لحد التسليم، كل خطوة واضحة وآمنة.',
+    subheadAr: 'من التصفح حتى التسليم، كل خطوة واضحة وامنة.',
     sponsor: 'Bugatti.',
     sponsorAr: 'بوغاتي.',
     sponsorLine: 'Engineering artistry at hypercar level.',
@@ -105,11 +105,11 @@ const heroSlides = [
   {
     image: bmwI8Image,
     headline: 'Modern Exotics, Curated Weekly',
-    headlineAr: 'عربيات مميزة حديثة بتتجدد أسبوعيًا',
+    headlineAr: 'سيارات مميزة حديثة تتجدد اسبوعيا',
     subhead: 'Fresh featured cars and auction-ready listings updated every week.',
-    subheadAr: 'عربيات مميزة ومزادات جاهزة بتتحدث كل أسبوع.',
+    subheadAr: 'سيارات مميزة وقوائم جاهزة للمزاد تتحدث كل اسبوع.',
     sponsor: 'BMW i8.',
-    sponsorAr: 'بي إم دبليو i8.',
+    sponsorAr: 'بي ام دبليو i8.',
     sponsorLine: 'Futuristic design with hybrid supercar spirit.',
     sponsorLineAr: 'تصميم مستقبلي بروح سوبركار هايبرد.'
   }
@@ -138,7 +138,7 @@ const LandingPage: React.FC = () => {
       setStats(statsResponse);
       setVehicles(vehicleResponse);
     } catch (err) {
-      setError(t('We could not load the latest featured vehicles. Please try again.', 'مش قادرين نحمّل العربيات المميزة دلوقتي. جرّب تاني.'));
+      setError(t('We could not load the latest featured vehicles. Please try again.', 'تعذر تحميل السيارات المميزة حاليا. يرجى المحاولة مرة اخرى.'));
     } finally {
       setIsLoading(false);
     }
@@ -201,7 +201,7 @@ const LandingPage: React.FC = () => {
                           : 'text-white/80 hover:text-white'
                       }`}
                     >
-                      {t('Buy', 'اشتري')}
+                      {t('Buy', 'شراء')}
                     </button>
                     <button
                       type="button"
@@ -226,7 +226,7 @@ const LandingPage: React.FC = () => {
                         type="text"
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
-                        placeholder={t('Search for make and model', 'دوّر على الماركة والموديل')}
+                        placeholder={t('Search for make and model', 'ابحث عن الماركة والموديل')}
                         className="hero-search-input w-full bg-transparent text-sm focus:outline-none"
                       />
                     </div>
@@ -268,7 +268,7 @@ const LandingPage: React.FC = () => {
                       type="button"
                       onClick={() => setActiveSlide(prev => (prev + 1) % heroSlides.length)}
                       className="h-10 w-10 rounded-full border border-white/40 text-white flex items-center justify-center hover:bg-white/10 transition-colors"
-                      aria-label={t('Next slide', 'الشريحة اللي بعدها')}
+                      aria-label={t('Next slide', 'الشريحة التالية')}
                     >
                       <ChevronRight size={18} />
                     </button>
@@ -283,7 +283,7 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-center">
               <div>
-                <p className="section-eyebrow">{t('Market snapshot', 'لقطة من السوق')}</p>
+                <p className="section-eyebrow">{t('Market snapshot', 'لمحة من السوق')}</p>
                 <h2 className="section-title">{t('Marketplace signals', 'مؤشرات السوق')}</h2>
                 <p className="section-subtitle max-w-xl">
                   {t(
@@ -296,31 +296,31 @@ const LandingPage: React.FC = () => {
                     to="/browse"
                     className="market-cta-primary inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold transition-colors"
                   >
-                    {t('Explore inventory', 'استكشف العربيات')}
+                    {t('Explore inventory', 'استكشف السيارات')}
                     <ArrowRight size={16} />
                   </Link>
                   <Link
                     to="/sell"
                     className="market-cta-secondary inline-flex items-center gap-2 px-5 py-2 rounded-full border text-sm font-semibold transition-colors"
                   >
-                    {t('List your car', 'اعرض عربيتك')}
+                    {t('List your car', 'اعرض سيارتك')}
                   </Link>
                 </div>
               </div>
               <div className="value-card rounded-3xl p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{t('Updated weekly', 'بيتحدّث أسبوعيًا')}</p>
-                    <p className="text-lg font-semibold">{t('Market snapshot', 'لقطة من السوق')}</p>
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{t('Updated weekly', 'يتم التحديث اسبوعيا')}</p>
+                    <p className="text-lg font-semibold">{t('Market snapshot', 'لمحة من السوق')}</p>
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {stats ? (
                     <>
-                      <StatCard label={t('Active listings', 'قوائم شغالة')} value={formatNumber(stats.activeListings)} />
+                      <StatCard label={t('Active listings', 'قوائم نشطة')} value={formatNumber(stats.activeListings)} />
                       <StatCard label={t('AVERAGE time to sell', 'متوسط وقت البيع')} value={stats.avgTimeToSell} />
-                      <StatCard label={t('Escrow protected', 'مدفوعات مؤمنة')} value={stats.escrowProtected} />
-                      <StatCard label={t('Qualified buyers', 'مشتريين مؤهلين')} value={formatNumber(86)} />
+                      <StatCard label={t('Escrow protected', 'حماية الاسكرو')} value={stats.escrowProtected} />
+                      <StatCard label={t('Qualified buyers', 'مشترون مؤهلون')} value={formatNumber(86)} />
                     </>
                   ) : (
                     Array.from({ length: 4 }).map((_, index) => (
@@ -343,17 +343,17 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
               <div className="text-center mx-auto">
-                <p className="section-eyebrow">{t('Trending now', 'ترند الأسبوع')}</p>
-                <h2 className="section-title">{t('Vehicles trending this week', 'عربيات عليها اهتمام الأسبوع ده')}</h2>
+                <p className="section-eyebrow">{t('Trending now', 'الاكثر تداولا')}</p>
+                <h2 className="section-title">{t('Vehicles trending this week', 'السيارات الاكثر تداولا هذا الاسبوع')}</h2>
                 <p className="section-subtitle max-w-2xl mx-auto">
                   {t(
                     'High-interest listings with verified condition reports and active bids.',
-                    'قوائم عليها طلب عالي بتقارير حالة موثّقة ومزايدات شغالة.'
+                    'قوائم عليها طلب عالي بتقارير حالة موثقة ومزايدات شغالة.'
                   )}
                 </p>
               </div>
               <Link to="/browse" className="market-link text-sm font-semibold inline-flex items-center gap-2">
-                {t('Browse all listings', 'شوف كل القوائم')}
+                {t('Browse all listings', 'تصفح جميع القوائم')}
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -373,19 +373,19 @@ const LandingPage: React.FC = () => {
               </div>
             ) : error ? (
               <div className="bg-white border border-rose-200 rounded-2xl p-6 text-slate-700">
-                <p className="text-sm text-rose-600 font-semibold mb-2">{t('Unable to load featured vehicles', 'مش قادرين نحمّل العربيات المميزة')}</p>
+                <p className="text-sm text-rose-600 font-semibold mb-2">{t('Unable to load featured vehicles', 'تعذر تحميل السيارات المميزة')}</p>
                 <p className="text-sm text-slate-600 mb-4">{error}</p>
                 <button
                   onClick={loadLandingData}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition-colors"
                 >
-                  {t('Try again', 'جرّب تاني')}
+                  {t('Try again', 'حاول مرة اخرى')}
                 </button>
               </div>
             ) : vehicles.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-6 text-slate-600">
-                <p className="text-sm font-semibold mb-2">{t('No vehicles to show yet', 'لسه مفيش عربيات للعرض')}</p>
-                <p className="text-sm">{t('Check back soon or explore the full inventory.', 'ارجع لنا قريب أو استكشف كل العربيات.')}</p>
+                <p className="text-sm font-semibold mb-2">{t('No vehicles to show yet', 'لا توجد سيارات للعرض بعد')}</p>
+                <p className="text-sm">{t('Check back soon or explore the full inventory.', 'عد لاحقا او استكشف جميع القوائم.')}</p>
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-3">
@@ -408,8 +408,8 @@ const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
               <div className="text-center mx-auto">
-                <p className="section-eyebrow">{t('Why AUTOUSATA', 'ليه AUTOUSATA')}</p>
-                <h2 className="section-title">{t('A premium experience, end to end', 'تجربة فخمة من البداية للنهاية')}</h2>
+                <p className="section-eyebrow">{t('Why AUTOUSATA', 'لماذا AUTOUSATA')}</p>
+                <h2 className="section-title">{t('A premium experience, end to end', 'تجربة فاخرة من البداية للنهاية')}</h2>
                 <p className="section-subtitle max-w-2xl mx-auto">
                   {t(
                     'We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.',
@@ -424,12 +424,12 @@ const LandingPage: React.FC = () => {
                 title={t('Protected transactions', 'معاملات مؤمنة')}
                 description={t(
                   'Escrow protection and verified seller profiles keep every purchase secure.',
-                  'حماية إسكرو وباعة موثّقين بيخلّوا كل عملية آمنة.'
+                  'حماية إسكرو وباعة موثقين بيخلوا كل عملية آمنة.'
                 )}
               />
               <ValueCard
                 icon={<Sparkles size={22} />}
-                title={t('Curated inventory', 'مخزون متراجع بعناية')}
+                title={t('Curated inventory', 'مخزون منسق بعناية')}
                 description={t(
                   'Each listing is reviewed for authenticity, condition, and total cost of ownership.',
                   'كل قائمة بتتراجع من ناحية الأصالة والحالة وتكلفة الملكية.'
@@ -437,7 +437,7 @@ const LandingPage: React.FC = () => {
               />
               <ValueCard
                 icon={<Trophy size={22} />}
-                title={t('Concierge guidance', 'إرشاد متخصص')}
+                title={t('Concierge guidance', 'ارشاد متخصص')}
                 description={t(
                   'Dedicated specialists help you bid, finance, and close with confidence.',
                   'متخصصين بيساعدوك في المزايدة والتمويل والإغلاق بثقة.'
@@ -450,8 +450,8 @@ const LandingPage: React.FC = () => {
         <section className="section-texture section-divider border-y border-slate-200/70">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div className="text-center mx-auto">
-              <p className="section-eyebrow">{t('How it works', 'إزاي الشغل ماشي')}</p>
-              <h2 className="section-title">{t('A simple path from browse to delivery', 'طريق بسيط من التصفح للتسليم')}</h2>
+              <p className="section-eyebrow">{t('How it works', 'الية العمل')}</p>
+              <h2 className="section-title">{t('A simple path from browse to delivery', 'مسار واضح من التصفح الى التسليم')}</h2>
               <p className="section-subtitle max-w-2xl mx-auto">
                 {t(
                   'Follow a clear, guided process whether you are buying or selling your next vehicle.',
@@ -462,15 +462,15 @@ const LandingPage: React.FC = () => {
             <div className="mt-10 grid gap-6 md:grid-cols-3">
               <ValueCard
                 icon={<Search size={22} />}
-                title={t('Browse and shortlist', 'تصفح واختار')}
+                title={t('Browse and shortlist', 'تصفح واختر')}
                 description={t(
                   'Filter verified listings and compare condition reports in one place.',
-                  'فلتر القوائم الموثّقة وقارن تقارير الحالة في مكان واحد.'
+                  'فلتر القوائم الموثقة وقارن تقارير الحالة في مكان واحد.'
                 )}
               />
               <ValueCard
                 icon={<Gavel size={22} />}
-                title={t('Bid or list confidently', 'زايد أو اعرض بثقة')}
+                title={t('Bid or list confidently', 'قدم مزايدة او اعرض بثقة')}
                 description={t(
                   'Transparent bidding and instant status updates keep you in control.',
                   'مزايدات واضحة وتحديثات فورية بتخليك متحكم.'
@@ -478,10 +478,10 @@ const LandingPage: React.FC = () => {
               />
               <ValueCard
                 icon={<Truck size={22} />}
-                title={t('Close and deliver', 'أقفل وسلّم')}
+                title={t('Close and deliver', 'انهاء وتسليم')}
                 description={t(
                   'Secure payments and guided handover ensure a smooth finish.',
-                  'مدفوعات آمنة وتسليم منظم بيخلّوا النهاية سهلة.'
+                  'مدفوعات آمنة وتسليم منظم بيخلوا النهاية سهلة.'
                 )}
               />
             </div>
@@ -490,7 +490,7 @@ const LandingPage: React.FC = () => {
                 to="/how-it-works"
                 className="market-cta-primary inline-flex items-center gap-2 px-6 py-2 rounded-full text-sm font-semibold transition-colors"
               >
-                {t('Explore the full guide', 'شوف الدليل كامل')}
+                {t('Explore the full guide', 'استعرض الدليل الكامل')}
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -529,7 +529,7 @@ const VehicleCard: React.FC<{ vehicle: Vehicle; listingId: string }> = ({ vehicl
     <Link
       to={`/listing/${listingId}`}
       className="group block bg-white/95 border border-slate-200/80 rounded-3xl overflow-hidden premium-card-hover backdrop-blur-sm shadow-[0_18px_45px_rgba(15,23,42,0.12)] hover:shadow-[0_30px_70px_rgba(15,23,42,0.18)] focus-visible:ring-2 focus-visible:ring-slate-900/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-      aria-label={t(`View listing for ${vehicle.year} ${vehicle.make} ${vehicle.model}`, `شوف قائمة ${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
+      aria-label={t(`View listing for ${vehicle.year} ${vehicle.make} ${vehicle.model}`, `عرض القائمة لسيارة ${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
     >
       <div className="relative">
         <img
