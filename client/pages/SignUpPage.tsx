@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Camera } from 'lucide-react'; 
+import { Eye, EyeOff, Camera } from 'lucide-react'; // <--- Added Camera Icon
+import { useLanguage } from '../contexts/LanguageContext';
+import bentGif from '../../assests/carsPictures/bentG.gif';
 
 const SignUpPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -23,6 +25,7 @@ const SignUpPage: React.FC = () => {
   
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -37,17 +40,17 @@ const SignUpPage: React.FC = () => {
     setError('');
 
     if (!agreedToTerms) {
-      setError('Please agree to the Terms & Privacy Policy');
+      setError(t('Please agree to the Terms & Privacy Policy', 'من فضلك وافق على الشروط وسياسة الخصوصية'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('Passwords do not match', 'كلمات السر مش متطابقة'));
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t('Password must be at least 8 characters', 'كلمة السر لازم تكون 8 حروف على الأقل'));
       return;
     }
 
@@ -75,18 +78,28 @@ const SignUpPage: React.FC = () => {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
+    if (result.success) {
+      navigate('/browse');
+    } else {
+      setError(result.error || t('Registration failed', 'فشل إنشاء الحساب'));
     }
   };
 
   return (
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
-      <div className="fixed inset-0 bg-cover auth-bg-signup" aria-hidden="true" />
-      <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-cover"
+        style={{ backgroundImage: `url(${bentGif})`, backgroundPosition: '82% center', filter: 'none' }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 bg-transparent" aria-hidden="true" />
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-5 md:p-7 w-full max-w-lg my-auto max-h-[calc(100vh-140px)] overflow-y-auto">
-          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">Become a AUTOUSATA Member!</h1>
-          <p className="text-sm text-slate-600 mb-4">Get access to verified listings, transparent bids, and concierge support!</p>
+          <h1 className="text-3xl font-semibold text-slate-900 mt-4 mb-2">{t('Become a AUTOUSATA Member!', 'انضم لـ AUTOUSATA دلوقتي!')}</h1>
+          <p className="text-sm text-slate-600 mb-4">
+            {t('Get access to verified listings, transparent bids, and concierge support!', 'احصل على قوائم موثقة، مزايدات واضحة، ودعم مخصص.')}
+          </p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -116,18 +129,18 @@ const SignUpPage: React.FC = () => {
                         />
                     </label>
                 </div>
-                <p className="text-xs text-slate-500 mt-2">Upload profile photo</p>
+                <p className="text-xs text-slate-500 mt-2">{t('Upload profile photo', 'ارفع صورة البروفايل')}</p>
             </div>
             {/* ====================================== */}
 
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-2">First name</label>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-2">{t('First name', 'الاسم الأول')}</label>
                   <input
                     id="firstName"
                     type="text"
-                    placeholder="Enter your first name"
+                    placeholder={t('Enter your first name', 'اكتب اسمك الأول')}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
@@ -135,11 +148,11 @@ const SignUpPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-2">Last name</label>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-2">{t('Last name', 'اسم العيلة')}</label>
                   <input
                     id="lastName"
                     type="text"
-                    placeholder="Enter your last name"
+                    placeholder={t('Enter your last name', 'اكتب اسم العيلة')}
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
@@ -148,11 +161,11 @@ const SignUpPage: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">Email address</label>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">{t('Email address', 'البريد الإلكتروني')}</label>
                 <input
                   id="email"
                   type="email"
-                  placeholder="you@email.com"
+                  placeholder={t('you@email.com', 'you@email.com')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -161,24 +174,24 @@ const SignUpPage: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                  Phone number <span className="text-slate-400 font-normal">(optional)</span>
+                  {t('Phone number', 'رقم الموبايل')} <span className="text-slate-400 font-normal">{t('(optional)', '(اختياري)')}</span>
                 </label>
                 <input
                   id="phone"
                   type="tel"
-                  placeholder="Enter your phone number"
+                  placeholder={t('Enter your phone number', 'اكتب رقم الموبايل')}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all"
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">{t('Password', 'كلمة السر')}</label>
                 <div className="relative">
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Min. 8 characters"
+                    placeholder={t('Min. 8 characters', 'أقل حاجة ٨ حروف')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -189,19 +202,19 @@ const SignUpPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowPassword(prev => !prev)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors no-hover-rise"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('Hide password', 'اخفي كلمة السر') : t('Show password', 'اظهر كلمة السر')}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">Confirm password</label>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">{t('Confirm password', 'تأكيد كلمة السر')}</label>
                 <div className="relative">
                   <input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
+                    placeholder={t('Confirm your password', 'أكد كلمة السر')}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -211,7 +224,7 @@ const SignUpPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(prev => !prev)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors no-hover-rise"
-                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    aria-label={showConfirmPassword ? t('Hide confirm password', 'اخفي تأكيد كلمة السر') : t('Show confirm password', 'اظهر تأكيد كلمة السر')}
                   >
                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -228,7 +241,7 @@ const SignUpPage: React.FC = () => {
                 className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
               />
               <label htmlFor="terms" className="text-slate-600 cursor-pointer">
-                I agree to the <Link to="/terms" className="text-slate-900 font-medium hover:underline">Terms & Privacy Policy</Link>
+                {t('I agree to the', 'أنا موافق على')} <Link to="/terms" className="text-slate-900 font-medium hover:underline">{t('Terms & Privacy Policy', 'الشروط وسياسة الخصوصية')}</Link>
               </label>
             </div>
 
@@ -237,13 +250,13 @@ const SignUpPage: React.FC = () => {
               disabled={loading}
               className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-lg shadow-slate-900/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? t('Creating account...', 'جاري إنشاء الحساب...') : t('Create account', 'اعمل حساب')}
             </button>
 
             <p className="text-center text-sm text-slate-600">
-              Already have an account?{' '}
+              {t('Already have an account?', 'عندك حساب بالفعل؟')}{' '}
               <Link to="/login" className="font-semibold text-slate-900 hover:underline">
-                Log in
+                {t('Log in', 'سجل دخول')}
               </Link>
             </p>
           </form>
@@ -252,5 +265,6 @@ const SignUpPage: React.FC = () => {
     </section>
   );
 };
+}
 
 export default SignUpPage;

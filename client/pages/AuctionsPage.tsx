@@ -4,6 +4,7 @@ import { Clock, MapPin, Tag, Trophy, ArrowRight, SlidersHorizontal, ChevronLeft,
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
 import { Auction } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 type SortOption = 'endingSoon' | 'highestBid' | 'mostBids';
 
@@ -17,6 +18,7 @@ const AuctionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const { t, formatNumber, formatCurrencyEGP } = useLanguage();
 
   useEffect(() => {
     const fetchAuctions = async () => {
@@ -45,7 +47,7 @@ const AuctionsPage: React.FC = () => {
           setTotalPages(response.data.pagination.pages);
         }
       } catch (err) {
-        setError('Failed to load auctions');
+        setError(t('Failed to load auctions', 'فشل تحميل المزادات'));
       } finally {
         setLoading(false);
       }
@@ -62,7 +64,7 @@ const AuctionsPage: React.FC = () => {
   const formatTimeRemaining = (endTime: string, nowTime: number) => {
     const end = new Date(endTime).getTime();
     const diff = end - nowTime;
-    if (diff <= 0) return 'Ended';
+    if (diff <= 0) return t('Ended', 'انتهى');
     const totalSeconds = Math.max(0, Math.floor(diff / 1000));
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
@@ -92,24 +94,26 @@ const AuctionsPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="max-w-2xl mx-auto text-center hero-fade-in">
             <h1 className="text-4xl md:text-5xl font-semibold mt-2 tracking-tight">
-              Auction room
+              {t('Auction room', 'غرفة المزاد')}
             </h1>
             <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl mx-auto">
-              Watch bids in real time and follow the most in-demand cars on the platform. Sort by ending soon,
-              highest bid, or most competitive auctions.
+              {t(
+                'Watch bids in real time and follow the most in-demand cars on the platform. Sort by ending soon, highest bid, or most competitive auctions.',
+                'تابع المزايدات لحظة بلحظة وشوف العربيات الأكثر طلبا. رتب حسب الأقرب انتهاء أو أعلى مزايدة أو أكتر مزايدات.'
+              )}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs md:text-sm text-slate-200/90">
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
                 <Tag size={16} className="text-amber-300" />
-                Reserve prices disclosed
+                {t('Reserve prices disclosed', 'سعر الحد الأدنى معلن')}
               </div>
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
                 <Clock size={16} className="text-indigo-300" />
-                Live closing timers
+                {t('Live closing timers', 'عدادات نهاية مباشرة')}
               </div>
               <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
                 <Trophy size={16} className="text-emerald-300" />
-                Verified sellers only
+                {t('Verified sellers only', 'باعة موثقين فقط')}
               </div>
             </div>
           </div>
@@ -120,13 +124,13 @@ const AuctionsPage: React.FC = () => {
         <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <SlidersHorizontal size={18} className="text-slate-400" />
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Sort auctions by</span>
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('Sort auctions by', 'رتب المزادات حسب')}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { id: 'endingSoon', label: 'Ending soon' },
-              { id: 'highestBid', label: 'Highest bid' },
-              { id: 'mostBids', label: 'Most bids' }
+              { id: 'endingSoon', label: t('Ending soon', 'بينتهي قريب') },
+              { id: 'highestBid', label: t('Highest bid', 'أعلى مزايدة') },
+              { id: 'mostBids', label: t('Most bids', 'أكتر مزايدات') }
             ].map(option => (
               <button
                 key={option.id}
@@ -152,7 +156,7 @@ const AuctionsPage: React.FC = () => {
         ) : error ? (
            <div className="text-center text-red-500 py-10">{error}</div>
         ) : auctions.length === 0 ? (
-           <div className="text-center text-slate-500 py-10">No active auctions found.</div>
+           <div className="text-center text-slate-500 py-10">{t('No active auctions found.', 'مفيش مزادات شغالة دلوقتي.')}</div>
         ) : (
           <>
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -171,13 +175,13 @@ const AuctionsPage: React.FC = () => {
                         />
                     ) : (
                         <div className="h-48 w-full bg-slate-200 flex items-center justify-center text-slate-400">
-                            No Image
+                            {t('No Image', 'مفيش صورة')}
                         </div>
                     )}
                     
                     <div className="absolute top-4 left-4 flex gap-2">
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
-                        Live
+                        {t('Live', 'لايف')}
                       </span>
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/70 text-white">
                         {auction.vehicle.condition}
@@ -196,8 +200,8 @@ const AuctionsPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider">Current bid</p>
-                        <p className="text-lg font-bold text-indigo-600">EGP {auction.currentBid.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Current bid', 'أعلى مزايدة')}</p>
+                        <p className="text-lg font-bold text-indigo-600">{formatCurrencyEGP(auction.currentBid)}</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
@@ -205,14 +209,14 @@ const AuctionsPage: React.FC = () => {
                         <Clock size={14} />
                         {formatTimeRemaining(auction.endTime, now)}
                       </div>
-                      <span>{auction.bidCount} bids</span>
+                      <span>{formatNumber(auction.bidCount)} {t('bids', 'مزايدات')}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                       <Link
                         to={`/listing/${auction.id}`}
                         className="flex-1 text-center px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-2"
                       >
-                        Enter auction
+                        {t('Enter auction', 'ادخل المزاد')}
                         <ArrowRight size={16} />
                       </Link>
                     </div>
@@ -232,7 +236,7 @@ const AuctionsPage: React.FC = () => {
                         <ChevronLeft size={20} />
                     </button>
                     <span className="flex items-center px-4 text-sm font-medium text-slate-700">
-                        Page {page} of {totalPages}
+                        {t('Page', 'صفحة')} {page} {t('of', 'من')} {totalPages}
                     </span>
                     <button
                         onClick={() => handlePageChange(page + 1)}

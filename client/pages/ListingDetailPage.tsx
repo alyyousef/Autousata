@@ -12,10 +12,12 @@ import {
   Eye,
   Award,
   Zap,
+  X,
 } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 
@@ -23,6 +25,30 @@ const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
+
+const ARABIC_LISTING_COPY: Record<
+  string,
+  { description: string; longDescription: string; location: string }
+> = {
+  'auc-1': {
+    description: 'بورشه 911 لون طباشيري بداخلية نبيتي باقة سبورت كرونو',
+    longDescription:
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين',
+    location: 'القاهرة مصر'
+  },
+  'auc-2': {
+    description: 'تسلا موديل اس بلايد دفع رباعي شامل القيادة الذاتية حالة شبه جديدة',
+    longDescription:
+      'موديل بلايد ببطاريات قوية وتسارع عالي مقصورة نظيفة وتجهيزات حديثة مع حالة شبه جديدة',
+    location: 'الجيزة مصر'
+  },
+  'auc-3': {
+    description: 'فورد برونكو اصدار خاص باقة سكواتش اربعة ابواب لون ازرق كهربائي',
+    longDescription:
+      'اصدار محدود مع تجهيزات للطرق الوعرة وتجربة قيادة قوية مع عناية ممتازة بالمقصورة والهيكل',
+    location: 'الاسكندرية مصر'
+  }
+};
 
 const readDelistedIds = () => {
   if (typeof window === 'undefined') return new Set<string>();
@@ -101,21 +127,6 @@ const readPaymentStatus = (auctionId: string) => {
   }
 };
 
-const formatTimeRemaining = (endTime: string, now: number) => {
-  const end = new Date(endTime).getTime();
-  const diff = end - now;
-  if (diff <= 0) return 'Ended';
-  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-};
-
 const generateTimeStyles = (endTime: string, now: number) => {
   const end = new Date(endTime).getTime();
   const diff = end - now;
@@ -149,6 +160,7 @@ const ListingDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { addNotification } = useNotifications();
+  const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => readDelistedIds());
   const [now, setNow] = useState(() => Date.now());
   const [isBidOpen, setIsBidOpen] = useState(false);
@@ -163,8 +175,42 @@ const ListingDetailPage: React.FC = () => {
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [currentBid, setCurrentBid] = useState<number | null>(null);
   const [currentBidCount, setCurrentBidCount] = useState<number | null>(null);
+  const confettiPieces = useMemo(() => {
+    if (bidSuccess === null) return [];
+    const colors = ['#22c55e', '#38bdf8', '#f59e0b', '#ef4444', '#a78bfa', '#f97316', '#eab308'];
+    return Array.from({ length: 360 }).map((_, idx) => {
+      const width = 6 + Math.random() * 8;
+      const height = 10 + Math.random() * 12;
+      const drift = (Math.random() > 0.5 ? 1 : -1) * (90 + Math.random() * 260);
+      const drop = 320 + Math.random() * 420;
+      return {
+        id: idx,
+        left: `${Math.random() * 100}%`,
+        top: `${-15 + Math.random() * 40}%`,
+        delay: `${Math.random() * 950}ms`,
+        duration: `${1400 + Math.random() * 1400}ms`,
+        drift: `${drift}px`,
+        drop: `${drop}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        radius: Math.random() > 0.5 ? '999px' : '2px',
+      };
+    });
+  }, [bidSuccess]);
 
   const listing = useMemo(() => MOCK_AUCTIONS.find((auction) => auction.id === id), [id]);
+  const arabicCopy = listing ? ARABIC_LISTING_COPY[listing.id] : undefined;
+
+  const conditionLabel = (condition: string) => {
+    const key = condition.toLowerCase();
+    if (key === 'mint') return t('Mint', 'ممتازة جدا');
+    if (key === 'excellent') return t('Excellent', 'ممتازة');
+    if (key === 'good') return t('Good', 'جيدة');
+    if (key === 'fair') return t('Fair', 'مقبولة');
+    if (key === 'poor') return t('Poor', 'ضعيفة');
+    return condition;
+  };
 
   const canManageListings =
     user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
@@ -188,7 +234,10 @@ const ListingDetailPage: React.FC = () => {
     if (readPaymentStatus(listing.id) === 'paid') return;
     if (readPaymentNotice(listing.id)) return;
     addNotification(
-      `Auction ended. Please complete payment for ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}.`,
+      t(
+        `Auction ended. Please complete payment for ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}.`,
+        `انتهى المزاد يرجى اكمال الدفع لسيارة ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`
+      ),
       'warn'
     );
     writePaymentNotice(listing.id);
@@ -201,14 +250,16 @@ const ListingDetailPage: React.FC = () => {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
             <Zap className="w-10 h-10 text-slate-400" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">Listing Not Found</h1>
-          <p className="text-slate-600 mb-8 leading-relaxed">This vehicle may have been sold or is no longer available.</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">{t('Listing Not Found', 'الاعلان غير موجود')}</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            {t('This vehicle may have been sold or is no longer available.', 'قد تكون السيارة بيعت او لم تعد متاحة')}
+          </p>
           <Link
             to="/browse"
             className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40"
           >
             <ChevronLeft size={18} />
-            Discover More Listings
+            {t('Discover More Listings', 'اكتشف اعلانات اخرى')}
           </Link>
         </div>
       </div>
@@ -221,9 +272,46 @@ const ListingDetailPage: React.FC = () => {
   const effectiveBidCount = currentBidCount ?? listing.bidCount;
   const isEnded = new Date(listing.endTime).getTime() <= now;
   const paymentStatus = readPaymentStatus(listing.id);
+  const descriptionText = t(
+    listing.vehicle.description,
+    arabicCopy?.description ?? listing.vehicle.description
+  );
+  const longDescriptionText = t(
+    listing.vehicle.longDescription ||
+      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
+    arabicCopy?.longDescription ||
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
+  );
+  const locationText = t(listing.vehicle.location, arabicCopy?.location ?? listing.vehicle.location);
+  const formatTimeRemaining = (endTime: string) => {
+    const end = new Date(endTime).getTime();
+    const diff = end - now;
+    if (diff <= 0) return t('Ended', 'انتهى');
+    const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) {
+      return isArabic
+        ? `${formatNumber(days)} يوم ${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة`
+        : `${days}d ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return isArabic
+        ? `${formatNumber(hours)} ساعة ${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+        : `${hours}h ${minutes}m ${seconds}s`;
+    }
+    return isArabic
+      ? `${formatNumber(minutes)} دقيقة ${formatNumber(seconds)} ثانية`
+      : `${minutes}m ${seconds}s`;
+  };
 
   const handleDelist = () => {
-    const confirmed = window.confirm('Delist this vehicle from active listings?');
+    const confirmed = window.confirm(
+      t('Delist this vehicle from active listings?', 'هل تريد ازالة هذه السيارة من الاعلانات النشطة')
+    );
     if (!confirmed) return;
     setDelistedIds((prev) => {
       const next = new Set<string>(prev);
@@ -246,20 +334,25 @@ const ListingDetailPage: React.FC = () => {
     event.preventDefault();
     const amount = Number(bidAmount);
     if (new Date(listing.endTime).getTime() <= Date.now()) {
-      setBidError('Bidding has ended for this auction.');
+      setBidError(t('Bidding has ended for this auction.', 'انتهت المزايدة لهذا المزاد'));
       return;
     }
     const maxAllowed = effectiveBid * 3;
     if (!amount || Number.isNaN(amount)) {
-      setBidError('Enter a valid bid amount.');
+      setBidError(t('Enter a valid bid amount.', 'ادخل قيمة مزايدة صحيحة'));
       return;
     }
     if (amount <= effectiveBid) {
-      setBidError(`Bid must be higher than EGP ${effectiveBid.toLocaleString()}.`);
+      setBidError(t(`Bid must be higher than EGP ${formatNumber(effectiveBid)}.`, `يجب ان تكون المزايدة اعلى من ${formatCurrencyEGP(effectiveBid)}`));
       return;
     }
     if (amount > maxAllowed) {
-      setBidError(`Max bid is EGP ${maxAllowed.toLocaleString()} (3x current bid).`);
+      setBidError(
+        t(
+          `Max bid is EGP ${formatNumber(maxAllowed)} (3x current bid).`,
+          `الحد الاقصى ${formatCurrencyEGP(maxAllowed)} ثلاثة اضعاف السعر الحالي`
+        )
+      );
       return;
     }
     setBidError('');
@@ -280,11 +373,14 @@ const ListingDetailPage: React.FC = () => {
     });
     setBidSuccess(pendingBidAmount);
     addNotification(
-      `Your bidding on the ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} is completed at EGP ${pendingBidAmount.toLocaleString()}.`,
+      t(
+        `Your bidding on the ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} is completed at EGP ${formatNumber(pendingBidAmount)}.`,
+        `تم تسجيل مزايدتك على ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} بقيمة ${formatCurrencyEGP(pendingBidAmount)}`
+      ),
       'success'
     );
     setPendingBidAmount(null);
-    window.setTimeout(() => setBidSuccess(null), 3000);
+    window.setTimeout(() => setBidSuccess(null), 4200);
   };
 
   const handleCancelConfirm = () => {
@@ -299,23 +395,23 @@ const ListingDetailPage: React.FC = () => {
   return (
     <>
       {/* Background Gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 -z-10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 -z-10 listing-detail-bg" />
 
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen pb-24 listing-detail-page">
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60">
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 listing-detail-topbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <Link to="/browse" className="group flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 <div className="p-1.5 rounded-xl bg-white border border-slate-200 group-hover:border-slate-300 group-hover:shadow-sm transition-all">
                   <ChevronLeft size={16} />
                 </div>
-                <span className="font-medium">Back to Browse</span>
+                <span className="font-medium">{t('Back to Browse', 'العودة للتصفح')}</span>
               </Link>
               <div className="flex items-center gap-3">
                 <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
                   <Eye size={12} />
-                  {Math.floor(Math.random() * 100) + 50} watching
+                  {formatNumber(Math.floor(Math.random() * 100) + 50)} {t('watching', 'مشاهد')}
                 </span>
               </div>
             </div>
@@ -328,7 +424,7 @@ const ListingDetailPage: React.FC = () => {
             {/* Left Column - Images */}
             <div className="lg:col-span-2 space-y-6">
               {/* Main Image */}
-              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group">
+              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group listing-detail-main-card">
                 <img
                   src={listing.vehicle.images[0]}
                   alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
@@ -343,10 +439,10 @@ const ListingDetailPage: React.FC = () => {
                         : 'bg-emerald-600 text-white border border-emerald-500/60'
                     }`}
                   >
-                    {isDelisted ? 'Delisted' : 'Live Auction'}
+                    {isDelisted ? t('Delisted', 'تم ازالة الاعلان') : t('Live Auction', 'مزاد مباشر')}
                   </span>
                   <span className="px-4 py-2.5 rounded-full text-xs font-black uppercase tracking-wider shadow-lg bg-blue-600 text-white border border-blue-500/60">
-                    {listing.vehicle.condition}
+                    {conditionLabel(listing.vehicle.condition)}
                   </span>
                 </div>
                 <div className="absolute bottom-5 right-5">
@@ -354,7 +450,7 @@ const ListingDetailPage: React.FC = () => {
                     onClick={() => setLightboxIndex(0)}
                     className="px-4 py-2.5 rounded-xl backdrop-blur-md bg-white/95 border border-white/70 text-slate-800 text-sm font-semibold hover:bg-white transition-all duration-300 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:shadow-slate-300/50"
                   >
-                    View All Photos
+                    {t('View All Photos', 'عرض كل الصور')}
                   </button>
                 </div>
               </div>
@@ -390,46 +486,48 @@ const ListingDetailPage: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-2 text-slate-600 text-sm">
                     <MapPin size={14} />
-                    {listing.vehicle.location}
+                    {locationText}
                   </div>
                 </div>
 
                 <h1 className="text-3xl font-bold text-slate-900 leading-tight">
                   {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
                 </h1>
-                <p className="text-slate-600 leading-relaxed">{listing.vehicle.description}</p>
+                <p className="text-slate-600 leading-relaxed">{descriptionText}</p>
               </div>
 
               {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm">
+                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
                   <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                     <TrendingUp size={14} />
-                    <span>Current Bid</span>
+                    <span>{t('Current Bid', 'السعر الحالي')}</span>
                   </div>
                   <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">
-                    EGP {effectiveBid.toLocaleString()}
+                    {formatCurrencyEGP(effectiveBid)}
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">{effectiveBidCount} bids placed</div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {formatNumber(effectiveBidCount)} {t('bids placed', 'مزايدات')}
+                  </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm">
-                  <div className="text-slate-500 text-sm mb-1">Mileage</div>
+                <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
+                  <div className="text-slate-500 text-sm mb-1">{t('Mileage', 'المسافة')}</div>
                   <div className="text-2xl font-bold text-slate-900">
-                    {listing.vehicle.mileage.toLocaleString()}
-                    <span className="text-sm font-normal text-slate-500 ml-1">mi</span>
+                    {formatNumber(listing.vehicle.mileage)}
+                    <span className="text-sm font-normal text-slate-500 ml-1">{t('mi', 'ميل')}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">Low mileage</div>
+                  <div className="text-xs text-slate-500 mt-2">{t('Low mileage', 'مسافة قليلة')}</div>
                 </div>
               </div>
 
               {/* Unified Time + Verification + Bid (with subtle glow, no blur spam) */}
-              <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden">
+              <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm overflow-hidden listing-detail-bid-card">
                 {/* Time */}
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-2 text-slate-700">
                     <Clock size={16} className={timeStyles.iconText} />
-                    <span className="text-sm font-medium">Time Remaining</span>
+                    <span className="text-sm font-medium">{t('Time Remaining', 'الوقت المتبقي')}</span>
                   </div>
                   <span
                     className={[
@@ -437,7 +535,7 @@ const ListingDetailPage: React.FC = () => {
                       timeStyles.badgeBg,
                     ].join(' ')}
                   >
-                    {formatTimeRemaining(listing.endTime, now)}
+                    {formatTimeRemaining(listing.endTime)}
                   </span>
                 </div>
 
@@ -447,11 +545,11 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-emerald-600" />
-                    <span className="text-sm font-medium text-slate-700">Verified Listing</span>
+                    <span className="text-sm font-medium text-slate-700">{t('Verified Listing', 'اعلان موثق')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Award size={14} className="text-amber-600" />
-                    <span className="text-xs text-slate-600">Premium Seller</span>
+                    <span className="text-xs text-slate-600">{t('Premium Seller', 'بائع مميز')}</span>
                   </div>
                 </div>
 
@@ -460,19 +558,21 @@ const ListingDetailPage: React.FC = () => {
                   {isEnded ? (
                     <div className="space-y-3">
                       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                        Auction ended. Please complete payment to secure the vehicle.
+                        {t('Auction ended. Please complete payment to secure the vehicle.', 'انتهى المزاد يرجى اكمال الدفع لتاكيد السيارة')}
                       </div>
                       {paymentStatus === 'paid' ? (
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                          Payment confirmed. Our concierge will contact you for pickup.
+                          {t('Payment confirmed. Our concierge will contact you for pickup.', 'تم تاكيد الدفع وسيتم التواصل معك لاستلام السيارة')}
                         </div>
                       ) : (
                         <Link
                           to={`/payment/${listing.id}`}
                           className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
                         >
-                          Complete payment
-                          <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()})</span>
+                          {t('Complete payment', 'اكمل الدفع')}
+                          <span className="text-white/85 text-sm font-medium">
+                            {isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)})`}
+                          </span>
                         </Link>
                       )}
                     </div>
@@ -494,12 +594,14 @@ const ListingDetailPage: React.FC = () => {
                         ].join(' ')}
                       >
                         <Gavel size={18} />
-                        Place your bid
-                        <span className="text-white/85 text-sm font-medium">(EGP {effectiveBid.toLocaleString()}+)</span>
+                        {t('Place your bid', 'قدم مزايدتك')}
+                        <span className="text-white/85 text-sm font-medium">
+                          {isArabic ? `${formatCurrencyEGP(effectiveBid)}` : `(EGP ${formatNumber(effectiveBid)}+)`}
+                        </span>
                       </button>
 
                       <p className="text-center text-slate-700 text-sm font-semibold mt-3">
-                        Join {effectiveBidCount} other bidders in this auction
+                        {t('Join', 'انضم')} {formatNumber(effectiveBidCount)} {t('other bidders in this auction', 'مزايد اخر في هذا المزاد')}
                       </p>
                     </>
                   )}
@@ -517,32 +619,31 @@ const ListingDetailPage: React.FC = () => {
                         : 'bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 text-rose-700 hover:from-rose-100 hover:to-pink-100 hover:shadow-md'
                     }`}
                   >
-                    {isDelisted ? '✨ Restore Listing' : 'Delist Listing'}
+                    {isDelisted ? t('Restore Listing', 'استرجاع الاعلان') : t('Delist Listing', 'ازالة الاعلان')}
                   </button>
                   <button className="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 border border-slate-200 text-slate-700 text-sm font-semibold hover:from-slate-100 hover:to-slate-200 hover:shadow-md transition-all">
-                    Save
+                    {t('Save', 'حفظ')}
                   </button>
                 </div>
               )}
 
               {/* Detailed Description */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/70 shadow-sm">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200/70 shadow-sm listing-detail-desc-card">
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Tag size={16} className="text-emerald-500" />
-                    Detailed Description
+                    {t('Detailed Description', 'الوصف التفصيلي')}
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsDescriptionOpen(true)}
                     className="px-4 py-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
                   >
-                    View
+                    {t('View', 'عرض')}
                   </button>
                 </div>
                 <p className="text-sm text-slate-600 leading-relaxed line-clamp-3">
-                  {listing.vehicle.longDescription ||
-                    'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                  {longDescriptionText}
                 </p>
               </div>
             </div>
@@ -563,11 +664,15 @@ const ListingDetailPage: React.FC = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Place Your Bid</h2>
-                    <p className="text-slate-600 mt-2">Enter your offer for this premium vehicle</p>
+                    <h2 className="text-2xl font-bold text-slate-900">{t('Place Your Bid', 'قدم مزايدتك')}</h2>
+                    <p className="text-slate-600 mt-2">{t('Enter your offer for this premium vehicle', 'اكتب قيمة المزايدة للسيارة المميزة')}</p>
                   </div>
-                  <button onClick={() => setIsBidOpen(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                    ✕
+                  <button
+                    onClick={() => setIsBidOpen(false)}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                    aria-label={t('Close', 'اغلاق')}
+                  >
+                    <X size={18} />
                   </button>
                 </div>
 
@@ -575,12 +680,12 @@ const ListingDetailPage: React.FC = () => {
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 rounded-2xl p-6 mb-6 border border-slate-200">
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <div className="text-sm text-slate-500 mb-1">Current Bid</div>
-                      <div className="text-2xl font-bold text-blue-600">EGP {effectiveBid.toLocaleString()}</div>
+                      <div className="text-sm text-slate-500 mb-1">{t('Current Bid', 'السعر الحالي')}</div>
+                      <div className="text-2xl font-bold text-blue-600">{formatCurrencyEGP(effectiveBid)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-slate-500 mb-1">Maximum Bid</div>
-                      <div className="text-lg font-bold text-slate-900">EGP {(effectiveBid * 3).toLocaleString()}</div>
+                      <div className="text-sm text-slate-500 mb-1">{t('Maximum Bid', 'الحد الاقصى')}</div>
+                      <div className="text-lg font-bold text-slate-900">{formatCurrencyEGP(effectiveBid * 3)}</div>
                     </div>
                   </div>
                 </div>
@@ -596,9 +701,11 @@ const ListingDetailPage: React.FC = () => {
 
                 <form onSubmit={handleBidSubmit}>
                   <div className="mb-6">
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">Your Bid Amount (EGP)</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-3">
+                      {t('Your Bid Amount', 'قيمة المزايدة')} {isArabic ? '' : '(EGP)'}
+                    </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">EGP</span>
+                      <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input
                         type="number"
                         value={bidAmount}
@@ -606,7 +713,7 @@ const ListingDetailPage: React.FC = () => {
                         min={effectiveBid + 1}
                         max={effectiveBid * 3}
                         className="w-full pl-12 pr-4 py-4 text-lg font-semibold rounded-2xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
-                        placeholder={`${effectiveBid.toLocaleString()}`}
+                        placeholder={`${formatNumber(effectiveBid)}`}
                         autoFocus
                       />
                     </div>
@@ -625,7 +732,7 @@ const ListingDetailPage: React.FC = () => {
                               : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
                           }`}
                         >
-                          EGP {suggested.toLocaleString()}
+                          {formatCurrencyEGP(suggested)}
                         </button>
                       ))}
                     </div>
@@ -637,13 +744,13 @@ const ListingDetailPage: React.FC = () => {
                       onClick={() => setIsBidOpen(false)}
                       className="flex-1 py-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors shadow-md shadow-rose-500/30"
                     >
-                      Cancel
+                      {t('Cancel', 'الغاء')}
                     </button>
                     <button
                       type="submit"
                       className="flex-1 py-4 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg shadow-emerald-500/30"
                     >
-                      Submit Bid
+                      {t('Submit Bid', 'ارسال المزايدة')}
                     </button>
                   </div>
                 </form>
@@ -661,14 +768,19 @@ const ListingDetailPage: React.FC = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Confirm Your Bid</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{t('Confirm Your Bid', 'تاكيد المزايدة')}</h2>
                     <p className="text-slate-600 mt-2">
-                      Are you sure you want to bid{' '}
-                      <span className="font-semibold text-slate-900">EGP {pendingBidAmount.toLocaleString()}</span>? This action cannot be undone.
+                      {t('Are you sure you want to bid', 'هل تريد تاكيد المزايدة')}{' '}
+                      <span className="font-semibold text-slate-900">{formatCurrencyEGP(pendingBidAmount)}</span>{' '}
+                      {t('This action cannot be undone', 'لا يمكن التراجع عن هذه الخطوة')}
                     </p>
                   </div>
-                  <button onClick={handleCancelConfirm} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                    ✕
+                  <button
+                    onClick={handleCancelConfirm}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                    aria-label={t('Close', 'اغلاق')}
+                  >
+                    <X size={18} />
                   </button>
                 </div>
                 <div className="flex gap-3 mt-6">
@@ -677,14 +789,14 @@ const ListingDetailPage: React.FC = () => {
                     onClick={handleCancelConfirm}
                     className="flex-1 py-3.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors"
                   >
-                    Cancel
+                    {t('Cancel', 'الغاء')}
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirmBid}
                     className="flex-1 py-3.5 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold hover:from-emerald-700 hover:to-green-700 transition-all shadow-lg shadow-emerald-500/30"
                   >
-                    Confirm Bid
+                    {t('Confirm Bid', 'تاكيد المزايدة')}
                   </button>
                 </div>
               </div>
@@ -702,20 +814,19 @@ const ListingDetailPage: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <Tag size={16} className="text-emerald-500" />
-                    Full Description
+                    {t('Full Description', 'الوصف الكامل')}
                   </div>
                   <button
                     onClick={() => setIsDescriptionOpen(false)}
                     className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                    aria-label="Close description"
+                    aria-label={t('Close description', 'اغلاق الوصف')}
                   >
-                    ✕
+                    <X size={16} />
                   </button>
                 </div>
                 <div className="max-h-[60vh] overflow-auto pr-2 text-sm text-slate-600 leading-relaxed space-y-4">
                   <p>
-                    {listing.vehicle.longDescription ||
-                      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.'}
+                    {longDescriptionText}
                   </p>
                 </div>
                 <div className="mt-6 flex justify-end">
@@ -736,16 +847,22 @@ const ListingDetailPage: React.FC = () => {
         {bidSuccess !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4 animate-fade-in">
             <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" />
-            <div className="confetti-layer absolute inset-0 pointer-events-none">
-              {Array.from({ length: 140 }).map((_, idx) => (
+            <div className="confetti-layer fixed inset-0 pointer-events-none overflow-hidden">
+              {confettiPieces.map((piece) => (
                 <span
-                  key={`confetti-${idx}`}
+                  key={`confetti-${piece.id}`}
                   className="confetti-piece confetti-spray"
                   style={{
-                    left: `${(idx * 100) / 140}%`,
-                    animationDelay: `${idx * 10}ms`,
-                    animationDuration: `${1400 + (idx % 6) * 120}ms`,
-                    ['--confetti-drift' as string]: `${(idx % 2 === 0 ? 1 : -1) * (40 + (idx % 8) * 6)}px`,
+                    left: piece.left,
+                    top: piece.top,
+                    width: piece.width,
+                    height: piece.height,
+                    borderRadius: piece.radius,
+                    background: piece.color,
+                    animationDelay: piece.delay,
+                    animationDuration: piece.duration,
+                    ['--confetti-drift' as string]: piece.drift,
+                    ['--confetti-drop' as string]: piece.drop,
                   }}
                 />
               ))}
@@ -756,8 +873,10 @@ const ListingDetailPage: React.FC = () => {
                   <CheckCircle2 size={28} className="text-white" />
                 </div>
                 <div>
-                  <div className="text-lg font-bold">Bid Placed Successfully!</div>
-                  <div className="text-sm opacity-90">EGP {bidSuccess.toLocaleString()} is now live</div>
+                  <div className="text-lg font-bold">{t('Bid Placed Successfully', 'تمت المزايدة بنجاح')}</div>
+                  <div className="text-sm opacity-90">
+                    {t('Your bid is now live', 'تم تفعيل المزايدة')} {formatCurrencyEGP(bidSuccess)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -765,7 +884,7 @@ const ListingDetailPage: React.FC = () => {
         )}
 
         {/* Mobile Sticky Bid Bar */}
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/85 backdrop-blur-xl lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/85 backdrop-blur-xl lg:hidden listing-detail-mobilebar">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <button
               onClick={() => setIsBidOpen(true)}
@@ -783,8 +902,8 @@ const ListingDetailPage: React.FC = () => {
               ].join(' ')}
             >
               <Gavel size={16} />
-              Place bid
-              <span className="text-white/85">(EGP {effectiveBid.toLocaleString()}+)</span>
+              {t('Place bid', 'قدم مزايدة')}
+              <span className="text-white/85">{isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)}+)`}</span>
             </button>
           </div>
         </div>

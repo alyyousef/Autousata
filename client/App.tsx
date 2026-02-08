@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -26,8 +27,15 @@ import VerifyEmailPage from './pages/VerifyEmailPage'; // <--- Import belongs he
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    });
+    return () => window.cancelAnimationFrame(raf);
   }, [pathname]);
 
   return null;
@@ -71,12 +79,29 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const root = document.documentElement;
+    const storedTheme = window.localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      root.classList.add('theme-dark');
+      return;
+    }
+    if (storedTheme === 'light') {
+      root.classList.remove('theme-dark');
+      return;
+    }
+    window.localStorage.setItem('theme', 'light');
+    root.classList.remove('theme-dark');
+  }, []);
+
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <AppRoutes />
-      </NotificationProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 };
 

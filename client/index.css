@@ -5,6 +5,8 @@
 :root {
   --font-body: "Manrope", "Instrument Sans", sans-serif;
   --font-display: "Cormorant Garamond", "Instrument Serif", serif;
+  --font-body-ar: "Tajawal", "Cairo", sans-serif;
+  --font-display-ar: "Cairo", "Tajawal", sans-serif;
   --page-bg: radial-gradient(circle at top left, #f8fafc 0, #eef2f7 45%, #f8fafc 100%);
   --page-text: #0f172a;
   --nav-bg: rgba(255, 255, 255, 0.92);
@@ -67,11 +69,11 @@ body {
   text-rendering: optimizeLegibility;
   background: var(--page-bg);
   color: var(--page-text);
-  cursor: url("/assests/logos/diamondCursor32.svg") 16 16, auto;
 }
 
-a, button, input, textarea, select, [role='button'] {
-  cursor: url("/assests/logos/diamondCursor32.svg") 16 16, pointer;
+html[lang="ar"] body {
+  font-family: var(--font-body-ar);
+  letter-spacing: 0;
 }
 
 /* Landing page serif typography */
@@ -145,6 +147,36 @@ a, button, input, textarea, select, [role='button'] {
   -webkit-text-fill-color: #0f172a;
   box-shadow: 0 0 0 1000px #ffffff inset;
   transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Auth pages dark mode: replace light card glow with dark surface and preserve contrast */
+.theme-dark .auth-card {
+  background: linear-gradient(160deg, rgba(9, 14, 24, 0.96), rgba(15, 23, 42, 0.94));
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow:
+    0 30px 80px rgba(2, 6, 23, 0.75),
+    0 10px 30px rgba(15, 23, 42, 0.45);
+}
+
+.theme-dark .auth-card input,
+.theme-dark .auth-card textarea,
+.theme-dark .auth-card select {
+  background-color: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
+}
+
+.theme-dark .auth-card input:focus,
+.theme-dark .auth-card textarea:focus,
+.theme-dark .auth-card select:focus {
+  background-color: rgba(15, 23, 42, 0.92);
+}
+
+.theme-dark .auth-card input:-webkit-autofill,
+.theme-dark .auth-card input:-webkit-autofill:hover,
+.theme-dark .auth-card input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.92) inset;
 }
 
 .auth-bg-login {
@@ -226,7 +258,7 @@ a, button, input, textarea, select, [role='button'] {
     opacity: 1;
   }
   100% {
-    transform: translate(var(--confetti-drift, 0px), 320px) rotate(320deg);
+    transform: translate(var(--confetti-drift, 0px), var(--confetti-drop, 320px)) rotate(320deg);
     opacity: 0;
   }
 }
@@ -239,6 +271,16 @@ h5,
 h6 {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
+}
+
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3,
+html[lang="ar"] h4,
+html[lang="ar"] h5,
+html[lang="ar"] h6 {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
 }
 
 /* Smooth scrolling for a more polished feel */
@@ -479,6 +521,7 @@ button.no-hover-rise:active {
   align-items: center;
   padding: 0.35rem 0.15rem;
   font-weight: 600;
+  font-size: clamp(0.98rem, 0.4vw + 0.9rem, 1.12rem);
   letter-spacing: 0.02em;
   transition: color 180ms ease;
 }
@@ -509,6 +552,26 @@ button.no-hover-rise:active {
   color: var(--nav-link-active);
 }
 
+.nav-link-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.8);
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.nav-link:hover .nav-link-glyph,
+.nav-link.nav-link-active .nav-link-glyph {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: rgba(15, 23, 42, 0.95);
+}
+
 .nav-pill {
   background: var(--nav-pill-bg);
   border-color: var(--nav-pill-border);
@@ -518,6 +581,114 @@ button.no-hover-rise:active {
   background: var(--nav-cta-bg);
   color: var(--nav-cta-text);
   box-shadow: var(--nav-cta-shadow);
+}
+
+.dir-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+}
+
+
+.dir-toggle-btn {
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(51, 65, 85, 0.85);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.dir-toggle-btn::after {
+  display: none;
+}
+
+.dir-toggle-btn:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.dir-toggle-btn-active {
+  background: rgba(15, 23, 42, 0.9);
+  color: #ffffff;
+}
+
+.dir-toggle-mobile {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.3rem;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.dir-toggle-mobile .dir-toggle-btn {
+  flex: 1;
+  text-transform: none;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.theme-dark .dir-toggle {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 14px 24px rgba(2, 6, 23, 0.45);
+}
+
+.theme-dark .dir-toggle-btn {
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.theme-dark .dir-toggle-btn-active {
+  background: rgba(99, 102, 241, 0.85);
+  color: #ffffff;
+}
+
+html[dir="rtl"] body {
+  direction: rtl;
+}
+
+html[dir="rtl"] .dir-toggle {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .nav-link {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .nav-link::after {
+  left: auto;
+  right: 0;
+  transform-origin: right;
+}
+
+html[dir="rtl"] .nav-link-glyph {
+  margin-left: 0;
+}
+
+html[dir="rtl"] .hero-search {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .hero-search-input {
+  text-align: right;
+}
+
+html[dir="rtl"] .market-link {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] footer {
+  text-align: right;
 }
 
 .theme-toggle {
@@ -556,6 +727,19 @@ button.no-hover-rise:active {
 
 .theme-dark .nav-icon {
   color: rgba(226, 232, 240, 0.85);
+}
+
+.theme-dark .nav-link-glyph {
+  background: rgba(148, 163, 184, 0.18);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.theme-dark .nav-link:hover .nav-link-glyph,
+.theme-dark .nav-link.nav-link-active .nav-link-glyph {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(129, 140, 248, 0.5);
+  color: #f8fafc;
 }
 
 .value-card {
@@ -636,6 +820,28 @@ button.no-hover-rise:active {
 
 .hero-search-button:hover {
   background: #1e40af;
+}
+
+@media (max-width: 640px) {
+  .nav-link {
+    font-size: 1rem;
+  }
+
+  .section-title {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+
+  .section-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .hero-panel {
+    padding: 1rem;
+  }
+
+  .landing-hero-shell {
+    border-radius: 24px;
+  }
 }
 
 .theme-dark .hero-select,
@@ -797,6 +1003,121 @@ button.no-hover-rise:active {
 
 .theme-dark .bg-indigo-100 {
   background-color: rgba(30, 64, 175, 0.25);
+}
+
+/* Home page buyer insights panel dark mode tuning */
+.theme-dark .buyer-insights-panel {
+  background:
+    radial-gradient(circle at top, rgba(56, 189, 248, 0.08), transparent 48%),
+    linear-gradient(165deg, rgba(7, 12, 23, 0.96), rgba(10, 18, 34, 0.92));
+  border-color: rgba(71, 85, 105, 0.55);
+  box-shadow:
+    0 22px 44px rgba(2, 6, 23, 0.5),
+    inset 0 1px 0 rgba(148, 163, 184, 0.14);
+}
+
+.theme-dark .buyer-insights-item {
+  background: linear-gradient(180deg, rgba(22, 31, 50, 0.92), rgba(17, 24, 39, 0.88));
+  border-color: rgba(100, 116, 139, 0.45);
+}
+
+.theme-dark .buyer-insights-note {
+  background: rgba(17, 24, 39, 0.86);
+  border-color: rgba(100, 116, 139, 0.4);
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.theme-dark .buyer-insights-amount {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.theme-dark .buyer-insights-helper {
+  color: rgba(203, 213, 225, 0.7);
+}
+
+/* Home page search bar dark mode: avoid white browser default background/glow */
+.theme-dark .hero-panel input[type="text"] {
+  background-color: rgba(15, 23, 42, 0.92);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
+}
+
+.theme-dark .hero-panel input[type="text"]:focus {
+  background-color: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.25);
+}
+
+/* Brochure CTA dark mode: remove bright white hover fill */
+.brochure-download-btn {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.brochure-download-btn:hover {
+  background: #f1f5f9;
+}
+
+.theme-dark .brochure-download-btn {
+  background: rgba(15, 23, 42, 0.86);
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+}
+
+.theme-dark .brochure-download-btn:hover {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(148, 163, 184, 0.44);
+}
+
+/* Listing detail page dark mode */
+.theme-dark .listing-detail-bg {
+  background: radial-gradient(circle at top, rgba(30, 64, 175, 0.14), transparent 40%),
+    linear-gradient(160deg, rgba(2, 6, 23, 0.98), rgba(8, 14, 28, 0.96));
+}
+
+.theme-dark .listing-detail-page {
+  color: #e2e8f0;
+}
+
+.theme-dark .listing-detail-topbar {
+  background: rgba(8, 14, 28, 0.8);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.theme-dark .listing-detail-main-card {
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.78));
+  border-color: rgba(148, 163, 184, 0.24);
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.55);
+}
+
+.theme-dark .listing-detail-stat-card,
+.theme-dark .listing-detail-bid-card,
+.theme-dark .listing-detail-desc-card {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(10, 18, 33, 0.88));
+  border-color: rgba(148, 163, 184, 0.25);
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.35);
+}
+
+.theme-dark .listing-detail-mobilebar {
+  background: rgba(8, 14, 28, 0.88);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.theme-dark .listing-detail-page .bg-gradient-to-r.from-slate-50.to-blue-50\/50,
+.theme-dark .listing-detail-page .bg-gradient-to-r.from-slate-50.to-green-50,
+.theme-dark .listing-detail-page .bg-gradient-to-r.from-slate-50.to-slate-100 {
+  background-image: none;
+  background-color: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.theme-dark .listing-detail-page .bg-slate-100 {
+  background-color: rgba(30, 41, 59, 0.75);
+}
+
+.theme-dark .listing-detail-page .border-white\/40,
+.theme-dark .listing-detail-page .border-white\/70 {
+  border-color: rgba(148, 163, 184, 0.24);
 }
 
 /* Utility: animated pill-style buttons */
