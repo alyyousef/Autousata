@@ -229,7 +229,7 @@ const HomePage: React.FC = () => {
                   <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
                     <div className="space-y-2">
                       <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                      <span className={`buyer-insights-status inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
                         entry.status === 'Leading'
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-rose-100 text-rose-700'
@@ -261,7 +261,7 @@ const HomePage: React.FC = () => {
                   <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
                     <div className="space-y-2">
                       <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
-                      <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                      <span className="buyer-insights-status inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
                         {payment.status === 'Unpaid' ? t('Unpaid', 'غير مدفوع') : payment.status}
                       </span>
                     </div>

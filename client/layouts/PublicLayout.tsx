@@ -415,14 +415,14 @@ const PublicLayout: React.FC = () => {
                   <>
                     <NavLink
                       to="/login"
-                      className="nav-link text-sm"
+                      className="nav-link nav-mobile-auth text-sm"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {t('Login', 'تسجيل دخول')}
                     </NavLink>
                     <NavLink
                       to="/signup"
-                      className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
+                      className="nav-mobile-auth rounded-full bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-md shadow-indigo-500/30 transition-all"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {t('Sign up', 'اعمل حساب')}
@@ -440,7 +440,7 @@ const PublicLayout: React.FC = () => {
       </main>
 
       {!hideFooter && (
-        <footer className="bg-slate-950 text-slate-200 border-t border-slate-800/70">
+        <footer className="site-footer bg-slate-950 text-slate-200 border-t border-slate-800/70">
           {/* Footer content unchanged */}
           <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div className="grid gap-10 md:grid-cols-[1.3fr_0.7fr_0.7fr]">

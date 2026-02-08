@@ -241,7 +241,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
         <Outlet />
       </main>
 
-      <footer className="bg-slate-950 text-slate-200 border-t border-slate-800/70">
+      <footer className="site-footer bg-slate-950 text-slate-200 border-t border-slate-800/70">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
             <div className="col-span-2">
