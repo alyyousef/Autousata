@@ -377,7 +377,7 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin-content/kyc/pending', {
+  const response = await fetch('http://localhost:5000/api/admin/content/kyc/pending', {
     method: 'GET',
     headers,
   });
@@ -396,7 +396,7 @@ export const getLiveAuctions = async (token?: string): Promise<LiveAuction[]> =>
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin-content/auctions/live', {
+  const response = await fetch('http://localhost:5000/api/admin/content/auctions/live', {
     method: 'GET',
     headers,
   });
@@ -415,7 +415,7 @@ export const getPendingPayments = async (token?: string): Promise<PendingPayment
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin-content/payments/pending', {
+  const response = await fetch('http://localhost:5000/api/admin/content/payments/pending', {
     method: 'GET',
     headers,
   });

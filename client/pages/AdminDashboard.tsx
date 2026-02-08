@@ -6,8 +6,7 @@ import {
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport } from '../services/adminApi';
-import { set } from 'zod';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, LiveAuction, getLiveAuctions, PendingPayment, getPendingPayments } from '../services/adminApi';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -15,7 +14,7 @@ const AdminDashboard: React.FC = () => {
   const adminToken = (location.state as any)?.token as string | undefined;
   // Optional: fallback to localStorage if state is missing
   const effectiveToken = adminToken || localStorage.getItem('authToken') || undefined;
-  const [activeTab, setActiveTab] = useState<'vehicles' | 'kyc' | 'disputes' | 'reports'>('vehicles');
+  const [activeTab, setActiveTab] = useState<'vehicles' | 'kyc' | 'auctions' | 'payments'>('vehicles');
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [vehicleLoading, setVehicleLoading] = useState(false);
   const [vehicleError, setVehicleError] = useState<string | null>(null);
@@ -24,6 +23,15 @@ const AdminDashboard: React.FC = () => {
   const [showInspectionModal, setShowInspectionModal] = useState<{ open: boolean; vehicle?: VehicleItem; viewMode?: boolean }>(() => ({ open: false }));
   const [inspectionForm, setInspectionForm] = useState<CreateInspectionPayload | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [kycDocuments, setKycDocuments] = useState<KYCDocument[]>([]);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycError, setKycError] = useState<string | null>(null);
+  const [auctions, setAuctions] = useState<LiveAuction[]>([]);
+  const [auctionsLoading, setAuctionsLoading] = useState(false);
+  const [auctionsError, setAuctionsError] = useState<string | null>(null);
+  const [payments, setPayments] = useState<PendingPayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const tabsRef = React.useRef<HTMLDivElement>(null);
 
   // Ensure the token passed via navigation is stored for API usage
@@ -66,6 +74,72 @@ const AdminDashboard: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [vehicleSearch, vehicleStatusFilter, effectiveToken]);
 
+  // Load KYC documents when KYC tab is active
+  useEffect(() => {
+    const loadKYC = async () => {
+      if (activeTab !== 'kyc') return;
+      
+      setKycLoading(true);
+      setKycError(null);
+      try {
+        const data = await getPendingKYC(effectiveToken);
+        setKycDocuments(data || []);
+      } catch (e) {
+        console.error('KYC fetch error:', e);
+        setKycError(e instanceof Error ? e.message : 'Failed to load KYC documents');
+        setKycDocuments([]);
+      } finally {
+        setKycLoading(false);
+      }
+    };
+    
+    loadKYC();
+  }, [activeTab, effectiveToken]);
+
+  // Load auctions when auctions tab is active
+  useEffect(() => {
+    const loadAuctions = async () => {
+      if (activeTab !== 'auctions') return;
+      
+      setAuctionsLoading(true);
+      setAuctionsError(null);
+      try {
+        const data = await getLiveAuctions(effectiveToken);
+        setAuctions(data || []);
+      } catch (e) {
+        console.error('Auctions fetch error:', e);
+        setAuctionsError(e instanceof Error ? e.message : 'Failed to load auctions');
+        setAuctions([]);
+      } finally {
+        setAuctionsLoading(false);
+      }
+    };
+    
+    loadAuctions();
+  }, [activeTab, effectiveToken]);
+
+  // Load payments when payments tab is active
+  useEffect(() => {
+    const loadPayments = async () => {
+      if (activeTab !== 'payments') return;
+      
+      setPaymentsLoading(true);
+      setPaymentsError(null);
+      try {
+        const data = await getPendingPayments(effectiveToken);
+        setPayments(data || []);
+      } catch (e) {
+        console.error('Payments fetch error:', e);
+        setPaymentsError(e instanceof Error ? e.message : 'Failed to load payments');
+        setPayments([]);
+      } finally {
+        setPaymentsLoading(false);
+      }
+    };
+    
+    loadPayments();
+  }, [activeTab, effectiveToken]);
+
   return (
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -104,12 +178,18 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-indigo-600 font-bold mt-1">4 Urgent</p>
             </div>
           </div>
-          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover">
-            <div className="bg-amber-50 text-amber-600 p-4 rounded-2xl">
+          <div 
+            className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover cursor-pointer"
+            onClick={() => {
+              setActiveTab('auctions');
+              tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
+            <div className="bg-emerald-50 text-emerald-600 p-4 rounded-2xl">
               <AlertTriangle size={24} />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Disputes</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Live Auctions</p>
               <h3 className="text-2xl font-black text-slate-900">12</h3>
               <p className="text-[10px] text-amber-600 font-bold mt-1">2 New Claims</p>
             </div>
@@ -161,7 +241,7 @@ const AdminDashboard: React.FC = () => {
           {/* Tabs */}
           <div className="px-8 border-b border-slate-100">
             <div className="flex gap-8">
-              {['vehicles', 'kyc', 'disputes', 'reports'].map((tab) => (
+              {['vehicles', 'kyc', 'auctions', 'payments'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -344,62 +424,232 @@ const AdminDashboard: React.FC = () => {
 
             {activeTab === 'kyc' && (
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50/50">
-                    <tr>
-                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">User</th>
-                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
-                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted</th>
-                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                      <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {[
-                      { name: 'Ahmed Sayed', email: 'ahmed@example.com', type: 'Dealer', date: '2h ago', status: 'Pending' },
-                      { name: 'Mohamed Hamdy', email: 'mohamed@example.com', type: 'Seller', date: '5h ago', status: 'In Review' },
-                      { name: 'Youssef Khaled', email: 'youssef@example.com', type: 'Buyer', date: '1d ago', status: 'Pending' }
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
-                        <td className="px-4 py-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
-                              <img src={`https://picsum.photos/seed/${row.name}/40/40`} alt="" />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900">{row.name}</p>
-                              <p className="text-xs text-slate-400">{row.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-6 text-sm text-slate-600">{row.type}</td>
-                        <td className="px-4 py-6 text-sm text-slate-500">{row.date}</td>
-                        <td className="px-4 py-6">
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${row.status === 'In Review' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-6 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Approve">
-                              <CheckCircle size={18} />
-                            </button>
-                            <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Reject">
-                              <XCircle size={18} />
-                            </button>
-                            <button
-                              className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all"
-                              title="More actions"
-                              aria-label="More actions"
-                            >
-                              <MoreVertical size={18} />
-                            </button>
-                          </div>
-                        </td>
+                {kycLoading && (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  </div>
+                )}
+                
+                {!kycLoading && kycError && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm">
+                    {kycError}
+                  </div>
+                )}
+                
+                {!kycLoading && !kycError && (
+                  <table className="w-full">
+                    <thead className="bg-slate-50/50">
+                      <tr>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">User</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Document Type</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {kycDocuments && kycDocuments.length > 0 ? (
+                        kycDocuments.map((doc, index) => {
+                          const firstName = doc.firstName || 'N/A';
+                          const lastName = doc.lastName || '';
+                          const email = doc.email || 'N/A';
+                          const docType = doc.documentType ? doc.documentType.replace(/_/g, ' ') : 'N/A';
+                          const submittedDate = doc.submittedAt ? new Date(doc.submittedAt).toLocaleDateString() : 'N/A';
+                          const status = doc.kycDocStatus || 'pending';
+                          
+                          return (
+                            <tr key={doc.kycId || doc.userId || `kyc-${index}`} className="hover:bg-slate-50/50 transition-all group">
+                              <td className="px-4 py-6">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm">
+                                    {firstName[0]?.toUpperCase() || 'U'}{lastName[0]?.toUpperCase() || ''}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-slate-900">{firstName} {lastName}</p>
+                                    <p className="text-xs text-slate-400">{email}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-6 text-sm text-slate-600 capitalize">{docType}</td>
+                              <td className="px-4 py-6 text-sm text-slate-500">{submittedDate}</td>
+                              <td className="px-4 py-6">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                                  status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                                  status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 
+                                  'bg-rose-50 text-rose-600'
+                                }`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-6 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Approve">
+                                    <CheckCircle size={18} />
+                                  </button>
+                                  <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Reject">
+                                    <XCircle size={18} />
+                                  </button>
+                                  <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="More actions">
+                                    <MoreVertical size={18} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                            No pending KYC documents
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'auctions' && (
+              <div className="overflow-x-auto">
+                {auctionsLoading && (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  </div>
+                )}
+                
+                {!auctionsLoading && auctionsError && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm">
+                    {auctionsError}
+                  </div>
+                )}
+                
+                {!auctionsLoading && !auctionsError && (
+                  <table className="w-full">
+                    <thead className="bg-slate-50/50">
+                      <tr>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Auction ID</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seller</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Bid</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">End Time</th>
+                        <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {auctions && auctions.length > 0 ? (
+                        auctions.map((auction, index) => {
+                          const auctionId = auction.id || 'N/A';
+                          const sellerName = auction.sellerName || 'N/A';
+                          const status = auction.status || 'N/A';
+                          const currentBid = auction.currentBid ? `${auction.currentBid.toLocaleString()} EGP` : 'No bids';
+                          const endTime = auction.endTime ? new Date(auction.endTime).toLocaleString() : 'N/A';
+                          
+                          return (
+                            <tr key={auction.id || `auction-${index}`} className="hover:bg-slate-50/50 transition-all group">
+                              <td className="px-4 py-6 text-sm font-mono text-slate-600">{auctionId}</td>
+                              <td className="px-4 py-6 text-sm text-slate-900">{sellerName}</td>
+                              <td className="px-4 py-6">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                                  status === 'live' ? 'bg-emerald-50 text-emerald-600' : 
+                                  status === 'scheduled' ? 'bg-indigo-50 text-indigo-600' : 
+                                  'bg-slate-50 text-slate-600'
+                                }`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-6 text-sm font-bold text-slate-900">{currentBid}</td>
+                              <td className="px-4 py-6 text-sm text-slate-500">{endTime}</td>
+                              <td className="px-4 py-6 text-right">
+                                <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="View details">
+                                  <ArrowUpRight size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                            No live auctions
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'payments' && (
+              <div className="overflow-x-auto">
+                {paymentsLoading && (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  </div>
+                )}
+                
+                {!paymentsLoading && paymentsError && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm">
+                    {paymentsError}
+                  </div>
+                )}
+                
+                {!paymentsLoading && !paymentsError && (
+                  <table className="w-full">
+                    <thead className="bg-slate-50/50">
+                      <tr>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment ID</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Buyer</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Initiated</th>
+                        <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payments && payments.length > 0 ? (
+                        payments.map((payment, index) => {
+                          const paymentId = payment.id || 'N/A';
+                          const buyerName = payment.buyerName || 'N/A';
+                          const amount = payment.amount ? `${payment.amount.toLocaleString()} ${payment.currency || 'EGP'}` : 'N/A';
+                          const status = payment.status || 'N/A';
+                          const initiated = payment.initiatedAt ? new Date(payment.initiatedAt).toLocaleString() : 'N/A';
+                          
+                          return (
+                            <tr key={payment.id || `payment-${index}`} className="hover:bg-slate-50/50 transition-all group">
+                              <td className="px-4 py-6 text-sm font-mono text-slate-600">{paymentId}</td>
+                              <td className="px-4 py-6 text-sm text-slate-900">{buyerName}</td>
+                              <td className="px-4 py-6 text-sm font-bold text-slate-900">{amount}</td>
+                              <td className="px-4 py-6">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                                  status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                                  status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 
+                                  status === 'failed' ? 'bg-rose-50 text-rose-600' :
+                                  'bg-slate-50 text-slate-600'
+                                }`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-6 text-sm text-slate-500">{initiated}</td>
+                              <td className="px-4 py-6 text-right">
+                                <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="View details">
+                                  <ArrowUpRight size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                            No pending payments
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </div>

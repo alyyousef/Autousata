@@ -123,6 +123,9 @@ const searchVehicles = async (searchTerm) => {
                 WHERE LOWER(MAKE) LIKE LOWER(:search)
                     OR LOWER(MODEL) LIKE LOWER(:search)
                     OR LOWER(LOCATION_CITY) LIKE LOWER(:search)
+                    OR LOWER(BODY_TYPE) LIKE LOWER(:search)
+                    OR LOWER(COLOR) LIKE LOWER(:search)
+                    OR LOWER(FUEL_TYPE) LIKE LOWER(:search)
                 ORDER BY CREATED_AT DESC`,
             { search: `%${searchTerm}%` },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }

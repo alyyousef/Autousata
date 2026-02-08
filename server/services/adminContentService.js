@@ -33,9 +33,8 @@ const getPendingKYCService = async () => {
                 K.REVIEWED_AT,
                 K.REVIEWED_BY_ADMIN_ID
             FROM DIP.KYC_DOCUMENTS K
-            LEFT JOIN DIP.USERS U ON K.USER_ID = U.ID
-            WHERE K.STATUS = 'pending'
-            ORDER BY K.SUBMITTED_AT DESC`,
+            RIGHT JOIN DIP.USERS U ON K.USER_ID = U.ID
+            WHERE U.KYC_STATUS = 'pending'`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
