@@ -167,6 +167,7 @@ const ListingDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [auction, setAuction] = useState<any | null>(null);
+  const [vehicleOnly, setVehicleOnly] = useState<any | null>(null); // fixed-price vehicle (no auction)
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => readDelistedIds());
   const [now, setNow] = useState(() => Date.now());
   const [isBidOpen, setIsBidOpen] = useState(false);
@@ -254,10 +255,26 @@ const ListingDetailPage: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchAuction = async () => {
+    const fetchListing = async () => {
       if (!id) return;
       setLoading(true);
       setError(null);
+
+      // 1. Try fixed-price vehicle first
+      try {
+        const vehicleRes = await apiService.getPublicVehicle(id);
+        if (vehicleRes.data && !vehicleRes.error) {
+          if (isMounted) {
+            setVehicleOnly(vehicleRes.data);
+            setLoading(false);
+          }
+          return;
+        }
+      } catch {
+        // Not a fixed-price vehicle, try auction
+      }
+
+      // 2. Fall back to auction
       try {
         const auctionResponse = await apiService.getAuctionById(id);
 
@@ -267,7 +284,7 @@ const ListingDetailPage: React.FC = () => {
         }
 
         if (!auctionResponse.data) {
-          setError('Auction not found.');
+          setError('Listing not found.');
           return;
         }
 
@@ -298,7 +315,7 @@ const ListingDetailPage: React.FC = () => {
         }
       } catch (err) {
         if (isMounted) {
-          setError('Failed to load auction.');
+          setError('Failed to load listing.');
         }
       } finally {
         if (isMounted) {
@@ -307,7 +324,7 @@ const ListingDetailPage: React.FC = () => {
       }
     };
 
-    fetchAuction();
+    fetchListing();
 
     return () => {
       isMounted = false;
@@ -366,7 +383,7 @@ const ListingDetailPage: React.FC = () => {
     );
   }
 
-  if (!auction) {
+  if (!auction && !vehicleOnly) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl p-10 text-center shadow-2xl shadow-slate-200/50 border border-white/40">
@@ -384,6 +401,113 @@ const ListingDetailPage: React.FC = () => {
             <ChevronLeft size={18} />
             {t('Discover More Listings', 'اكتشف اعلانات اخرى')}
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ──── FIXED-PRICE VEHICLE DETAIL VIEW ────
+  if (vehicleOnly) {
+    const v = vehicleOnly;
+    return (
+      <div className="min-h-screen bg-slate-50 pb-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Link to="/browse" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-6">
+            <ChevronLeft size={16} /> {t('Back to Browse', 'رجوع للتصفح')}
+          </Link>
+
+          {/* Image */}
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm mb-6">
+            {v.images && v.images.length > 0 ? (
+              <img src={v.images[0]} alt={`${v.year} ${v.make} ${v.model}`} className="w-full h-72 md:h-96 object-cover" />
+            ) : (
+              <div className="w-full h-72 md:h-96 bg-slate-100 flex items-center justify-center text-slate-300">
+                <Tag size={64} />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Details */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600">
+                    {t('Fixed Price', 'سعر ثابت')}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                    {conditionLabel(v.condition)}
+                  </span>
+                </div>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+                  {v.year} {v.make} {v.model}
+                </h1>
+                {v.location && (
+                  <p className="flex items-center gap-2 text-sm text-slate-500 mt-2">
+                    <MapPin size={14} /> {v.location}
+                  </p>
+                )}
+                {v.description && (
+                  <p className="text-slate-600 mt-4 leading-relaxed">{v.description}</p>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">{t('Vehicle Details', 'تفاصيل السيارة')}</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div><span className="text-slate-400">{t('Year', 'السنة')}</span><p className="font-semibold text-slate-900">{v.year}</p></div>
+                  <div><span className="text-slate-400">{t('Mileage', 'المسافة')}</span><p className="font-semibold text-slate-900">{formatNumber(v.mileage)} {t('km', 'كم')}</p></div>
+                  <div><span className="text-slate-400">{t('Color', 'اللون')}</span><p className="font-semibold text-slate-900">{v.color}</p></div>
+                  <div><span className="text-slate-400">{t('Body', 'الهيكل')}</span><p className="font-semibold text-slate-900">{v.bodyType}</p></div>
+                  <div><span className="text-slate-400">{t('Transmission', 'ناقل الحركة')}</span><p className="font-semibold text-slate-900">{v.transmission}</p></div>
+                  <div><span className="text-slate-400">{t('Fuel', 'الوقود')}</span><p className="font-semibold text-slate-900">{v.fuelType}</p></div>
+                  <div><span className="text-slate-400">{t('Seats', 'المقاعد')}</span><p className="font-semibold text-slate-900">{v.seats}</p></div>
+                  <div><span className="text-slate-400">{t('Condition', 'الحالة')}</span><p className="font-semibold text-slate-900">{conditionLabel(v.condition)}</p></div>
+                </div>
+              </div>
+
+              {v.features && v.features.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">{t('Features', 'المميزات')}</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {v.features.map((f: string, i: number) => (
+                      <span key={i} className="px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-sm text-slate-700">{f}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Purchase Card */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-6">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Price', 'السعر')}</p>
+                <p className="text-3xl font-black text-emerald-600 mb-4">{formatCurrencyEGP(v.price)}</p>
+                <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+                  <ShieldCheck size={16} className="text-emerald-500" />
+                  {t('Verified seller', 'بائع موثق')}
+                </div>
+                {user ? (
+                  <Link
+                    to={`/payment/${v._id}?type=direct`}
+                    className="block w-full text-center px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                  >
+                    {t('Buy Now', 'اشترِ الان')}
+                  </Link>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="block w-full text-center px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors"
+                  >
+                    {t('Login to Buy', 'سجل دخول للشراء')}
+                  </Link>
+                )}
+                {v.sellerName && (
+                  <p className="text-xs text-slate-400 text-center mt-4">{t('Sold by', 'يباع بواسطة')} {v.sellerName}</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

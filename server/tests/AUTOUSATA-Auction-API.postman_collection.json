@@ -1,0 +1,632 @@
+{
+  "info": {
+    "_postman_id": "autousata-auctions-collection",
+    "name": "AUTOUSATA - Auction API",
+    "description": "Complete collection for testing AUTOUSATA auction endpoints and validating database schema compatibility",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vehicleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auctionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('authToken', jsonData.token);",
+                  "    pm.environment.set('userId', jsonData.user.id);",
+                  "    pm.test('Token saved', () => {",
+                  "        pm.expect(jsonData.token).to.be.a('string');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@autousata.com\",\n  \"phone\": \"01234567890\",\n  \"password\": \"testpass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new test user for auction testing"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('authToken', jsonData.token);",
+                  "    pm.environment.set('userId', jsonData.user.id);",
+                  "    pm.test('Login successful', () => {",
+                  "        pm.expect(jsonData.token).to.be.a('string');",
+                  "        pm.expect(jsonData.user).to.be.an('object');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@autousata.com\",\n  \"password\": \"testpass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with test credentials"
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication endpoints for obtaining access tokens"
+    },
+    {
+      "name": "Vehicles (Setup)",
+      "item": [
+        {
+          "name": "Create Test Vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const vehicleId = jsonData._id || jsonData.id;",
+                  "    pm.environment.set('vehicleId', vehicleId);",
+                  "    pm.test('Vehicle created', () => {",
+                  "        pm.expect(vehicleId).to.be.a('string');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"make\": \"BMW\",\n  \"model\": \"M3\",\n  \"year\": 2022,\n  \"mileage\": 15000,\n  \"vin\": \"TEST{{$timestamp}}\",\n  \"plateNumber\": \"TST{{$timestamp}}\",\n  \"color\": \"Blue\",\n  \"bodyType\": \"sedan\",\n  \"transmission\": \"automatic\",\n  \"fuelType\": \"petrol\",\n  \"seats\": 5,\n  \"condition\": \"excellent\",\n  \"price\": 850000,\n  \"currency\": \"EGP\",\n  \"description\": \"Test vehicle for auction API testing - BMW M3 2022 in excellent condition\",\n  \"location\": \"Cairo\",\n  \"features\": [\"Leather Seats\", \"Sunroof\", \"Navigation\", \"Parking Sensors\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehicles"]
+            },
+            "description": "Create a test vehicle to use for auction creation"
+          },
+          "response": []
+        }
+      ],
+      "description": "Vehicle creation for auction setup"
+    },
+    {
+      "name": "Auctions",
+      "item": [
+        {
+          "name": "Create Auction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const auctionId = jsonData._id || jsonData.id;",
+                  "    pm.environment.set('auctionId', auctionId);",
+                  "    ",
+                  "    pm.test('Auction created successfully', () => {",
+                  "        pm.expect(auctionId).to.be.a('string');",
+                  "        pm.expect(jsonData.status).to.equal('draft');",
+                  "        pm.expect(jsonData.vehicleId).to.be.a('string');",
+                  "        pm.expect(jsonData.reservePrice).to.be.a('number');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has correct structure', () => {",
+                  "        pm.expect(jsonData).to.have.property('startTime');",
+                  "        pm.expect(jsonData).to.have.property('endTime');",
+                  "        pm.expect(jsonData).to.have.property('currentBid');",
+                  "        pm.expect(jsonData).to.have.property('bidCount');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Set start time to 1 minute from now",
+                  "const startTime = new Date(Date.now() + 60000);",
+                  "pm.environment.set('auctionStartTime', startTime.toISOString());",
+                  "",
+                  "// Set end time to 1 hour from now",
+                  "const endTime = new Date(Date.now() + 3600000);",
+                  "pm.environment.set('auctionEndTime', endTime.toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"startTime\": \"{{auctionStartTime}}\",\n  \"endTime\": \"{{auctionEndTime}}\",\n  \"startPrice\": 800000,\n  \"reservePrice\": 850000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"]
+            },
+            "description": "Create a new auction for a vehicle. Validates:\n- User owns the vehicle\n- No existing auction for this vehicle\n- Valid date ranges\n- Proper price structure"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Auctions (Live)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Response has auctions array', () => {",
+                  "    pm.expect(jsonData).to.have.property('auctions');",
+                  "    pm.expect(jsonData.auctions).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Response has pagination', () => {",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "    pm.expect(jsonData.pagination).to.have.property('total');",
+                  "    pm.expect(jsonData.pagination).to.have.property('page');",
+                  "    pm.expect(jsonData.pagination).to.have.property('pages');",
+                  "});",
+                  "",
+                  "if (jsonData.auctions.length > 0) {",
+                  "    pm.test('Auction has valid structure', () => {",
+                  "        const auction = jsonData.auctions[0];",
+                  "        pm.expect(auction).to.have.property('_id');",
+                  "        pm.expect(auction).to.have.property('vehicleId');",
+                  "        pm.expect(auction).to.have.property('currentBid');",
+                  "        pm.expect(auction).to.have.property('bidCount');",
+                  "        pm.expect(auction).to.have.property('status');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?page=1&limit=10&sortBy=endingSoon",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Results per page"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "endingSoon",
+                  "description": "Sort options: endingSoon, highestBid, mostBids, newest"
+                }
+              ]
+            },
+            "description": "Get paginated list of live auctions with sorting options"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Auction by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Auction ID matches', () => {",
+                  "    pm.expect(jsonData._id).to.equal(pm.environment.get('auctionId'));",
+                  "});",
+                  "",
+                  "pm.test('Has vehicle details', () => {",
+                  "    pm.expect(jsonData).to.have.property('vehicleId');",
+                  "    pm.expect(jsonData.vehicleId).to.have.property('make');",
+                  "    pm.expect(jsonData.vehicleId).to.have.property('model');",
+                  "    pm.expect(jsonData.vehicleId).to.have.property('year');",
+                  "});",
+                  "",
+                  "pm.test('Has auction details', () => {",
+                  "    pm.expect(jsonData).to.have.property('currentBid');",
+                  "    pm.expect(jsonData).to.have.property('bidCount');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData).to.have.property('minBidIncrement');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}"]
+            },
+            "description": "Get detailed information about a specific auction including vehicle details"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Seller Auctions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Response has auctions array', () => {",
+                  "    pm.expect(jsonData).to.have.property('auctions');",
+                  "    pm.expect(jsonData.auctions).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (jsonData.auctions.length > 0) {",
+                  "    pm.test('All auctions belong to seller', () => {",
+                  "        const sellerId = pm.environment.get('userId');",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            pm.expect(auction.sellerId).to.equal(sellerId);",
+                  "        });",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "seller"]
+            },
+            "description": "Get all auctions created by the authenticated seller"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Bid History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Response has bids array', () => {",
+                  "    pm.expect(jsonData).to.have.property('bids');",
+                  "    pm.expect(jsonData.bids).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (jsonData.bids.length > 0) {",
+                  "    pm.test('Bid has valid structure', () => {",
+                  "        const bid = jsonData.bids[0];",
+                  "        pm.expect(bid).to.have.property('id');",
+                  "        pm.expect(bid).to.have.property('userId');",
+                  "        pm.expect(bid).to.have.property('amount');",
+                  "        pm.expect(bid).to.have.property('timestamp');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Bids are sorted by time (newest first)', () => {",
+                  "        for (let i = 1; i < jsonData.bids.length; i++) {",
+                  "            const prevTime = new Date(jsonData.bids[i-1].timestamp);",
+                  "            const currTime = new Date(jsonData.bids[i].timestamp);",
+                  "            pm.expect(prevTime.getTime()).to.be.at.least(currTime.getTime());",
+                  "        }",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}/bids?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}", "bids"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of bids to retrieve"
+                }
+              ]
+            },
+            "description": "Get bid history for an auction (newest first)"
+          },
+          "response": []
+        },
+        {
+          "name": "Place Bid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Note: This will fail if auction is not in 'live' status",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    pm.test('Bid placed successfully', () => {",
+                  "        pm.expect(jsonData.success).to.be.true;",
+                  "        pm.expect(jsonData).to.have.property('bid');",
+                  "        pm.expect(jsonData).to.have.property('currentBid');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Bid amount is correct', () => {",
+                  "        pm.expect(jsonData.bid.amount).to.be.a('number');",
+                  "        pm.expect(jsonData.bid.amount).to.be.above(0);",
+                  "    });",
+                  "} else if (pm.response.code === 400) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Received expected error', () => {",
+                  "        pm.expect(jsonData).to.have.property('msg');",
+                  "    });",
+                  "    console.log('Bid failed (expected if auction not live):', jsonData.msg);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 850000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}", "bids"]
+            },
+            "description": "Place a bid on an active auction. Requirements:\n- Auction must be in 'live' status\n- Bid must be higher than current bid + minimum increment\n- User must not be the seller\n- User must be authenticated"
+          },
+          "response": []
+        }
+      ],
+      "description": "Auction management endpoints"
+    },
+    {
+      "name": "Database Validation",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Server is running', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Database is connected', () => {",
+                  "    pm.expect(jsonData).to.have.property('database');",
+                  "    pm.expect(jsonData.database).to.equal('connected');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check server and database connectivity"
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints to validate database connectivity and schema"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log('Request:', pm.request.url.toString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "pm.test('Response time is acceptable', () => {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});"
+        ]
+      }
+    }
+  ]
+}

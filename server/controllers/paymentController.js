@@ -536,4 +536,125 @@ async function handleChargeRefunded(charge, connection) {
     console.log(`Payment ${paymentId} refunded via webhook`);
 }
 
+/**
+ * Create Direct Payment Intent (Fixed-Price Purchase)
+ * POST /api/payments/create-direct-intent
+ */
+exports.createDirectPaymentIntent = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { vehicleId } = req.body;
+        const userId = req.user.id;
+
+        if (!vehicleId) {
+            return res.status(400).json({ error: 'vehicleId is required' });
+        }
+
+        // Atomically claim the vehicle (optimistic lock via status check)
+        const claimResult = await connection.execute(
+            `UPDATE VEHICLES SET STATUS = 'sold'
+             WHERE ID = :vehicleId AND STATUS = 'active'
+               AND ID NOT IN (SELECT VEHICLE_ID FROM AUCTIONS WHERE STATUS NOT IN ('cancelled'))`,
+            { vehicleId }
+        );
+
+        if (claimResult.rowsAffected === 0) {
+            return res.status(409).json({ error: 'Vehicle is no longer available for purchase' });
+        }
+
+        // Fetch vehicle details
+        const vehResult = await connection.execute(
+            `SELECT ID, SELLER_ID, MAKE, MODEL, YEAR_MFG, PRICE_EGP
+             FROM VEHICLES WHERE ID = :vehicleId`,
+            { vehicleId },
+            { outFormat: require('oracledb').OUT_FORMAT_OBJECT }
+        );
+
+        const vehicle = vehResult.rows[0];
+
+        if (vehicle.SELLER_ID === userId) {
+            // Rollback claim
+            await connection.execute(`UPDATE VEHICLES SET STATUS = 'active' WHERE ID = :vehicleId`, { vehicleId });
+            await connection.commit();
+            return res.status(400).json({ error: 'You cannot buy your own vehicle' });
+        }
+
+        const priceEGP = Number(vehicle.PRICE_EGP);
+        const breakdown = calculatePaymentBreakdown(priceEGP);
+
+        // Create payment record (AUCTION_ID is NULL for direct purchases)
+        const paymentId = uuidv4();
+        await connection.execute(
+            `INSERT INTO PAYMENTS (
+                ID, AUCTION_ID, BUYER_ID, SELLER_ID,
+                AMOUNT_EGP, CURRENCY, PAYMENT_METHOD, GATEWAY,
+                STATUS, INITIATED_AT
+            ) VALUES (
+                :paymentId, NULL, :buyerId, :sellerId,
+                :amount, 'EGP', 'card', 'Stripe',
+                'pending', SYSTIMESTAMP
+            )`,
+            {
+                paymentId,
+                buyerId: userId,
+                sellerId: vehicle.SELLER_ID,
+                amount: breakdown.totalAmount
+            }
+        );
+
+        // Create Stripe PaymentIntent
+        const vehicleTitle = `${vehicle.YEAR_MFG} ${vehicle.MAKE} ${vehicle.MODEL}`;
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: breakdown.totalAmount * 100,
+            currency: 'egp',
+            metadata: {
+                vehicleId: vehicle.ID,
+                paymentId,
+                userId,
+                vehicleDescription: vehicleTitle,
+                purchaseType: 'direct',
+                vehiclePrice: priceEGP,
+                platformCommission: breakdown.platformCommission,
+                stripeFee: breakdown.stripeFee
+            },
+            description: `Direct purchase: ${vehicleTitle}`,
+            automatic_payment_methods: { enabled: true },
+        });
+
+        await connection.execute(
+            `UPDATE PAYMENTS SET GATEWAY_ORDER_ID = :gatewayOrderId WHERE ID = :paymentId`,
+            { gatewayOrderId: paymentIntent.id, paymentId }
+        );
+
+        await connection.commit();
+
+        res.status(200).json({
+            success: true,
+            clientSecret: paymentIntent.client_secret,
+            paymentId,
+            breakdown: {
+                vehiclePrice: priceEGP,
+                platformCommission: breakdown.platformCommission,
+                stripeFee: breakdown.stripeFee,
+                totalAmount: breakdown.totalAmount,
+                sellerPayout: breakdown.sellerPayout
+            },
+            vehicle: {
+                id: vehicle.ID,
+                title: vehicleTitle
+            }
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error creating direct payment intent:', error);
+        res.status(500).json({
+            error: 'Failed to create payment intent',
+            details: error.message
+        });
+    } finally {
+        await connection.close();
+    }
+};
+
 module.exports = exports;

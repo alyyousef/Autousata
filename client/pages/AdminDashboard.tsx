@@ -13,7 +13,7 @@ const AdminDashboard: React.FC = () => {
   const location = useLocation();
   const adminToken = (location.state as any)?.token as string | undefined;
   // Optional: fallback to localStorage if state is missing
-  const effectiveToken = adminToken || localStorage.getItem('authToken') || undefined;
+  const effectiveToken = adminToken || localStorage.getItem('accessToken') || undefined;
   const [activeTab, setActiveTab] = useState<'vehicles' | 'kyc' | 'auctions' | 'payments'>('vehicles');
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [vehicleLoading, setVehicleLoading] = useState(false);
@@ -288,6 +288,7 @@ const AdminDashboard: React.FC = () => {
                     <tr>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Info</th>
+                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inspection</th>
                       <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
@@ -295,13 +296,13 @@ const AdminDashboard: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {vehicleLoading && (
-                      <tr><td className="px-4 py-6" colSpan={5}>Loading vehicles…</td></tr>
+                      <tr><td className="px-4 py-6" colSpan={6}>Loading vehicles…</td></tr>
                     )}
                     {vehicleError && !vehicleLoading && (
-                      <tr><td className="px-4 py-6 text-rose-600" colSpan={5}>{vehicleError}</td></tr>
+                      <tr><td className="px-4 py-6 text-rose-600" colSpan={6}>{vehicleError}</td></tr>
                     )}
                     {!vehicleLoading && !vehicleError && vehicles.length === 0 && (
-                      <tr><td className="px-4 py-6 text-slate-500" colSpan={5}>No vehicles found.</td></tr>
+                      <tr><td className="px-4 py-6 text-slate-500" colSpan={6}>No vehicles found.</td></tr>
                     )}
                     {!vehicleLoading && !vehicleError && vehicles.map((v) => {
                       const canEditStatus = v.inspection_req === 0 || Boolean(v.inspection_report);
@@ -318,6 +319,15 @@ const AdminDashboard: React.FC = () => {
                               <p>Mileage: {v.milage?.toLocaleString() ?? '—'} km · Location: {v.location || '—'}</p>
                               <p>Condition: {v.car_condition || '—'} · Price: {v.price ? `${v.price} ${v.currency || 'EGP'}` : '—'}</p>
                             </div>
+                          </td>
+                          <td className="px-4 py-6">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                              v.sale_type === 'auction'
+                                ? 'bg-violet-50 text-violet-600'
+                                : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {v.sale_type === 'auction' ? 'Auction' : 'Fixed Price'}
+                            </span>
                           </td>
                           <td className="px-4 py-6">
                             <select

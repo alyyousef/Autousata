@@ -11,6 +11,13 @@ const { authenticate, authorize } = require('../middleware/auth');
 router.post('/create-intent', authenticate, paymentController.createPaymentIntent);
 
 /**
+ * @route   POST /api/payments/create-direct-intent
+ * @desc    Create a Stripe Payment Intent for direct (fixed-price) vehicle purchase
+ * @access  Private (Authenticated users only)
+ */
+router.post('/create-direct-intent', authenticate, paymentController.createDirectPaymentIntent);
+
+/**
  * @route   POST /api/payments/:id/confirm
  * @desc    Confirm payment completion and create escrow
  * @access  Private (Buyer only)

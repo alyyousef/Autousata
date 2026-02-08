@@ -7,27 +7,32 @@ const { rateLimitBid } = require('../middleware/rateLimiter');
 const bidProcessingService = require('../services/bidProcessingService');
 const { getIO } = require('../server');
 
-// POST /api/auctions - Create a new auction
+// POST /api/auctions - Create a new auction (draft)
+// Accepts durationDays instead of startTime/endTime.
+// Actual start/end times are calculated when admin approves the vehicle.
 router.post('/', auth, async (req, res) => {
   let connection;
   try {
     const {
       vehicleId,
-      startTime,
-      endTime,
+      durationDays,
       startPrice,
       reservePrice
     } = req.body;
 
-    if (!vehicleId || !startTime || !endTime || startPrice === undefined || reservePrice === undefined) {
+    if (!vehicleId || startPrice === undefined || reservePrice === undefined) {
       return res.status(400).json({ msg: 'Missing required auction fields' });
     }
 
-    const startDate = new Date(startTime);
-    const endDate = new Date(endTime);
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-      return res.status(400).json({ msg: 'Invalid start or end time' });
+    // Validate durationDays — must be 1, 3, or 7
+    const validDurations = [1, 3, 7];
+    const duration = Number(durationDays) || 3;
+    if (!validDurations.includes(duration)) {
+      return res.status(400).json({ msg: 'Invalid duration. Must be 1, 3, or 7 days.' });
     }
+
+    // Placeholder dates — will be overwritten on admin approval
+    const placeholderDate = new Date();
 
     connection = await oracledb.getConnection();
 
@@ -70,6 +75,7 @@ router.post('/', auth, async (req, res) => {
         start_time,
         end_time,
         original_end_time,
+        duration_days,
         reserve_price_egp,
         starting_bid_egp,
         current_bid_egp,
@@ -87,6 +93,7 @@ router.post('/', auth, async (req, res) => {
         :startTime,
         :endTime,
         :originalEndTime,
+        :durationDays,
         :reservePriceEgp,
         :startingBidEgp,
         :currentBid,
@@ -102,9 +109,10 @@ router.post('/', auth, async (req, res) => {
         vehicleId,
         sellerId: req.user.id,
         status: 'draft',
-        startTime: startDate,
-        endTime: endDate,
-        originalEndTime: endDate,
+        startTime: placeholderDate,
+        endTime: placeholderDate,
+        originalEndTime: placeholderDate,
+        durationDays: duration,
         reservePriceEgp: Number(reservePrice) || 0,
         startingBidEgp: startBid,
         currentBid: startBid,
@@ -122,9 +130,7 @@ router.post('/', auth, async (req, res) => {
       _id: auctionId,
       vehicleId,
       sellerId: req.user.id,
-      startTime: startDate,
-      endTime: endDate,
-      originalEndTime: endDate,
+      durationDays: duration,
       startPrice: startBid,
       reservePrice: Number(reservePrice) || 0,
       currentBid: startBid,

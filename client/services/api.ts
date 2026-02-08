@@ -220,6 +220,51 @@ async verifyEmailOtp(email: string, otp: string) {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
+  // =========================================================
+  // BROWSE / BUY-NOW METHODS (Public)
+  // =========================================================
+
+  async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
+    const qp = new URLSearchParams();
+    if (params.page) qp.set('page', params.page.toString());
+    if (params.limit) qp.set('limit', params.limit.toString());
+    if (params.make) qp.set('make', params.make);
+    if (params.minPrice) qp.set('minPrice', params.minPrice.toString());
+    if (params.maxPrice) qp.set('maxPrice', params.maxPrice.toString());
+    if (params.bodyType) qp.set('bodyType', params.bodyType);
+    if (params.sort) qp.set('sort', params.sort);
+    return this.request<{ vehicles: any[]; page: number; limit: number; total: number; totalPages: number }>(`/vehicles/browse?${qp.toString()}`);
+  }
+
+  async getPublicVehicle(vehicleId: string) {
+    return this.request<any>(`/vehicles/browse/${vehicleId}`);
+  }
+
+  /**
+   * Create a Stripe Payment Intent for a direct (fixed-price) purchase
+   */
+  async createDirectPaymentIntent(vehicleId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        vehiclePrice: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      vehicle: {
+        id: string;
+        title: string;
+      };
+    }>('/payments/create-direct-intent', {
+      method: 'POST',
+      body: JSON.stringify({ vehicleId }),
+    });
+  }
+
   async getSellerAuctions() {
     return this.request<{ auctions: any[] }>('/auctions/seller');
   }
