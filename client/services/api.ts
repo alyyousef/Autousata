@@ -129,24 +129,23 @@ class ApiService {
     }
     return response;
   }
-async verifyEmailOtp(email: string, otp: string) {
+
+  async verifyEmailOtp(email: string, otp: string) {
     return this.request('/auth/verify-email-otp', {
       method: 'POST',
       body: JSON.stringify({ email, otp }),
     });
   }
 
-async uploadKYC(file: File) {
+  async uploadKYC(file: File) {
     const formData = new FormData();
-    formData.append('kycDocument', file); // Field name must match backend 'upload.single'
+    formData.append('kycDocument', file); 
 
     return this.request<{ kycStatus: string; kycDocumentUrl: string }>('/profile/kyc', {
       method: 'PUT',
       body: formData,
     });
   }
-
-
 
   async login(email: string, password: string) {
     const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
@@ -163,6 +162,23 @@ async uploadKYC(file: File) {
   async logout() {
     this.clearTokens();
     return { data: { success: true } }; // Just clear local state
+  }
+
+  // =========================================================
+  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // =========================================================
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
   }
 
   // =========================================================
@@ -209,14 +225,11 @@ async uploadKYC(file: File) {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
-
-async createVehicle(data: any, files: File[]) {
+  async createVehicle(data: any, files: File[]) {
     const formData = new FormData();
 
-    // Append simple fields
     Object.keys(data).forEach(key => {
         if (data[key] !== undefined && data[key] !== null && key !== 'images') {
-             // Stringify arrays (like features)
              if(Array.isArray(data[key])) {
                  formData.append(key, JSON.stringify(data[key]));
              } else {
@@ -225,25 +238,22 @@ async createVehicle(data: any, files: File[]) {
         }
     });
 
-    // Append Files (This matches backend: upload.array('images', 10))
     files.forEach((file) => {
         formData.append('images', file);
     });
 
     return this.request<{ _id: string }>('/vehicles', {
       method: 'POST',
-      body: formData, // Sending FormData triggers the correct browser behavior
+      body: formData, 
     });
   }
 
-  // ✅ NEW METHOD: Create Auction
   async createAuction(data: any) {
     return this.request<any>('/auctions', {
         method: 'POST',
         body: JSON.stringify(data)
     });
   }
-
 
   async getSellerAuctions() {
     return this.request<{ auctions: any[] }>('/auctions/seller');
@@ -271,9 +281,6 @@ async createVehicle(data: any, files: File[]) {
   // PAYMENT METHODS
   // =========================================================
   
-  /**
-   * Create a Stripe Payment Intent for an auction
-   */
   async createPaymentIntent(auctionId: string) {
     return this.request<{
       success: boolean;
@@ -297,9 +304,6 @@ async createVehicle(data: any, files: File[]) {
     });
   }
 
-  /**
-   * Confirm payment completion
-   */
   async confirmPayment(paymentId: string) {
     return this.request<{
       success: boolean;
@@ -311,9 +315,6 @@ async createVehicle(data: any, files: File[]) {
     });
   }
 
-  /**
-   * Get payment details by auction ID
-   */
   async getPaymentByAuction(auctionId: string) {
     return this.request<{
       success: boolean;
@@ -334,9 +335,6 @@ async createVehicle(data: any, files: File[]) {
     }>(`/payments/auction/${auctionId}`);
   }
 
-  /**
-   * Get escrow details
-   */
   async getEscrowDetails(escrowId: string) {
     return this.request<{
       success: boolean;
@@ -357,9 +355,6 @@ async createVehicle(data: any, files: File[]) {
     }>(`/payments/escrows/${escrowId}`);
   }
 
-  /**
-   * Buyer confirms vehicle receipt (releases escrow)
-   */
   async confirmVehicleReceipt(escrowId: string) {
     return this.request<{
       success: boolean;
@@ -371,9 +366,6 @@ async createVehicle(data: any, files: File[]) {
     });
   }
 
-  /**
-   * Initiate dispute on escrow
-   */
   async initiateDispute(escrowId: string, reason: string) {
     return this.request<{
       success: boolean;
@@ -385,9 +377,6 @@ async createVehicle(data: any, files: File[]) {
     });
   }
 
-  /**
-   * Admin: Get all disputed escrows
-   */
   async getDisputedEscrows() {
     return this.request<{
       success: boolean;
@@ -414,9 +403,6 @@ async createVehicle(data: any, files: File[]) {
     }>('/payments/escrows/disputed');
   }
 
-  /**
-   * Admin: Process refund
-   */
   async processRefund(paymentId: string, reason: string, amount?: number) {
     return this.request<{
       success: boolean;

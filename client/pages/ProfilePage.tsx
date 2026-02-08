@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Mail, Phone, ExternalLink, Camera, ChevronRight, LogOut, MapPin, User, FileText, CheckCircle, AlertTriangle, XCircle, UploadCloud } from 'lucide-react';
+import { Shield, Mail, Phone, ExternalLink, Camera, ChevronRight, LogOut, MapPin, User, FileText, CheckCircle, AlertTriangle, XCircle, UploadCloud, Lock, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -24,6 +24,10 @@ const ProfilePage: React.FC = () => {
   
   // KYC Specific Loading State
   const [kycLoading, setKycLoading] = useState(false);
+  
+  // Password Reset States
+  const [resetLoading, setResetLoading] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
@@ -225,7 +229,6 @@ const ProfilePage: React.FC = () => {
       try {
         const res = await apiService.uploadKYC(file);
         if (res.data) {
-          // Update local user context with new status
           updateUser({ 
             kycStatus: res.data.kycStatus,
             kycDocumentUrl: res.data.kycDocumentUrl
@@ -239,6 +242,23 @@ const ProfilePage: React.FC = () => {
       } finally {
         setKycLoading(false);
       }
+    }
+  };
+
+  // --- Password Reset Execution (Triggered by Modal) ---
+  const executePasswordReset = async () => {
+    setResetLoading(true);
+    setShowResetModal(false); // Close modal immediately
+    setError('');
+    setSuccess('');
+
+    try {
+      await apiService.forgotPassword(user.email);
+      setSuccess('Password reset link sent! Check your email.');
+    } catch (err) {
+      setError('Failed to send reset link.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -281,7 +301,6 @@ const ProfilePage: React.FC = () => {
     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
   };
 
-  // Helper for KYC Status Display
   const renderKycBadge = () => {
     const status = user.kycStatus || 'not_uploaded';
     switch (status) {
@@ -297,7 +316,7 @@ const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page">
+    <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page relative">
       {isLightboxOpen && (
         <ImageLightbox
           src={displayAvatar}
@@ -305,10 +324,49 @@ const ProfilePage: React.FC = () => {
           onClose={() => setIsLightboxOpen(false)}
         />
       )}
+
+      {/* ✅ CUSTOM PASSWORD RESET MODAL */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowResetModal(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setShowResetModal(false)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-4">
+                <Lock size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Reset Password?</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                We will send a secure reset link to <strong>{user.email}</strong>. This will allow you to create a new password.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setShowResetModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executePasswordReset}
+                  className="flex-1 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+                >
+                  Send Link
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* LEFT COLUMN: Avatar, Contact Verification, KYC */}
+          {/* LEFT COLUMN: Avatar, Contact Verification, KYC, Security */}
           <div className="lg:col-span-1 space-y-6">
             
             {/* 1. Avatar Card */}
@@ -384,7 +442,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. KYC Verification Card (NEW) */}
+            {/* 3. KYC Verification Card */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText size={16} /> Identity Verification (KYC)
@@ -396,7 +454,6 @@ const ProfilePage: React.FC = () => {
                   {renderKycBadge()}
                 </div>
 
-                {/* Status Message */}
                 <p className="text-xs text-slate-500 leading-relaxed">
                   {(!user.kycStatus || user.kycStatus === 'not_uploaded') && "To sell or bid, please upload a government-issued ID (PDF only)."}
                   {user.kycStatus === 'pending' && "Your document is under review by our team. This usually takes 24 hours."}
@@ -404,7 +461,6 @@ const ProfilePage: React.FC = () => {
                   {user.kycStatus === 'denied' && "Your document was rejected. Please upload a clear, valid PDF."}
                 </p>
 
-                {/* Upload Area (Hidden if Approved) */}
                 {user.kycStatus !== 'approved' && (user.kycStatus !== 'pending') && (
                   <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 hover:border-indigo-400 transition-all group">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -432,7 +488,6 @@ const ProfilePage: React.FC = () => {
                   </label>
                 )}
                 
-                {/* View Document Link */}
                 {user.kycDocumentUrl && (
                   <a 
                     href={user.kycDocumentUrl} 
@@ -444,6 +499,29 @@ const ProfilePage: React.FC = () => {
                   </a>
                 )}
               </div>
+            </div>
+
+            {/* 4. Security Card */}
+            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Lock size={16} /> Security
+              </h3>
+              
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Need to update your password? We will send a secure reset link to <strong>{user.email}</strong>.
+              </p>
+
+              <button 
+                onClick={() => setShowResetModal(true)}
+                disabled={resetLoading}
+                className="w-full py-2.5 flex items-center justify-center gap-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50"
+              >
+                {resetLoading ? (
+                   <><div className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full"/> Sending...</>
+                ) : (
+                   'Change Password via Email'
+                )}
+              </button>
             </div>
 
             <button onClick={handleLogout} className="w-full mt-2 py-2.5 flex items-center justify-center gap-2 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 transition-all">
