@@ -14,12 +14,15 @@ import {
   Zap,
   X,
 } from 'lucide-react';
-import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
+import { apiService } from '../services/api';
+import porsche911Image from '../../assests/carsPictures/porsche911.png';
+import teslaModelSPlaidImage from '../../assests/carsPictures/teslaModelSPlaid.jpg';
+import fordBroncoImage from '../../assests/carsPictures/fordBroncoF.jpg';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
@@ -161,6 +164,9 @@ const ListingDetailPage: React.FC = () => {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [auction, setAuction] = useState<any | null>(null);
   const [delistedIds, setDelistedIds] = useState<Set<string>>(() => readDelistedIds());
   const [now, setNow] = useState(() => Date.now());
   const [isBidOpen, setIsBidOpen] = useState(false);
@@ -199,8 +205,8 @@ const ListingDetailPage: React.FC = () => {
     });
   }, [bidSuccess]);
 
-  const listing = useMemo(() => MOCK_AUCTIONS.find((auction) => auction.id === id), [id]);
-  const arabicCopy = listing ? ARABIC_LISTING_COPY[listing.id] : undefined;
+  const fallbackImages = useMemo(() => [porsche911Image, teslaModelSPlaidImage, fordBroncoImage], []);
+  const arabicCopy = auction ? ARABIC_LISTING_COPY[auction.id] : undefined;
 
   const conditionLabel = (condition: string) => {
     const key = condition.toLowerCase();
@@ -212,77 +218,6 @@ const ListingDetailPage: React.FC = () => {
     return condition;
   };
 
-  const canManageListings =
-    user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!listing) return;
-    const stored = readBidState(listing.id);
-    setCurrentBid(stored?.currentBid ?? listing.currentBid);
-    setCurrentBidCount(stored?.bidCount ?? listing.bidCount);
-  }, [listing]);
-
-  useEffect(() => {
-    if (!listing) return;
-    const endTime = new Date(listing.endTime).getTime();
-    if (now < endTime) return;
-    if (readPaymentStatus(listing.id) === 'paid') return;
-    if (readPaymentNotice(listing.id)) return;
-    addNotification(
-      t(
-        `Auction ended. Please complete payment for ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}.`,
-        `انتهى المزاد يرجى اكمال الدفع لسيارة ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`
-      ),
-      'warn'
-    );
-    writePaymentNotice(listing.id);
-  }, [addNotification, listing, now]);
-
-  if (!listing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl p-10 text-center shadow-2xl shadow-slate-200/50 border border-white/40">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-            <Zap className="w-10 h-10 text-slate-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">{t('Listing Not Found', 'الاعلان غير موجود')}</h1>
-          <p className="text-slate-600 mb-8 leading-relaxed">
-            {t('This vehicle may have been sold or is no longer available.', 'قد تكون السيارة بيعت او لم تعد متاحة')}
-          </p>
-          <Link
-            to="/browse"
-            className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40"
-          >
-            <ChevronLeft size={18} />
-            {t('Discover More Listings', 'اكتشف اعلانات اخرى')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const isDelisted = delistedIds.has(listing.id);
-  const timeStyles = generateTimeStyles(listing.endTime, now);
-  const effectiveBid = currentBid ?? listing.currentBid;
-  const effectiveBidCount = currentBidCount ?? listing.bidCount;
-  const isEnded = new Date(listing.endTime).getTime() <= now;
-  const paymentStatus = readPaymentStatus(listing.id);
-  const descriptionText = t(
-    listing.vehicle.description,
-    arabicCopy?.description ?? listing.vehicle.description
-  );
-  const longDescriptionText = t(
-    listing.vehicle.longDescription ||
-      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
-    arabicCopy?.longDescription ||
-      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
-  );
-  const locationText = t(listing.vehicle.location, arabicCopy?.location ?? listing.vehicle.location);
   const formatTimeRemaining = (endTime: string) => {
     const end = new Date(endTime).getTime();
     const diff = end - now;
@@ -308,6 +243,170 @@ const ListingDetailPage: React.FC = () => {
       : `${minutes}m ${seconds}s`;
   };
 
+  const canManageListings =
+    user?.role === UserRole.SELLER || user?.role === UserRole.ADMIN || user?.role === UserRole.DEALER;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAuction = async () => {
+      if (!id) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const auctionResponse = await apiService.getAuctionById(id);
+
+        if (auctionResponse.error) {
+          setError(auctionResponse.error);
+          return;
+        }
+
+        if (!auctionResponse.data) {
+          setError('Auction not found.');
+          return;
+        }
+
+        const raw = auctionResponse.data;
+        const vehicle = raw.vehicleId || {};
+        const images = Array.isArray(vehicle.images) && vehicle.images.length > 0 ? vehicle.images : fallbackImages;
+
+        const mapped = {
+          id: raw._id,
+          vehicle: {
+            ...vehicle,
+            images,
+            description: vehicle.description || '',
+            longDescription: vehicle.description || ''
+          },
+          sellerId: raw.sellerId,
+          currentBid: raw.currentBid || 0,
+          startingBid: raw.startPrice || 0,
+          reservePrice: raw.reservePrice || 0,
+          bidCount: raw.bidCount || 0,
+          endTime: raw.endTime,
+          status: raw.status,
+          minBidIncrement: raw.minBidIncrement || 50
+        };
+
+        if (isMounted) {
+          setAuction(mapped);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError('Failed to load auction.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchAuction();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackImages, id, t]);
+
+  useEffect(() => {
+    if (!auction) return;
+    const stored = readBidState(auction.id);
+    setCurrentBid(stored?.currentBid ?? auction.currentBid);
+    setCurrentBidCount(stored?.bidCount ?? auction.bidCount);
+  }, [auction]);
+
+  useEffect(() => {
+    if (!auction) return;
+    const endTime = new Date(auction.endTime).getTime();
+    if (now < endTime) return;
+    if (readPaymentStatus(auction.id) === 'paid') return;
+    if (readPaymentNotice(auction.id)) return;
+    addNotification(
+      t(
+        `Auction ended. Please complete payment for ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}.`,
+        `انتهى المزاد يرجى اكمال الدفع لسيارة ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`
+      ),
+      'warn'
+    );
+    writePaymentNotice(auction.id);
+  }, [addNotification, auction, now]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
+        <div className="text-slate-600 text-sm">Loading auction...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl p-10 text-center shadow-2xl shadow-slate-200/50 border border-white/40">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+            <Zap className="w-10 h-10 text-slate-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">Auction Unavailable</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">{error}</p>
+          <Link
+            to="/auctions"
+            className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40"
+          >
+            <ChevronLeft size={18} />
+            Back to Auctions
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auction) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white/90 backdrop-blur-sm rounded-3xl p-10 text-center shadow-2xl shadow-slate-200/50 border border-white/40">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+            <Zap className="w-10 h-10 text-slate-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">{t('Listing Not Found', 'الاعلان غير موجود')}</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            {t('This vehicle may have been sold or is no longer available.', 'قد تكون السيارة بيعت او لم تعد متاحة')}
+          </p>
+          <Link
+            to="/auctions"
+            className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40"
+          >
+            <ChevronLeft size={18} />
+            {t('Discover More Listings', 'اكتشف اعلانات اخرى')}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isDelisted = delistedIds.has(auction.id);
+  const timeStyles = generateTimeStyles(auction.endTime, now);
+  const effectiveBid = currentBid ?? auction.currentBid;
+  const effectiveBidCount = currentBidCount ?? auction.bidCount;
+  const isEnded = new Date(auction.endTime).getTime() <= now;
+  const paymentStatus = readPaymentStatus(auction.id);
+  const descriptionText = t(
+    auction.vehicle.description,
+    arabicCopy?.description ?? auction.vehicle.description
+  );
+  const longDescriptionText = t(
+    auction.vehicle.longDescription ||
+      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
+    arabicCopy?.longDescription ||
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
+  );
+  const locationText = t(auction.vehicle.location, arabicCopy?.location ?? auction.vehicle.location);
+
   const handleDelist = () => {
     const confirmed = window.confirm(
       t('Delist this vehicle from active listings?', 'هل تريد ازالة هذه السيارة من الاعلانات النشطة')
@@ -315,7 +414,7 @@ const ListingDetailPage: React.FC = () => {
     if (!confirmed) return;
     setDelistedIds((prev) => {
       const next = new Set<string>(prev);
-      next.add(listing.id);
+      next.add(auction.id);
       updateDelistedIds(next);
       return next;
     });
@@ -324,7 +423,7 @@ const ListingDetailPage: React.FC = () => {
   const handleRestore = () => {
     setDelistedIds((prev) => {
       const next = new Set<string>(prev);
-      next.delete(listing.id);
+      next.delete(auction.id);
       updateDelistedIds(next);
       return next;
     });
@@ -333,7 +432,7 @@ const ListingDetailPage: React.FC = () => {
   const handleBidSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(bidAmount);
-    if (new Date(listing.endTime).getTime() <= Date.now()) {
+    if (new Date(auction.endTime).getTime() <= Date.now()) {
       setBidError(t('Bidding has ended for this auction.', 'انتهت المزايدة لهذا المزاد'));
       return;
     }
@@ -342,8 +441,9 @@ const ListingDetailPage: React.FC = () => {
       setBidError(t('Enter a valid bid amount.', 'ادخل قيمة مزايدة صحيحة'));
       return;
     }
-    if (amount <= effectiveBid) {
-      setBidError(t(`Bid must be higher than EGP ${formatNumber(effectiveBid)}.`, `يجب ان تكون المزايدة اعلى من ${formatCurrencyEGP(effectiveBid)}`));
+    const minAllowed = effectiveBid + (auction.minBidIncrement || 50);
+    if (amount < minAllowed) {
+      setBidError(t(`Minimum bid is EGP ${formatNumber(minAllowed)}.`, `الحد الادنى ${formatCurrencyEGP(minAllowed)}`));
       return;
     }
     if (amount > maxAllowed) {
@@ -360,27 +460,41 @@ const ListingDetailPage: React.FC = () => {
     setIsConfirmOpen(true);
   };
 
-  const handleConfirmBid = () => {
+  const handleConfirmBid = async () => {
     if (pendingBidAmount === null) return;
-    setIsConfirmOpen(false);
-    setIsBidOpen(false);
-    setBidAmount('');
-    setCurrentBid(pendingBidAmount);
-    setCurrentBidCount((prev) => {
-      const next = (prev ?? listing.bidCount) + 1;
-      writeBidState(listing.id, pendingBidAmount, next);
-      return next;
-    });
-    setBidSuccess(pendingBidAmount);
-    addNotification(
-      t(
-        `Your bidding on the ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} is completed at EGP ${formatNumber(pendingBidAmount)}.`,
-        `تم تسجيل مزايدتك على ${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model} بقيمة ${formatCurrencyEGP(pendingBidAmount)}`
-      ),
-      'success'
-    );
-    setPendingBidAmount(null);
-    window.setTimeout(() => setBidSuccess(null), 4200);
+    try {
+      const response = await apiService.placeBid(auction.id, pendingBidAmount);
+      if (response.error) {
+        setBidError(response.error);
+        return;
+      }
+      setIsConfirmOpen(false);
+      setIsBidOpen(false);
+      setBidAmount('');
+      setCurrentBid(pendingBidAmount);
+      setCurrentBidCount((prev) => {
+        const next = (prev ?? auction.bidCount) + 1;
+        writeBidState(auction.id, pendingBidAmount, next);
+        return next;
+      });
+      setBidSuccess(pendingBidAmount);
+      setPendingBidAmount(null);
+      setAuction((prev: any) => prev ? {
+        ...prev,
+        currentBid: pendingBidAmount,
+        bidCount: prev.bidCount + 1
+      } : prev);
+      addNotification(
+        t(
+          `Your bidding on the ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} is completed at EGP ${formatNumber(pendingBidAmount)}.`,
+          `تم تسجيل مزايدتك على ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} بقيمة ${formatCurrencyEGP(pendingBidAmount)}`
+        ),
+        'success'
+      );
+      window.setTimeout(() => setBidSuccess(null), 4200);
+    } catch (err) {
+      setBidError(t('Failed to place bid. Please try again.', 'فشل تقديم المزايدة، حاول مرة اخرى'));
+    }
   };
 
   const handleCancelConfirm = () => {
@@ -402,7 +516,7 @@ const ListingDetailPage: React.FC = () => {
         <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 listing-detail-topbar">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              <Link to="/browse" className="group flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
+              <Link to="/auctions" className="group flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 <div className="p-1.5 rounded-xl bg-white border border-slate-200 group-hover:border-slate-300 group-hover:shadow-sm transition-all">
                   <ChevronLeft size={16} />
                 </div>
@@ -424,13 +538,19 @@ const ListingDetailPage: React.FC = () => {
             {/* Left Column - Images */}
             <div className="lg:col-span-2 space-y-6">
               {/* Main Image */}
-              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group listing-detail-main-card">
-                <img
-                  src={listing.vehicle.images[0]}
-                  alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
-                  className="w-full h-[500px] object-cover cursor-zoom-in transition-transform duration-700 group-hover:scale-105"
-                  onClick={() => setLightboxIndex(0)}
-                />
+              <div className="relative rounded-3xl overflow-hidden border border-white/40 bg-gradient-to-br from-white to-slate-50 shadow-2xl shadow-slate-200/50 group">
+                {auction.vehicle.images?.length ? (
+                  <img
+                    src={auction.vehicle.images[0]}
+                    alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
+                    className="w-full h-[500px] object-cover cursor-zoom-in transition-transform duration-700 group-hover:scale-105"
+                    onClick={() => setLightboxIndex(0)}
+                  />
+                ) : (
+                  <div className="w-full h-[500px] bg-slate-100 flex items-center justify-center text-slate-400">
+                    No Image
+                  </div>
+                )}
                 <div className="absolute top-5 left-5 flex flex-col gap-2">
                   <span
                     className={`px-4 py-2.5 rounded-full text-xs font-black uppercase tracking-wider shadow-lg ${
@@ -442,12 +562,13 @@ const ListingDetailPage: React.FC = () => {
                     {isDelisted ? t('Delisted', 'تم ازالة الاعلان') : t('Live Auction', 'مزاد مباشر')}
                   </span>
                   <span className="px-4 py-2.5 rounded-full text-xs font-black uppercase tracking-wider shadow-lg bg-blue-600 text-white border border-blue-500/60">
-                    {conditionLabel(listing.vehicle.condition)}
+                    {conditionLabel(auction.vehicle.condition)}
                   </span>
                 </div>
                 <div className="absolute bottom-5 right-5">
                   <button
                     onClick={() => setLightboxIndex(0)}
+                    disabled={!auction.vehicle.images?.length}
                     className="px-4 py-2.5 rounded-xl backdrop-blur-md bg-white/95 border border-white/70 text-slate-800 text-sm font-semibold hover:bg-white transition-all duration-300 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:shadow-slate-300/50"
                   >
                     {t('View All Photos', 'عرض كل الصور')}
@@ -457,7 +578,7 @@ const ListingDetailPage: React.FC = () => {
 
               {/* Thumbnail Grid */}
               <div className="grid grid-cols-4 gap-4">
-                {listing.vehicle.images.slice(0, 4).map((image, index) => (
+                {auction.vehicle.images.slice(0, 4).map((image: string, index: number) => (
                   <div
                     key={index}
                     className={`relative rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
@@ -482,7 +603,7 @@ const ListingDetailPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 text-sm font-semibold text-blue-700">
-                    {listing.vehicle.year}
+                    {auction.vehicle.year}
                   </span>
                   <div className="flex items-center gap-2 text-slate-600 text-sm">
                     <MapPin size={14} />
@@ -491,7 +612,7 @@ const ListingDetailPage: React.FC = () => {
                 </div>
 
                 <h1 className="text-3xl font-bold text-slate-900 leading-tight">
-                  {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
+                  {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
                 </h1>
                 <p className="text-slate-600 leading-relaxed">{descriptionText}</p>
               </div>
@@ -514,7 +635,7 @@ const ListingDetailPage: React.FC = () => {
                 <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-2xl p-5 border border-slate-200/60 shadow-sm listing-detail-stat-card">
                   <div className="text-slate-500 text-sm mb-1">{t('Mileage', 'المسافة')}</div>
                   <div className="text-2xl font-bold text-slate-900">
-                    {formatNumber(listing.vehicle.mileage)}
+                    {formatNumber(auction.vehicle.mileage)}
                     <span className="text-sm font-normal text-slate-500 ml-1">{t('mi', 'ميل')}</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-2">{t('Low mileage', 'مسافة قليلة')}</div>
@@ -535,7 +656,7 @@ const ListingDetailPage: React.FC = () => {
                       timeStyles.badgeBg,
                     ].join(' ')}
                   >
-                    {formatTimeRemaining(listing.endTime)}
+                    {formatTimeRemaining(auction.endTime)}
                   </span>
                 </div>
 
@@ -555,6 +676,29 @@ const ListingDetailPage: React.FC = () => {
 
                 {/* CTA */}
                 <div className="px-5 pb-5">
+                  <button
+                    onClick={() => setIsBidOpen(true)}
+                    className={[
+                      'w-full rounded-2xl px-6 py-4',
+                      'bg-emerald-600 text-white',
+                      'text-base font-semibold tracking-wide',
+                      'shadow-lg shadow-emerald-600/20',
+                      'ring-1 ring-emerald-600/25',
+                      'hover:bg-emerald-700 hover:shadow-emerald-600/30 hover:ring-emerald-600/35',
+                      'active:scale-[0.99]',
+                      'transition-all duration-200',
+                      'flex items-center justify-center gap-3',
+                      'focus:outline-none focus:ring-4 focus:ring-emerald-500/20',
+                    ].join(' ')}
+                  >
+                    <Gavel size={18} />
+                    Place your bid
+                    <span className="text-white/85 text-sm font-medium">(EGP {auction.currentBid.toLocaleString()}+)</span>
+                  </button>
+
+                  <p className="text-center text-slate-700 text-sm font-semibold mt-3">
+                    Join {auction.bidCount} other bidders in this auction
+                  </p>
                   {isEnded ? (
                     <div className="space-y-3">
                       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -566,7 +710,7 @@ const ListingDetailPage: React.FC = () => {
                         </div>
                       ) : (
                         <Link
-                          to={`/payment/${listing.id}`}
+                          to={`/payment/${auction.id}`}
                           className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
                         >
                           {t('Complete payment', 'اكمل الدفع')}
@@ -710,7 +854,7 @@ const ListingDetailPage: React.FC = () => {
                         type="number"
                         value={bidAmount}
                         onChange={(e) => setBidAmount(e.target.value)}
-                        min={effectiveBid + 1}
+                        min={effectiveBid + (auction.minBidIncrement || 50)}
                         max={effectiveBid * 3}
                         className="w-full pl-12 pr-4 py-4 text-lg font-semibold rounded-2xl border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
                         placeholder={`${formatNumber(effectiveBid)}`}
@@ -942,9 +1086,9 @@ const ListingDetailPage: React.FC = () => {
 
       {lightboxIndex !== null && (
         <ImageLightbox
-          images={listing.vehicle.images}
+          images={auction.vehicle.images}
           startIndex={lightboxIndex}
-          alt={`${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`}
+          alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
           onClose={() => setLightboxIndex(null)}
         />
       )}

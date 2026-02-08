@@ -4,10 +4,14 @@ This document provides a comprehensive reference for the AUTOUSATA Oracle Databa
 
 ## Schema Overview
 
-The database is designed for a used car auction platform. It handles users (buyers, sellers, inspectors, admins), vehicle listings, inspections, auctions, bidding, payments, escrow, and notifications.
+The database is designed for a used car auction platform. It handles users (buyers, sellers, inspectors, admins), vehicle listings, inspections, auctions, bidding, payments, escrow, notifications, and real-time webhook integrations.
 
 **Schema Name:** `DIP`
 **Database Type:** Oracle Database 19c+
+
+**Recent Updates:**
+- **Payment Integration** (Migration 001): Added Stripe payment tracking, webhook idempotency, payment deadlines
+- **Real-Time Auctions** (Migration 002): Added Socket.IO webhook subscriptions, delivery logging, optimized indexes
 
 ## Entity Relationship Diagram (Mermaid)
 
@@ -20,6 +24,7 @@ erDiagram
     USERS ||--o{ KYC_DOCUMENTS : submits
     USERS ||--o{ USER_RATINGS : "rates / is rated"
     USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ WEBHOOK_SUBSCRIPTIONS : subscribes
 
     VEHICLES ||--|| INSPECTION_REPORTS : "has"
     VEHICLES ||--|| AUCTIONS : "auctioned via"
@@ -30,6 +35,9 @@ erDiagram
     AUCTIONS ||--o{ NOTIFICATIONS : "triggers"
 
     PAYMENTS ||--|| ESCROWS : "funds"
+    PAYMENTS ||--o{ WEBHOOK_EVENTS : "tracks"
+
+    WEBHOOK_SUBSCRIPTIONS ||--o{ WEBHOOK_DELIVERY_LOG : "logs"
 
     KYC_DOCUMENTS }|--|| USERS : "reviewed by admin"
 ```
@@ -172,9 +180,14 @@ The bidding event for a vehicle.
 | `LEADING_BIDDER_ID` | VARCHAR2(36) | FK -> USERS | Current highest bidder |
 | `WINNER_ID` | VARCHAR2(36) | FK -> USERS | Final winner |
 | `PAYMENT_ID` | VARCHAR2(36) | FK -> PAYMENTS | Linked payment |
+| `PAYMENT_DEADLINE` | TIMESTAMP | | 24-hour payment window deadline |
 | `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Creation timestamp |
 | `STARTED_AT` | TIMESTAMP | | Actual start time |
 | `ENDED_AT` | TIMESTAMP | | Actual end time |
+
+**Indexes:**
+- `IDX_AUCTIONS_STATUS_ENDTIME` - Composite index on (STATUS, END_TIME) for scheduler optimization
+- `IDX_AUCTIONS_PAYMENT_DEADLINE` - Index on PAYMENT_DEADLINE for payment tracking
 
 ### 6. BIDS
 Individual bids placed on an auction.
@@ -191,6 +204,10 @@ Individual bids placed on an auction.
 | `IP_ADDRESS` | VARCHAR2(45) | | Bidder IP |
 | `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Creation timestamp |
 | `UPDATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Update timestamp |
+
+**Indexes:**
+- `IDX_BIDS_AUCTION_TIME` - Composite index on (AUCTION_ID, CREATED_AT DESC) for bid history
+- `IDX_BIDS_BIDDER` - Index on BIDDER_ID for user bid queries
 
 ### 7. PAYMENTS
 Transaction records.
@@ -214,6 +231,16 @@ Transaction records.
 | `COMPLETED_AT` | TIMESTAMP | | Completed timestamp |
 | `FAILED_AT` | TIMESTAMP | | Failed timestamp |
 | `REFUNDED_AT` | TIMESTAMP | | Refunded timestamp |
+
+**Indexes:**
+- `IDX_PAYMENTS_AUCTION` - Index on AUCTION_ID
+- `IDX_PAYMENTS_BUYER` - Index on BUYER_ID
+- `IDX_PAYMENTS_SELLER` - Index on SELLER_ID
+- `IDX_PAYMENTS_STATUS` - Index on STATUS
+- `IDX_PAYMENTS_GATEWAY_ORDER` - Index on GATEWAY_ORDER_ID
+
+**Constraints:**
+- `CHK_PAYMENTS_STATUS` - CHECK (STATUS IN ('pending', 'completed', 'failed', 'refunded', 'cancelled'))
 
 ### 8. ESCROWS
 Funds held securely until transfer is confirmed.
@@ -241,6 +268,16 @@ Funds held securely until transfer is confirmed.
 | `DISPUTE_RESOLVED_AT` | TIMESTAMP | | Dispute resolved |
 | `DISPUTE_NOTES` | CLOB | | Dispute notes |
 | `AUTO_RELEASE_AT` | TIMESTAMP | | Auto release time |
+
+**Indexes:**
+- `IDX_ESCROWS_PAYMENT` - Index on PAYMENT_ID
+- `IDX_ESCROWS_AUCTION` - Index on AUCTION_ID
+- `IDX_ESCROWS_STATUS` - Index on STATUS
+- `IDX_ESCROWS_BUYER` - Index on BUYER_ID
+- `IDX_ESCROWS_SELLER` - Index on SELLER_ID
+
+**Constraints:**
+- `CHK_ESCROWS_STATUS` - CHECK (STATUS IN ('held', 'released', 'refunded', 'disputed'))
 
 ### 9. USER_RATINGS
 Reputation system.
@@ -288,6 +325,97 @@ System alerts.
 | `SENT_AT` | TIMESTAMP | | Sent timestamp |
 | `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Created timestamp |
 
+### 11. WEBHOOK_EVENTS
+Stripe webhook idempotency tracking to prevent duplicate event processing.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `ID` | VARCHAR2(36) | PK | UUID |
+| `EVENT_ID` | VARCHAR2(255) | Unique, Not Null | Stripe event ID |
+| `EVENT_TYPE` | VARCHAR2(100) | Not Null | Stripe event type |
+| `PROCESSED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Processing timestamp |
+| `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Creation timestamp |
+
+**Indexes:**
+- `IDX_WEBHOOK_EVENTS_EVENT_ID` - Index on EVENT_ID for fast lookup
+- `IDX_WEBHOOK_EVENTS_TYPE` - Index on EVENT_TYPE
+
+### 12. WEBHOOK_SUBSCRIPTIONS
+User-defined webhook subscriptions for real-time auction events.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `ID` | VARCHAR2(36) | PK | UUID (generated by application) |
+| `USER_ID` | VARCHAR2(36) | FK -> USERS, Not Null | Subscribing user |
+| `EVENT_TYPE` | VARCHAR2(50) | Not Null, Check | Event type to subscribe to |
+| `WEBHOOK_URL` | VARCHAR2(500) | Not Null | Destination URL for webhook delivery |
+| `SECRET_KEY` | VARCHAR2(100) | Not Null | HMAC secret for signature verification |
+| `IS_ACTIVE` | NUMBER(1) | Default 1, Check 0/1 | Active status |
+| `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Creation timestamp |
+| `UPDATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Update timestamp (auto-updated by trigger) |
+
+**Indexes:**
+- `IDX_WH_SUB_USER` - Index on USER_ID
+- `IDX_WH_SUB_EVENT` - Composite index on (EVENT_TYPE, IS_ACTIVE)
+- `IDX_WH_SUB_ACTIVE` - Index on IS_ACTIVE
+
+**Constraints:**
+- `CHK_WH_SUB_ACTIVE` - CHECK (IS_ACTIVE IN (0, 1))
+- `CHK_WH_EVENT_TYPE` - CHECK (EVENT_TYPE IN ('bid.placed', 'auction.ending_soon', 'user.outbid', 'auction.ended', 'auction.winner_declared'))
+- `FK_WH_SUB_USER` - Foreign key to USERS(ID) with CASCADE DELETE
+
+**Triggers:**
+- `TRG_WH_SUB_UPDATED_AT` - Auto-updates UPDATED_AT on row modification
+
+### 13. WEBHOOK_DELIVERY_LOG
+Webhook delivery history and debugging information.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `ID` | VARCHAR2(36) | PK | UUID (generated by application) |
+| `SUBSCRIPTION_ID` | VARCHAR2(36) | FK -> WEBHOOK_SUBSCRIPTIONS, Not Null | Source subscription |
+| `EVENT_TYPE` | VARCHAR2(50) | Not Null | Event type delivered |
+| `PAYLOAD` | CLOB | Not Null | JSON payload sent |
+| `RESPONSE_STATUS` | NUMBER(3) | | HTTP response status code |
+| `RESPONSE_BODY` | CLOB | | Response body from endpoint |
+| `ATTEMPT_NUMBER` | NUMBER(2) | Default 1, Not Null | Delivery attempt (1-3) |
+| `DELIVERED_AT` | TIMESTAMP | | Successful delivery timestamp |
+| `FAILED_AT` | TIMESTAMP | | Failed delivery timestamp |
+| `ERROR_MESSAGE` | CLOB | | Error details if failed |
+| `CREATED_AT` | TIMESTAMP | Default CURRENT_TIMESTAMP | Creation timestamp |
+
+**Indexes:**
+- `IDX_WH_LOG_SUB` - Index on SUBSCRIPTION_ID
+- `IDX_WH_LOG_CREATED` - Index on CREATED_AT
+
+**Constraints:**
+- `FK_WH_LOG_SUB` - Foreign key to WEBHOOK_SUBSCRIPTIONS(ID) with CASCADE DELETE
+
+## Database Views
+
+### V_PAYMENT_SUMMARY
+Comprehensive payment analytics view combining payments, escrows, auctions, and vehicles.
+
+**Columns:**
+- Payment details (ID, AUCTION_ID, BUYER_ID, SELLER_ID, AMOUNT_EGP, STATUS, timestamps)
+- Escrow details (ID, STATUS, COMMISSION_EGP, SELLER_PAYOUT_EGP, BUYER_RECEIVED, SELLER_TRANSFER)
+- Vehicle details (VEHICLE_ID, YEAR, MAKE, MODEL)
+
+**Usage:** Payment reporting, analytics, and financial dashboards
+
+### V_LIVE_AUCTIONS
+Real-time auction monitoring view for active auctions.
+
+**Columns:**
+- Auction details (AUCTION_ID, VEHICLE_ID, SELLER_ID, STATUS, timing fields, bid details)
+- Vehicle summary (MAKE, MODEL, YEAR_MFG)
+- TOTAL_BIDS - Aggregate count of accepted bids
+- URGENCY_STATUS - Computed field: 'ENDED', 'ENDING_SOON' (<5 min), or 'ACTIVE'
+
+**Usage:** Real-time dashboards, auction scheduler, Socket.IO event triggers
+
+**Performance:** Optimized with IDX_AUCTIONS_STATUS_ENDTIME composite index
+
 ## Stored Procedures
 
 ### `sp_register_user`
@@ -308,7 +436,7 @@ Fetches basic public user info.
 ## API Implementation Notes
 
 1.  **JSON Handling**:
-    *   Columns like `VEHICLES.FEATURES`, `INSPECTION_REPORTS.PHOTOS_URL`, `NOTIFICATIONS.CHANNELS_SENT`, `USER_RATINGS.CATEGORY_SCORES`, `USER_RATINGS.POSITIVE_ASPECTS`, `USER_RATINGS.NEGATIVE_ASPECTS` are stored as **CLOB** with `IS JSON` constraints.
+    *   Columns like `VEHICLES.FEATURES`, `INSPECTION_REPORTS.PHOTOS_URL`, `NOTIFICATIONS.CHANNELS_SENT`, `USER_RATINGS.CATEGORY_SCORES`, `USER_RATINGS.POSITIVE_ASPECTS`, `USER_RATINGS.NEGATIVE_ASPECTS`, and `WEBHOOK_DELIVERY_LOG.PAYLOAD` are stored as **CLOB** with `IS JSON` constraints.
     *   Ensure your API backend parses these JSON strings when reading and stringifies them when writing.
 
 2.  **Date/Time**:
@@ -327,3 +455,20 @@ Fetches basic public user info.
 5.  **Security**:
     *   Always hash passwords before calling `sp_register_user` or comparing with `sp_login_user`.
     *   Use `sp_login_user` to check for `BANNED` or `INACTIVE` status during authentication.
+    *   **Webhook Security**: Validate webhook signatures using HMAC-SHA256 and the `SECRET_KEY` from `WEBHOOK_SUBSCRIPTIONS`.
+    *   **Stripe Webhooks**: Use `WEBHOOK_EVENTS.EVENT_ID` for idempotency - verify event hasn't been processed before executing business logic.
+
+6.  **Real-Time Bidding**:
+    *   Use the `IDX_AUCTIONS_STATUS_ENDTIME` composite index for efficient scheduler queries.
+    *   Socket.IO implementation should emit events matching `WEBHOOK_SUBSCRIPTIONS.EVENT_TYPE` values.
+    *   Query `V_LIVE_AUCTIONS` view for real-time auction dashboards instead of complex joins.
+
+7.  **Webhook Delivery**:
+    *   Retry failed webhooks up to 3 times (exponential backoff: 1s, 5s, 15s).
+    *   Log each attempt in `WEBHOOK_DELIVERY_LOG` with `ATTEMPT_NUMBER`.
+    *   Include `X-Webhook-Signature` header with HMAC-SHA256(payload, SECRET_KEY).
+
+8.  **Payment Deadline Tracking**:
+    *   Set `AUCTIONS.PAYMENT_DEADLINE` to 24 hours after auction ends.
+    *   Use scheduled jobs to check `PAYMENT_DEADLINE` and trigger notifications for unpaid winners.
+    *   Index on `PAYMENT_DEADLINE` enables efficient queries for overdue payments.

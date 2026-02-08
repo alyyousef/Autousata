@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -173,6 +173,22 @@ async verifyEmailOtp(email: string, otp: string) {
     return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
   }
 
+  async getAuctionById(auctionId: string) {
+    return this.request<any>(`/auctions/${auctionId}`);
+  }
+
+  async getAuctionBids(auctionId: string, limit = 20) {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    return this.request<{ bids: any[] }>(`/auctions/${auctionId}/bids?${queryParams.toString()}`);
+  }
+
+  async placeBid(auctionId: string, amount: number) {
+    return this.request<{ bid: any; currentBid: number }>(`/auctions/${auctionId}/bids`, {
+      method: 'POST',
+      body: JSON.stringify({ amount })
+    });
+  }
+
   async getSellerVehicles() {
     return this.request<any[]>('/vehicles');
   }
@@ -200,6 +216,168 @@ async verifyEmailOtp(email: string, otp: string) {
     return this.request<{ avatar: string }>('/profile/avatar', {
       method: 'PUT',
       body: formData,
+    });
+  }
+
+  // =========================================================
+  // PAYMENT METHODS
+  // =========================================================
+  
+  /**
+   * Create a Stripe Payment Intent for an auction
+   */
+  async createPaymentIntent(auctionId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        bidAmount: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      auction: {
+        id: string;
+        vehicle: string;
+        deadline: string;
+      };
+    }>('/payments/create-intent', {
+      method: 'POST',
+      body: JSON.stringify({ auctionId }),
+    });
+  }
+
+  /**
+   * Confirm payment completion
+   */
+  async confirmPayment(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      paymentId: string;
+      escrowId: string;
+    }>(`/payments/${paymentId}/confirm`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get payment details by auction ID
+   */
+  async getPaymentByAuction(auctionId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/auction/${auctionId}`);
+  }
+
+  /**
+   * Get escrow details
+   */
+  async getEscrowDetails(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      escrow: {
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        commissionEGP: number;
+        sellerPayoutEGP: number;
+        status: string;
+        buyerReceived?: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+      };
+    }>(`/payments/escrows/${escrowId}`);
+  }
+
+  /**
+   * Buyer confirms vehicle receipt (releases escrow)
+   */
+  async confirmVehicleReceipt(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+      sellerPayoutEGP: number;
+    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Initiate dispute on escrow
+   */
+  async initiateDispute(escrowId: string, reason: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+    }>(`/payments/escrows/${escrowId}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  /**
+   * Admin: Get all disputed escrows
+   */
+  async getDisputedEscrows() {
+    return this.request<{
+      success: boolean;
+      disputes: Array<{
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        disputeReason: string;
+        disputedAt: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+        buyer: {
+          name: string;
+          email: string;
+        };
+        seller: {
+          name: string;
+          email: string;
+        };
+      }>;
+    }>('/payments/escrows/disputed');
+  }
+
+  /**
+   * Admin: Process refund
+   */
+  async processRefund(paymentId: string, reason: string, amount?: number) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      refundId: string;
+      amountRefundedEGP: number;
+    }>(`/payments/${paymentId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, amount }),
     });
   }
 }
