@@ -72,6 +72,9 @@ app.use("/api/admin/users", adminUsersRoutes);
 
 const adminContentRoutes = require("./routes/adminContent");
 app.use("/api/admin/content", adminContentRoutes);
+const adminFinanceRoutes = require("./routes/adminFinance");
+app.use("/api/admin/finance", adminFinanceRoutes);
+
 const adminRoutes = require("./routes/admin");
 app.use("/api/admin", adminRoutes);
 
