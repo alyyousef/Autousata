@@ -8,7 +8,7 @@ const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
 const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 
 // =========================================================
-// 1. GENERATE TOKEN (Legacy single token)
+// 1. GENERATE TOKEN (Legacy support)
 // =========================================================
 const generateToken = (userId) => {
   return jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: LEGACY_TOKEN_EXPIRES_IN });
@@ -24,19 +24,18 @@ const generateTokens = (userId) => {
 };
 
 // =========================================================
-// 3. VERIFY REFRESH TOKEN (Helper)
+// 3. VERIFY REFRESH TOKEN
 // =========================================================
-// Why: The controller will need this to check if a user is allowed to get a new token.
 const verifyRefreshToken = (token) => {
   try {
     return jwt.verify(token, REFRESH_SECRET);
   } catch (error) {
-    return null; // Invalid or expired
+    return null;
   }
 };
 
 // =========================================================
-// 4. AUTHENTICATE MIDDLEWARE (Checks Access Token)
+// 4. AUTHENTICATE & MAP DATA (The Critical Part)
 // =========================================================
 const authenticate = async (req, res, next) => {
   let connection;
@@ -47,42 +46,57 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Verify against ACCESS_SECRET (Short lived)
+    // Verify Access Token
     const decoded = jwt.verify(token, ACCESS_SECRET);
     
     connection = await oracledb.getConnection();
 
+    // === UPDATED PROCEDURE CALL ===
+    // Added :ver to catch the verification status
     const result = await connection.execute(
       `BEGIN 
-         sp_get_user_by_id(:id, :name, :email, :role, :status); 
+         sp_get_user_by_id(:id, :fn, :ln, :em, :ph, :role, :status, :pic, :city, :ver); 
        END;`,
       {
         id: decoded.userId,
-        name:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        email:  { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        role:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+        fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        em: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ph: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        pic: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        city: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+        ver: { dir: oracledb.BIND_OUT, type: oracledb.STRING } // <--- CATCH VERIFICATION STATUS
       }
     );
 
     const userData = result.outBinds;
 
-    if (userData.status !== 'SUCCESS') {
+    if (userData.status === 'NOT_FOUND') {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // === DATA MAPPING ===
     req.user = {
       id: decoded.userId,
-      name: userData.name,
-      email: userData.email,
-      role: userData.role
+      firstName: userData.fn,
+      lastName: userData.ln,
+      email: userData.em,
+      phone: userData.ph,
+      role: userData.role,
+      profileImage: userData.pic,
+      location: {
+        city: userData.city
+      },
+      // Convert '1' to true, '0' to false
+      emailVerified: userData.ver === '1' 
     };
     
     req.token = token;
     next();
 
   } catch (error) {
-    // Specific error message helps frontend know IF it should try to refresh
     if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ error: 'TokenExpired', message: 'Access token expired' });
     }
@@ -100,10 +114,7 @@ const authenticate = async (req, res, next) => {
 // =========================================================
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();
@@ -111,7 +122,7 @@ const authorize = (...roles) => {
 };
 
 module.exports = {
-  generateToken,
+  generateToken, // Legacy
   generateTokens,
   verifyRefreshToken,
   authenticate,

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { StripeProvider } from './contexts/StripeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 
 import AppLayout from './layouts/AppLayout';
@@ -14,7 +15,6 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import TermsPage from './pages/TermsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import AuctionDetailPage from './pages/AuctionDetailPage';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import CreateListingPage from './pages/CreateListingPage';
@@ -71,7 +71,7 @@ const AppRoutes: React.FC = () => {
 
         <Route element={<AppLayout user={user} />}>
           {/* Protected Routes */}
-          <Route path="/auction/:id" element={<AuctionDetailPage />} />
+          <Route path="/auction/:id" element={<ListingDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>
@@ -97,13 +97,16 @@ const App: React.FC = () => {
   }, []);
 
   return (
+    <StripeProvider>
     <LanguageProvider>
       <AuthProvider>
         <NotificationProvider>
           <AppRoutes />
         </NotificationProvider>
       </AuthProvider>
-    </LanguageProvider>
+      </LanguageProvider>
+    </StripeProvider>
+   
   );
 };
 

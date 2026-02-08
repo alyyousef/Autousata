@@ -1,5 +1,4 @@
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const oracledb = require('oracledb');
 const db = require('../config/db');
 const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
@@ -8,7 +7,7 @@ const { sendVerificationEmail } = require('../services/emailService');
 require('dotenv').config();
 
 // ==========================================
-// 1. REGISTER
+// 1. REGISTER (With OTP)
 // ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
@@ -18,6 +17,7 @@ async function register(req, res) {
     try {
         console.log(`👉 Registering: ${email}`);
 
+        // A. Upload Profile Image (Optional)
         let profilePicUrl = null;
         if (file) {
             console.log("📸 [1] Starting S3 Upload...");
@@ -25,14 +25,15 @@ async function register(req, res) {
             console.log("✅ [2] S3 Upload Finished:", profilePicUrl);
         }
 
+        // B. Hash Password
         console.log("🔑 [3] Hashing Password...");
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
-        const verificationToken = crypto.randomBytes(32).toString('hex');
 
         console.log("🔌 [4] Requesting Database Connection...");
         connection = await db.getConnection();
         
+        // C. Execute Registration Procedure (Handles Soft Deletes/Revival)
         console.log("📝 [5] Executing Stored Procedure...");
         const result = await connection.execute(
             `BEGIN 
@@ -50,32 +51,37 @@ async function register(req, res) {
             }
         );
 
-        console.log("✅ [6] DB Execution Complete.");
         const status = result.outBinds.out_status;
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
-            // Update token in DB
+            console.log("✅ [6] User Record Created/Updated.");
+
+            // D. Generate 6-Digit OTP
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+            // E. Save OTP to DB
             await connection.execute(
-                `UPDATE users 
-                 SET email_verification_token = :token,
-                     email_token_expiry = CURRENT_TIMESTAMP + INTERVAL '1' DAY
-                 WHERE id = :u_id`, 
-                { token: verificationToken, u_id: newUserId },
-                { autoCommit: true }
+                `BEGIN sp_save_email_otp(:email, :otp, :status); END;`,
+                { 
+                    email: email, 
+                    otp: otpCode, 
+                    status: { dir: oracledb.BIND_OUT, type: oracledb.STRING } 
+                }
             );
 
-            console.log("✉️ [7] Sending Verification Email...");
-            sendVerificationEmail(email, verificationToken)
+            // F. Send Email
+            console.log("✉️ [7] Sending OTP Email...");
+            sendVerificationEmail(email, otpCode)
                 .catch(err => console.error("Email failed in background:", err));
 
+            // G. Generate Tokens (So user is logged in, but unverified)
             const { accessToken, refreshToken } = generateTokens(newUserId);
 
             res.status(201).json({ 
                 message: 'User registered successfully. Please verify your email.',
                 accessToken,
                 refreshToken,
-                token: accessToken,
                 user: {
                     id: newUserId,
                     firstName,
@@ -83,7 +89,7 @@ async function register(req, res) {
                     email,
                     role: 'client',
                     profileImage: profilePicUrl,
-                    emailVerified: false
+                    emailVerified: false // Flag for Frontend to redirect to OTP page
                 }
             });
 
@@ -97,9 +103,7 @@ async function register(req, res) {
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         if (connection) {
-            try {
-                await connection.close();
-            } catch (e) { console.error("Error closing connection:", e); }
+            try { await connection.close(); } catch (e) { console.error("Error closing connection:", e); }
         }
     }
 }
@@ -113,7 +117,6 @@ async function login(req, res) {
 
     try {
         console.log(`👉 Logging in: ${email}`);
-        
         connection = await db.getConnection();
 
         const result = await connection.execute(
@@ -154,7 +157,6 @@ async function login(req, res) {
                 message: 'Login successful',
                 accessToken,
                 refreshToken,
-                token: accessToken,
                 user: {
                     id: userData.id,
                     firstName: userData.fn,
@@ -179,50 +181,45 @@ async function login(req, res) {
 }
 
 // ==========================================
-// 3. VERIFY EMAIL
+// 3. VERIFY EMAIL OTP (New!)
 // ==========================================
-async function verifyEmail(req, res) {
-    const { token } = req.body;
+async function verifyEmailOtp(req, res) {
+    const { email, otp } = req.body;
     let connection;
 
     try {
+        console.log(`👉 Verifying OTP for: ${email}`);
         connection = await db.getConnection();
 
         const result = await connection.execute(
-            `SELECT id FROM users 
-             WHERE email_verification_token = :token 
-             AND email_token_expiry > CURRENT_TIMESTAMP`,
-            [token]
+            `BEGIN sp_verify_email_otp(:email, :otp, :status); END;`,
+            {
+                email: email,
+                otp: otp,
+                status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
+            }
         );
 
-        if (result.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid or expired verification link.' });
+        const status = result.outBinds.status;
+
+        if (status === 'SUCCESS') {
+            res.json({ success: true, message: 'Email verified successfully!' });
+        } else {
+            // Map DB errors to friendly messages
+            let errorMsg = 'Verification failed';
+            if (status === 'INVALID_OTP') errorMsg = 'Invalid code. Please try again.';
+            if (status === 'OTP_EXPIRED') errorMsg = 'Code expired. Please request a new one.';
+            if (status === 'NO_OTP_REQUESTED') errorMsg = 'No verification request found.';
+            
+            res.status(400).json({ error: errorMsg, code: status });
         }
 
-        const userId = result.rows[0][0];
-
-        await connection.execute(
-            `UPDATE users 
-             SET email_verified = '1', 
-                 email_verification_token = NULL, 
-                 email_token_expiry = NULL 
-             WHERE id = :u_id`,
-            { u_id: userId },
-            { autoCommit: true }
-        );
-
-        res.json({ message: 'Email verified successfully! You can now log in.' });
-
     } catch (err) {
-        console.error('Verification error:', err);
+        console.error('❌ OTP Verify Error:', err);
         res.status(500).json({ error: 'Verification failed' });
     } finally {
         if (connection) {
-            try {
-                await connection.close();
-            } catch (e) {
-                console.error("Error closing connection:", e);
-            }
+            try { await connection.close(); } catch (e) { console.error(e); }
         }
     }
 }
@@ -251,63 +248,18 @@ async function refreshToken(req, res) {
 }
 
 // ==========================================
-// 5. CURRENT USER
+// 5. GET CURRENT USER
 // ==========================================
-async function getCurrentUser(req, res) {
-    let connection;
-
-    try {
-        const userId = req.user?.id;
-
-        if (!userId) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-
-        connection = await db.getConnection();
-
-        const result = await connection.execute(
-            `SELECT id, first_name, last_name, email, phone, role, profile_pic_url, location_city, email_verified, phone_verified
-             FROM users
-             WHERE id = :uid`,
-            { uid: userId }
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const row = result.rows[0];
-        const user = {
-            id: row[0],
-            firstName: row[1],
-            lastName: row[2],
-            name: `${row[1] || ''} ${row[2] || ''}`.trim(),
-            email: row[3],
-            phone: row[4],
-            role: row[5],
-            profileImage: row[6],
-            avatar: row[6],
-            location: { city: row[7] },
-            emailVerified: row[8] === '1',
-            phoneVerified: row[9] === '1'
-        };
-
-        res.json({ user });
-
-    } catch (err) {
-        console.error('Get current user error:', err);
-        res.status(500).json({ error: 'Failed to fetch user' });
-    } finally {
-        if (connection) {
-            try {
-                await connection.close();
-            } catch (e) {
-                console.error('Error closing connection:', e);
-            }
-        }
+async function getMe(req, res) {
+    // req.user is already populated by the 'authenticate' middleware
+    if (!req.user) {
+        return res.status(401).json({ error: 'Not authenticated' });
     }
+    
+    // Simply return the user attached to the request
+    res.json({ 
+        user: req.user 
+    });
 }
 
-const getMe = (req, res) => getCurrentUser(req, res);
-
-module.exports = { register, login, verifyEmail, refreshToken, getCurrentUser, getMe };
+module.exports = { register, login, verifyEmailOtp, refreshToken, getMe };

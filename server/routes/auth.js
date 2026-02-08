@@ -2,18 +2,26 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { upload } = require('../middleware/uploadMiddleware');
-const { authenticate } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth'); 
 
 console.log('✅ Auth Routes Loaded');
 
-// Public Routes
+// 1. REGISTER (With Image Upload)
 router.post('/register', upload.single('profileImage'), (req, res, next) => {
     console.log('📨 Request hit Register Route'); 
     next();
 }, authController.register);
 
+// 2. LOGIN
 router.post('/login', authController.login);
-router.post('/verify-email', authController.verifyEmail);
+
+// 3. REFRESH TOKEN
 router.post('/refresh-token', authController.refreshToken);
-router.get('/me', authenticate, authController.getCurrentUser);
+
+// 4. VERIFY EMAIL OTP (Make sure this matches the export in authController!)
+router.post('/verify-email-otp', authController.verifyEmailOtp);
+
+// 5. GET CURRENT USER (Protected)
+router.get('/me', authenticate, authController.getMe);
+
 module.exports = router;

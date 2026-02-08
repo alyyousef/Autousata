@@ -3,6 +3,9 @@ const router = express.Router();
 const oracledb = require('oracledb');
 const { randomUUID } = require('crypto');
 const { authenticate: auth } = require('../middleware/auth');
+const { rateLimitBid } = require('../middleware/rateLimiter');
+const bidProcessingService = require('../services/bidProcessingService');
+const { getIO } = require('../server');
 
 // POST /api/auctions - Create a new auction
 router.post('/', auth, async (req, res) => {
@@ -197,10 +200,13 @@ router.get('/', async (req, res) => {
         v.make,
         v.model,
         v.year_mfg,
+        v.mileage_km,
         v.car_condition,
         v.price_egp,
         v.vin,
         v.plate_number,
+        v.description,
+        v.location_city,
         v.features,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
@@ -245,12 +251,12 @@ router.get('/', async (req, res) => {
           make: row.MAKE,
           model: row.MODEL,
           year: Number(row.YEAR_MFG) || 0,
-          mileage: 0,
+          mileage: Number(row.MILEAGE_KM) || 0,
           vin: row.VIN,
           condition: conditionMap[conditionValue] || 'Good',
-          description: '',
+          description: row.DESCRIPTION || '',
           images: [],
-          location: '',
+          location: row.LOCATION_CITY || '',
           features
         },
         sellerId: row.SELLER_ID,
@@ -346,13 +352,17 @@ router.get('/:id', async (req, res) => {
         a.start_time,
         a.end_time,
         a.current_bid_egp,
+        a.min_bid_increment,
         v.make,
         v.model,
         v.year_mfg,
+        v.mileage_km,
         v.car_condition,
         v.price_egp,
         v.vin,
         v.plate_number,
+        v.description,
+        v.location_city,
         v.features,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
@@ -395,12 +405,12 @@ router.get('/:id', async (req, res) => {
         make: row.MAKE,
         model: row.MODEL,
         year: Number(row.YEAR_MFG) || 0,
-        mileage: 0,
+        mileage: Number(row.MILEAGE_KM) || 0,
         vin: row.VIN,
         condition: conditionMap[conditionValue] || 'Good',
-        description: '',
+        description: row.DESCRIPTION || '',
         images: [],
-        location: '',
+        location: row.LOCATION_CITY || '',
         features
       },
       sellerId: row.SELLER_ID,
@@ -408,6 +418,7 @@ router.get('/:id', async (req, res) => {
       startPrice: Number(row.PRICE_EGP) || 0,
       reservePrice: Number(row.PRICE_EGP) || 0,
       bidCount: Number(row.BID_COUNT) || 0,
+      minBidIncrement: Number(row.MIN_BID_INCREMENT) || 50,
       endTime: row.END_TIME,
       status: row.STATUS
     });
@@ -422,6 +433,125 @@ router.get('/:id', async (req, res) => {
         console.error('Oracle connection close error:', closeErr.message);
       }
     }
+  }
+});
+
+// GET /api/auctions/:id/bids - List recent bids for an auction
+router.get('/:id/bids', async (req, res) => {
+  let connection;
+  try {
+    const limitNum = Math.max(1, parseInt(req.query.limit, 10) || 20);
+    connection = await oracledb.getConnection();
+
+    const result = await connection.execute(
+      `SELECT
+        b.id,
+        b.bidder_id,
+        b.amount_egp,
+        b.created_at,
+        u.first_name,
+        u.last_name
+      FROM bids b
+      JOIN users u ON u.id = b.bidder_id
+      WHERE b.auction_id = :auctionId
+      ORDER BY b.created_at DESC
+      FETCH FIRST :limit ROWS ONLY`,
+      { auctionId: req.params.id, limit: limitNum },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const bids = (result.rows || []).map((row) => ({
+      id: row.ID,
+      userId: row.BIDDER_ID,
+      userName: `${row.FIRST_NAME || ''} ${row.LAST_NAME || ''}`.trim() || 'Bidder',
+      amount: Number(row.AMOUNT_EGP) || 0,
+      timestamp: row.CREATED_AT
+    }));
+
+    res.json({ bids });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (closeErr) {
+        console.error('Oracle connection close error:', closeErr.message);
+      }
+    }
+  }
+});
+
+// POST /api/auctions/:id/bids - Place a manual bid
+router.post('/:id/bids', auth, rateLimitBid, async (req, res) => {
+  try {
+    const amount = Number(req.body.amount);
+    if (!amount || Number.isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ msg: 'Invalid bid amount' });
+    }
+
+    // Use bidProcessingService to handle all bid logic
+    const result = await bidProcessingService.processBid({
+      auctionId: req.params.id,
+      bidderId: req.user.id,
+      amount,
+      bidSource: 'manual'
+    });
+
+    // Emit real-time update to all clients watching this auction
+    const io = getIO();
+    io.to(`auction:${req.params.id}`).emit('bid_placed', {
+      auctionId: req.params.id,
+      bid: {
+        id: result.bidId,
+        bidderId: result.anonymizedBidder,
+        amount: result.newCurrentBid,
+        timestamp: new Date().toISOString()
+      },
+      auction: {
+        currentBid: result.newCurrentBid,
+        bidCount: result.bidCount,
+        endTime: result.newEndTime || result.originalEndTime
+      }
+    });
+
+    // If there was a previous bidder, notify them
+    if (result.previousLeadingBidderId && result.previousLeadingBidderId !== req.user.id) {
+      io.to(`user:${result.previousLeadingBidderId}`).emit('user_outbid', {
+        auctionId: req.params.id,
+        newBid: result.newCurrentBid,
+        yourBid: result.previousBid
+      });
+    }
+
+    res.json({
+      success: true,
+      bid: {
+        id: result.bidId,
+        userId: req.user.id,
+        amount: result.newCurrentBid,
+        timestamp: new Date().toISOString()
+      },
+      currentBid: result.newCurrentBid,
+      extended: result.wasExtended,
+      newEndTime: result.newEndTime
+    });
+  } catch (err) {
+    console.error('[Auction Routes] Bid error:', err.message);
+    
+    // Handle specific error messages from bidProcessingService
+    if (err.message.includes('not found')) {
+      return res.status(404).json({ msg: err.message });
+    }
+    if (err.message.includes('cannot bid') || err.message.includes('not open') || err.message.includes('Minimum bid')) {
+      return res.status(400).json({ msg: err.message });
+    }
+    if (err.message.includes('not authorized')) {
+      return res.status(403).json({ msg: err.message });
+    }
+    
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 
