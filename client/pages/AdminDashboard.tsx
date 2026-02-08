@@ -173,6 +173,13 @@ const AdminDashboard: React.FC = () => {
             <Link to="/admin/users" className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">
               User Moderation
             </Link>
+<Link
+  to="/admin/finance/revenue"
+  className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
+>
+  Revenue Dashboard
+</Link>
+
             <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 flex items-center gap-2 hover:bg-slate-50 transition-all">
               <BarChart3 size={18} />
               Platform Metrics

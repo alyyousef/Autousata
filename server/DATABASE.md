@@ -443,6 +443,47 @@ Comprehensive payment analytics view combining payments, escrows, auctions, and 
 
 **Usage:** Payment reporting, analytics, and financial dashboards
 
+### 14. SELLER_PAYOUTS
+
+Tracks seller payout processing (admin-side), especially useful if payouts are handled manually or via a separate bank/wallet system.
+
+> Why this table?
+>
+> - `ESCROWS.STATUS = 'released'` means funds are eligible to be released, but it does **not** always mean the seller has actually been paid (bank transfer done).
+> - This table lets admins track payout execution, references, failures, and notes.
+
+| Column       | Type           | Constraints                           | Description                                                        |
+| :----------- | :------------- | :------------------------------------ | :----------------------------------------------------------------- |
+| `ID`         | VARCHAR2(36)   | PK, Default `RAWTOHEX(SYS_GUID())`    | Unique payout record ID                                            |
+| `ESCROW_ID`  | VARCHAR2(36)   | Not Null, FK -> `ESCROWS(ID)`         | Linked escrow being paid out                                       |
+| `SELLER_ID`  | VARCHAR2(36)   | Not Null                              | Seller receiving funds (should match `ESCROWS.SELLER_ID`)          |
+| `AMOUNT_EGP` | NUMBER(15,2)   | Not Null                              | Amount paid to seller (usually `ESCROWS.SELLER_PAYOUT_EGP`)        |
+| `METHOD`     | VARCHAR2(30)   |                                       | Payout method (`bank_transfer`, `wallet`, `cash`, etc.)            |
+| `STATUS`     | VARCHAR2(20)   | Default `pending`                     | `pending`, `paid`, `failed`                                        |
+| `REFERENCE`  | VARCHAR2(255)  |                                       | External transaction reference (bank ref, gateway payout id, etc.) |
+| `NOTE`       | VARCHAR2(1000) |                                       | Admin notes (optional)                                             |
+| `CREATED_AT` | TIMESTAMP      | Default `CURRENT_TIMESTAMP`, Not Null | When payout record was created                                     |
+| `PAID_AT`    | TIMESTAMP      |                                       | When payout was completed                                          |
+
+**Indexes (Recommended):**
+
+- `IDX_PAYOUTS_ESCROW` on (`ESCROW_ID`)
+- `IDX_PAYOUTS_SELLER` on (`SELLER_ID`)
+- `IDX_PAYOUTS_STATUS` on (`STATUS`)
+- `IDX_PAYOUTS_CREATED` on (`CREATED_AT`)
+
+**Constraints:**
+
+- `FK_PAYOUT_ESCROW` - Foreign key to `ESCROWS(ID)`
+
+**Example Workflow:**
+
+1. Escrow becomes `released` (eligible payout).
+2. Admin initiates payout externally (bank/wallet).
+3. Insert into `SELLER_PAYOUTS` with `STATUS='pending'`.
+4. Update to `STATUS='paid'` and set `PAID_AT` + `REFERENCE` once transfer succeeds.
+5. If transfer fails, set `STATUS='failed'` and add a `NOTE`.
+
 ### V_LIVE_AUCTIONS
 
 Real-time auction monitoring view for active auctions.
