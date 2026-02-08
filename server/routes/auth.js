@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { upload } = require('../middleware/uploadMiddleware'); // <--- CRITICAL IMPORT
+const { authenticate } = require('../middleware/auth');
 
 
 // Debug Log: Print to terminal when this file is loaded
