@@ -8,7 +8,10 @@ const {
   rejectVehicleController,
   acceptInspectionReportController,
   rejectInspectionReportController,
-  createInspectionReportController
+  createInspectionReportController,
+  selectInspectorController,
+  viewReportController,
+  editreportController
 } = require("../controllers/adminController");
 const router = express.Router();
 const { authenticate, authorize } = require("../middleware/auth");
@@ -23,5 +26,8 @@ router.patch('/vehicles/:vehicleId/reject', authenticate, authorize("admin"), re
 router.post('/inspections', authenticate, authorize("admin"), createInspectionReportController);
 router.patch('/inspections/:inspectionId/accept', authenticate, authorize("admin"), acceptInspectionReportController);
 router.patch('/inspections/:inspectionId/reject', authenticate, authorize("admin"), rejectInspectionReportController);
+router.get('/inspector/select', authenticate, authorize("admin"), selectInspectorController);
+router.get('/inspections/:reportId', authenticate, authorize("admin"), viewReportController);
+router.patch('/inspections/:reportId/edit', authenticate, authorize("admin"), editreportController);
 
 module.exports = router;

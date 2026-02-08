@@ -7,7 +7,10 @@ const {
     rejectVehicle,
     acceptinspectionrep,
     rejectinspectionrep,
-    addinspectionreport
+    addinspectionreport,
+    selectinspector,
+    viewreport,
+    editreport
 } = require('../services/adminService');
 
 
@@ -256,6 +259,61 @@ const createInspectionReportController = async (req, res) => {
     }
 };
 
+const selectInspectorController = async (req, res) => {   
+    try {
+        const inspectors = await selectinspector();
+        res.status(200).json({ inspectors });
+
+    }
+    catch (error) {
+        console.error('Controller - Select inspector error:', error);
+        res.status(500).json({ error: 'Failed to fetch inspectors' });
+    }
+};
+
+const viewReportController = async (req, res) => {
+    try {
+        const { reportId } = req.params;
+        if (!reportId) {
+            return res.status(400).json({ error: 'Report ID is required' });
+        }
+        const report = await viewreport(reportId);
+        if (report) {
+            res.status(200).json({ report });
+        } else {
+            res.status(404).json({ error: 'Report not found' });
+        }
+    } catch (error) {
+        console.error('Controller - View report error:', error);
+        res.status(500).json({ error: 'Failed to fetch report' });
+    }
+};
+
+const editreportController = async (req, res) => {
+    try {
+        const { reportId } = req.params;
+        const updateData = req.body;
+        if (!reportId) {
+            return res.status(400).json({ error: 'Report ID is required' });
+        }
+        const result = await editreport(reportId, updateData);
+        if (result.success) {
+            res.status(200).json({
+                message: 'Report updated successfully',
+                reportId,
+                updatedFields: updateData
+            });
+        } else {
+            res.status(404).json({ error: 'Report not found' });
+        }
+    } catch (error) {
+        console.error('Controller - Edit report error:', error);
+        res.status(500).json({ error: 'Failed to update report' });
+    }
+};
+
+
+
 module.exports = {
     getAllVehicles,
     filterVehiclesByStatus,
@@ -265,5 +323,8 @@ module.exports = {
     rejectVehicleController,
     acceptInspectionReportController,
     rejectInspectionReportController,
-    createInspectionReportController
+    createInspectionReportController,
+    selectInspectorController,
+    viewReportController,
+    editreportController
 };

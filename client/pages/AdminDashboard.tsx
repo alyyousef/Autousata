@@ -1,10 +1,13 @@
+'use client';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload } from '../services/adminApi';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport } from '../services/adminApi';
+import { set } from 'zod';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -18,8 +21,10 @@ const AdminDashboard: React.FC = () => {
   const [vehicleError, setVehicleError] = useState<string | null>(null);
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState<string>('');
-  const [showInspectionModal, setShowInspectionModal] = useState<{ open: boolean; vehicle?: VehicleItem }>(() => ({ open: false }));
+  const [showInspectionModal, setShowInspectionModal] = useState<{ open: boolean; vehicle?: VehicleItem; viewMode?: boolean }>(() => ({ open: false }));
   const [inspectionForm, setInspectionForm] = useState<CreateInspectionPayload | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const tabsRef = React.useRef<HTMLDivElement>(null);
 
   // Ensure the token passed via navigation is stored for API usage
   useEffect(() => {
@@ -83,7 +88,13 @@ const AdminDashboard: React.FC = () => {
 
         {/* Priority Queues */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover">
+          <div 
+            className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover cursor-pointer"
+            onClick={() => {
+              setActiveTab('kyc');
+              tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
             <div className="bg-indigo-50 text-indigo-600 p-4 rounded-2xl">
               <ShieldCheck size={24} />
             </div>
@@ -146,7 +157,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover">
+        <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover" ref={tabsRef}>
           {/* Tabs */}
           <div className="px-8 border-b border-slate-100">
             <div className="flex gap-8">
@@ -213,7 +224,7 @@ const AdminDashboard: React.FC = () => {
                       <tr><td className="px-4 py-6 text-slate-500" colSpan={5}>No vehicles found.</td></tr>
                     )}
                     {!vehicleLoading && !vehicleError && vehicles.map((v) => {
-                      const canEditStatus = !(v.inspection_req === 1 && !v.inspection_report);
+                      const canEditStatus = v.inspection_req === 0 || Boolean(v.inspection_report);
                       const inspectionDone = Boolean(v.inspection_report);
                       return (
                         <tr key={v.id} className="hover:bg-slate-50/50 transition-all group">
@@ -231,14 +242,12 @@ const AdminDashboard: React.FC = () => {
                           <td className="px-4 py-6">
                             <select
                               disabled={!canEditStatus}
-                              defaultValue={String(v.status).toLowerCase()}
+                              value={String(v.status).toLowerCase()}
                               className={`px-2.5 py-2 rounded-lg text-[12px] font-bold uppercase tracking-wider border ${canEditStatus ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
                               onChange={async (e) => {
                                 const newStatus = e.target.value;
                                 const res = await updateVehicleStatus(v.id, newStatus, effectiveToken);
                                 if (!res.ok) {
-                                  alert(res.message);
-                                  e.target.value = String(v.status).toLowerCase();
                                 } else {
                                   // Reload vehicles after status update
                                   const data = vehicleSearch.trim() 
@@ -265,24 +274,63 @@ const AdminDashboard: React.FC = () => {
                             <div className="flex justify-end gap-2">
                               <button
                                 className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700"
-                                onClick={() => {
-                                  setShowInspectionModal({ open: true, vehicle: v });
-                                  setInspectionForm({
-                                    vehicleId: v.id,
-                                    inspectorId: '',
-                                    inspectionDate: new Date().toISOString().slice(0, 10),
-                                    locationCity: v.location || '',
-                                    odometerReading: v.milage || 0,
-                                    overallCondition: 'good',
-                                    engineCond: 'good',
-                                    transmissionCond: 'good',
-                                    suspensionCond: 'good',
-                                    interiorCond: 'good',
-                                    paintCond: 'good',
-                                  });
+                                onClick={async () => {
+                                  if (v.inspection_req === 0 && v.inspection_report) {
+                                    // View mode: fetch report data
+                                    try {
+                                      const reportData = await getreport(v.inspection_report, effectiveToken);
+                                      if (reportData) {
+                                        const report = reportData as any;
+                                        setInspectionForm({
+                                          vehicleId: v.id,
+                                          inspectorId: report.inspectorId || '',
+                                          inspectionDate: report.inspectionDate ? new Date(report.inspectionDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                                          locationCity: report.locationCity || v.location || '',
+                                          odometerReading: report.odometerReading || v.milage || 0,
+                                          overallCondition: report.overallCondition || 'good',
+                                          engineCond: report.engineCond || 'good',
+                                          transmissionCond: report.transmissionCond || 'good',
+                                          suspensionCond: report.suspensionCond || 'good',
+                                          interiorCond: report.interiorCond || 'good',
+                                          paintCond: report.paintCond || 'good',
+                                          inspectorNotes: report.inspectorNotes || '',
+                                          photosUrl: report.photosUrl || [],
+                                          accidentHistory: report.accidentHistory || '',
+                                          mechanicalIssues: report.mechanicalIssues || '',
+                                          requiredRepairs: report.requiredRepairs || '',
+                                          estimatedRepairCost: report.estimatedRepairCost,
+                                          reportDocUrl: report.reportDocUrl || '',
+                                          status: report.status || 'pending',
+                                        });
+                                        setShowInspectionModal({ open: true, vehicle: v, viewMode: true });
+                                      }
+                                    } catch (error) {
+                                      console.error('Failed to fetch report:', error);
+                                      
+                                    }
+                                  } else {
+                                    // Create mode
+                                    setShowInspectionModal({ open: true, vehicle: v, viewMode: false });
+                                    setInspectionForm({
+                                      vehicleId: v.id,
+                                      inspectorId: '',
+                                      inspectionDate: new Date().toISOString().slice(0, 10),
+                                      locationCity: v.location || '',
+                                      odometerReading: v.milage || 0,
+                                      overallCondition: 'good',
+                                      engineCond: 'good',
+                                      transmissionCond: 'good',
+                                      suspensionCond: 'good',
+                                      interiorCond: 'good',
+                                      paintCond: 'good',
+                                      inspectorNotes: '',
+                                      photosUrl: [],
+                                      status: 'pending',
+                                    });
+                                  }
                                 }}
                               >
-                                Make Inspection Report
+                                {v.inspection_req === 0 ? 'View Report' : 'Make Inspection Report'}
                               </button>
                             </div>
                           </td>
@@ -291,78 +339,6 @@ const AdminDashboard: React.FC = () => {
                     })}
                   </tbody>
                 </table>
-
-                {showInspectionModal.open && showInspectionModal.vehicle && inspectionForm && (
-                  <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl">
-                      <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Inspection Report</p>
-                          <h3 className="text-xl font-black text-slate-900">{showInspectionModal.vehicle.make} {showInspectionModal.vehicle.model} {showInspectionModal.vehicle.year}</h3>
-                        </div>
-                        <button className="p-2 text-slate-400 hover:text-slate-900" onClick={() => setShowInspectionModal({ open: false })}>✕</button>
-                      </div>
-                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <label className="text-xs font-bold text-slate-700">Inspector ID
-                          <input className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" value={inspectionForm.inspectorId} onChange={(e) => setInspectionForm({ ...inspectionForm, inspectorId: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700">Inspection Date
-                          <input type="date" className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" value={inspectionForm.inspectionDate} onChange={(e) => setInspectionForm({ ...inspectionForm, inspectionDate: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700">Location City
-                          <input className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" value={inspectionForm.locationCity} onChange={(e) => setInspectionForm({ ...inspectionForm, locationCity: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700">Odometer Reading
-                          <input type="number" className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" value={inspectionForm.odometerReading} onChange={(e) => setInspectionForm({ ...inspectionForm, odometerReading: Number(e.target.value) })} />
-                        </label>
-                        {['overallCondition','engineCond','transmissionCond','suspensionCond','interiorCond','paintCond'].map((k) => (
-                          <label key={k} className="text-xs font-bold text-slate-700">{k}
-                            <select className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" value={(inspectionForm as any)[k]} onChange={(e) => setInspectionForm({ ...inspectionForm, [k]: e.target.value } as any)}>
-                              <option value="excellent">excellent</option>
-                              <option value="good">good</option>
-                              <option value="fair">fair</option>
-                              <option value="poor">poor</option>
-                            </select>
-                          </label>
-                        ))}
-                        <label className="text-xs font-bold text-slate-700 col-span-full">Accident History
-                          <textarea className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" onChange={(e) => setInspectionForm({ ...inspectionForm, accidentHistory: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700 col-span-full">Mechanical Issues
-                          <textarea className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" onChange={(e) => setInspectionForm({ ...inspectionForm, mechanicalIssues: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700 col-span-full">Required Repairs
-                          <textarea className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" onChange={(e) => setInspectionForm({ ...inspectionForm, requiredRepairs: e.target.value })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700">Estimated Repair Cost (EGP)
-                          <input type="number" className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" onChange={(e) => setInspectionForm({ ...inspectionForm, estimatedRepairCost: Number(e.target.value) })} />
-                        </label>
-                        <label className="text-xs font-bold text-slate-700 col-span-full">Report Document URL
-                          <input className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2" onChange={(e) => setInspectionForm({ ...inspectionForm, reportDocUrl: e.target.value })} />
-                        </label>
-                      </div>
-                      <div className="p-6 border-t border-slate-200 flex justify-end gap-2">
-                        <button className="px-4 py-2 bg-slate-100 rounded-lg text-sm font-bold" onClick={() => setShowInspectionModal({ open: false })}>Cancel</button>
-                        <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold" onClick={async () => {
-                          if (!inspectionForm) return;
-                          const res = await createInspectionReport(inspectionForm, effectiveToken);
-                          if (!res.ok) {
-                            alert(res.message);
-                          } else {
-                            setShowInspectionModal({ open: false });
-                            // Reload vehicles after creating inspection
-                            const data = vehicleSearch.trim() 
-                              ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
-                              : vehicleStatusFilter
-                              ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
-                              : await getAdminVehicles(effectiveToken);
-                            setVehicles(data);
-                          }
-                        }}>Save Report</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -428,6 +404,288 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Inspection Modal - Rendered at root level */}
+        {showInspectionModal.open && showInspectionModal.vehicle && inspectionForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+              {/* Header - Fixed */}
+              <div className="sticky top-0 p-6 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-2xl">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{showInspectionModal.viewMode ? 'View Inspection Report' : 'Create Inspection Report'}</p>
+                  <h3 className="text-xl font-black text-slate-900">{showInspectionModal.vehicle.make} {showInspectionModal.vehicle.model} {showInspectionModal.vehicle.year}</h3>
+                </div>
+                <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all" onClick={() => setShowInspectionModal({ open: false })}>✕</button>
+              </div>
+
+              {/* Content - Scrollable */}
+              <div className="overflow-y-auto max-h-[calc(100vh-280px)] p-6">
+                <div className="space-y-5">
+                  {/* Basic Info Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Inspector ID *</span>
+                      <input 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="Enter inspector ID"
+                        value={inspectionForm.inspectorId} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, inspectorId: e.target.value })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Inspection Date *</span>
+                      <input 
+                        type="date" 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        value={inspectionForm.inspectionDate} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, inspectionDate: e.target.value })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Location & Odometer */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Location City *</span>
+                      <input 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="Enter city"
+                        value={inspectionForm.locationCity} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, locationCity: e.target.value })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Odometer Reading (km) *</span>
+                      <input 
+                        type="number" 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="0"
+                        value={inspectionForm.odometerReading} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, odometerReading: Number(e.target.value) })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Condition Assessment - Organized */}
+                  <div className="border-t border-slate-100 pt-5">
+                    <h4 className="text-sm font-bold text-slate-900 mb-4">Condition Assessment</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { key: 'overallCondition', label: 'Overall Condition' },
+                        { key: 'engineCond', label: 'Engine' },
+                        { key: 'transmissionCond', label: 'Transmission' },
+                        { key: 'suspensionCond', label: 'Suspension' },
+                        { key: 'interiorCond', label: 'Interior' },
+                        { key: 'paintCond', label: 'Paint' },
+                      ].map(({ key, label }) => (
+                        <label key={key} className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700 mb-2">{label}</span>
+                          <select 
+                            className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                            value={(inspectionForm as any)[key]} 
+                            onChange={(e) => setInspectionForm({ ...inspectionForm, [key]: e.target.value } as any)}
+                            disabled={showInspectionModal.viewMode && !editMode}
+                          >
+                            <option value="excellent">Excellent</option>
+                            <option value="good">Good</option>
+                            <option value="fair">Fair</option>
+                            <option value="poor">Poor</option>
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Details Section */}
+                  <div className="border-t border-slate-100 pt-5">
+                    <h4 className="text-sm font-bold text-slate-900 mb-4">Inspection Details</h4>
+                    <div className="space-y-4">
+                      <label className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-700 mb-2">Accident History</span>
+                        <textarea 
+                          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                          placeholder="Describe any accident history..."
+                          rows={3}
+                          value={(inspectionForm as any).accidentHistory || ''} 
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, accidentHistory: e.target.value })} 
+                          disabled={showInspectionModal.viewMode && !editMode}
+                        />
+                      </label>
+                      <label className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-700 mb-2">Mechanical Issues</span>
+                        <textarea 
+                          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                          placeholder="List any mechanical issues found..."
+                          rows={3}
+                          value={(inspectionForm as any).mechanicalIssues || ''} 
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, mechanicalIssues: e.target.value })} 
+                          disabled={showInspectionModal.viewMode && !editMode}
+                        />
+                      </label>
+                      <label className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-700 mb-2">Required Repairs</span>
+                        <textarea 
+                          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                          placeholder="List required repairs..."
+                          rows={3}
+                          value={(inspectionForm as any).requiredRepairs || ''} 
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, requiredRepairs: e.target.value })} 
+                          disabled={showInspectionModal.viewMode && !editMode}
+                        />
+                      </label>
+                      <label className="flex flex-col">
+                        <span className="text-xs font-bold text-slate-700 mb-2">Inspector Notes</span>
+                        <textarea 
+                          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                          placeholder="Additional inspector notes..."
+                          rows={3}
+                          value={(inspectionForm as any).inspectorNotes || ''} 
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, inspectorNotes: e.target.value })} 
+                          disabled={showInspectionModal.viewMode && !editMode}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Cost & Document */}
+                  <div className="border-t border-slate-100 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Estimated Repair Cost (EGP)</span>
+                      <input 
+                        type="number" 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="0"
+                        value={(inspectionForm as any).estimatedRepairCost || ''} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, estimatedRepairCost: Number(e.target.value) })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Photos URLs (comma-separated)</span>
+                      <input 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="https://..., https://..."
+                        value={((inspectionForm as any).photosUrl || []).join(', ')} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, photosUrl: e.target.value.split(',').map(url => url.trim()).filter(url => url) })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Report Document URL</span>
+                      <input 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        placeholder="https://..."
+                        value={(inspectionForm as any).reportDocUrl || ''} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, reportDocUrl: e.target.value })} 
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      />
+                    </label>
+                    <label className="flex flex-col">
+                      <span className="text-xs font-bold text-slate-700 mb-2">Report Status</span>
+                      <select 
+                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        value={(inspectionForm as any).status || 'pending'} 
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, status: e.target.value })}
+                        disabled={showInspectionModal.viewMode && !editMode}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="passed">Passed</option>
+                        <option value="failed">Failed</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer - Fixed */}
+              <div className="sticky bottom-0 p-6 border-t border-slate-200 flex justify-end gap-3 bg-white rounded-b-2xl">
+                {showInspectionModal.viewMode && !editMode && (
+                  <>
+                    <button 
+                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
+                      onClick={() => setShowInspectionModal({ open: false })}
+                    >
+                      Close
+                    </button>
+                    <button 
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all" 
+                      onClick={() => setEditMode(true)}
+                    >
+                      Edit Report
+                    </button>
+                  </>
+                )}
+                {showInspectionModal.viewMode && editMode && (
+                  <>
+                    <button 
+                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
+                      onClick={() => setEditMode(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all" 
+                      onClick={async () => {
+                        // setShowInspectionModal({ open: false });
+                        if (!inspectionForm || !showInspectionModal.vehicle?.inspection_report) return;
+                        const res = await editreport(showInspectionModal.vehicle.inspection_report, inspectionForm, effectiveToken);
+                        if (!res.ok) {
+                        } else {
+                          setEditMode(false);
+                          // Reload vehicles after editing
+                          const data = vehicleSearch.trim() 
+                            ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
+                            : vehicleStatusFilter
+                            ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
+                            : await getAdminVehicles(effectiveToken);
+                          setVehicles(data);
+                        }
+                      }}
+                    >
+                      Save Changes
+                    </button>
+                  </>
+                )}
+                {!showInspectionModal.viewMode && (
+                  <>
+                    <button 
+                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
+                      onClick={() => setShowInspectionModal({ open: false })}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all" 
+                      onClick={async () => {
+                        if (!inspectionForm) return;
+                        setShowInspectionModal({ open: false });
+                        const res = await createInspectionReport(inspectionForm, effectiveToken);
+                        
+                        if (!res.ok) {
+                        } else {
+                          setShowInspectionModal({ open: false });
+                          // Reload vehicles after creating inspection
+                          const data = vehicleSearch.trim() 
+                            ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
+                            : vehicleStatusFilter
+                            ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
+                            : await getAdminVehicles(effectiveToken);
+                          setVehicles(data);
+                        }
+                      }}
+                    >
+                      Save Report
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
