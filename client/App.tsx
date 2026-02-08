@@ -1,33 +1,43 @@
-import React, { useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useLayoutEffect } from 'react';
+import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { StripeProvider } from './contexts/StripeContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { UserRole } from './types';
-
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
-import AboutPage from './pages/AboutPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import TermsPage from './pages/TermsPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import AuctionDetailPage from './pages/AuctionDetailPage';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsersPage from './pages/AdminUsersPage';
 import CreateListingPage from './pages/CreateListingPage';
 import ProfilePage from './pages/ProfilePage';
 import ListingDetailPage from './pages/ListingDetailPage';
+import AuctionDetailPage from './pages/AuctionDetailPage';
 import AuctionsPage from './pages/AuctionsPage';
+import PaymentPage from './pages/PaymentPage';
+import PaymentConfirmationPage from './pages/PaymentConfirmationPage';
 import VerifyEmailPage from './pages/VerifyEmailPage'; // <--- Import belongs here at the top!
 import AdminUserProfilePage from './pages/AdminUserProfilePage';
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    });
+    return () => window.cancelAnimationFrame(raf);
   }, [pathname]);
 
   return null;
@@ -58,13 +68,14 @@ const AppRoutes: React.FC = () => {
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
-          <Route path="/about" element={<AboutPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/payment/:id" element={<PaymentPage />} />
+          <Route path="/payment/:id/confirmation" element={<PaymentConfirmationPage />} />
         </Route>
 
         <Route element={<AppLayout user={user} />}>
@@ -98,10 +109,32 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    const root = document.documentElement;
+    const storedTheme = window.localStorage.getItem('theme');
+    if (storedTheme === 'dark') {
+      root.classList.add('theme-dark');
+      return;
+    }
+    if (storedTheme === 'light') {
+      root.classList.remove('theme-dark');
+      return;
+    }
+    window.localStorage.setItem('theme', 'light');
+    root.classList.remove('theme-dark');
+  }, []);
+
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <StripeProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
+      </AuthProvider>
+      </LanguageProvider>
+    </StripeProvider>
+   
   );
 };
 
