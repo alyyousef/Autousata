@@ -1,8 +1,10 @@
 const multer = require('multer');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const path = require('path');
 require('dotenv').config();
 
+// Initialize S3 Client
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -11,45 +13,47 @@ const s3 = new S3Client({
   },
 });
 
+// Configure Multer Storage (Memory Storage)
 const storage = multer.memoryStorage();
+
+// File Filter (Accept Images AND PDFs)
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'application/pdf'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, PNG, WEBP, and PDF are allowed.'), false);
+  }
+};
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
-    }
-  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit to 10MB
+  fileFilter: fileFilter,
 });
 
-const uploadToS3 = async (file, folder = 'profiles') => {
+// Helper: Upload to S3
+const uploadToS3 = async (file, folder = 'misc') => {
   if (!file) return null;
-  
-  // Create a UNIQUE name every time (timestamp + random number)
-  const fileName = `${folder}/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-  
-  console.log(`☁️ [S3 Debug] Preparing to upload: ${fileName}`);
-  console.log(`☁️ [S3 Debug] Bucket: ${process.env.AWS_BUCKET_NAME}`);
 
-  const command = new PutObjectCommand({
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: fileName,
-    Body: file.buffer,
-    ContentType: file.mimetype,
+  const fileName = `${folder}/${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+
+  const upload = new Upload({
+    client: s3,
+    params: {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      // ACL: 'public-read', // Uncomment if your bucket isn't public by policy
+    },
   });
 
-  try {
-    await s3.send(command);
-    const url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-    console.log(`✅ [S3 Debug] Upload Success! Link: ${url}`);
-    return url;
-  } catch (error) {
-    console.error('❌ [S3 Debug] S3 Upload Error:', error);
-    throw new Error('Image upload failed');
-  }
+  await upload.done();
+  
+  // Return the public URL
+  return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
 };
 
 module.exports = { upload, uploadToS3 };

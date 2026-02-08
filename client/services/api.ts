@@ -136,6 +136,18 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
+async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file); // Field name must match backend 'upload.single'
+
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>('/profile/kyc', {
+      method: 'PUT',
+      body: formData,
+    });
+  }
+
+
+
   async login(email: string, password: string) {
     const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
       method: 'POST',

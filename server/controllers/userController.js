@@ -17,13 +17,12 @@ async function updateProfile(req, res) {
         
         connection = await db.getConnection();
 
-        // FIX: Renamed :uid to :u_id to avoid conflicts, just to be safe
         const result = await connection.execute(
             `BEGIN
                 sp_update_profile(:u_id, :fn, :ln, :ph, :ct, :status);
              END;`,
             {
-                u_id: userId, // Matching the new parameter name
+                u_id: userId,
                 fn: firstName,
                 ln: lastName,
                 ph: phone,
@@ -82,7 +81,6 @@ async function updateAvatar(req, res) {
         // B. Update Database Record
         connection = await db.getConnection();
         
-        // FIX: Changed :uid to :u_id because "UID" is a reserved Oracle keyword!
         const sql = `
             UPDATE users 
             SET profile_pic_url = :url,
@@ -92,7 +90,7 @@ async function updateAvatar(req, res) {
 
         await connection.execute(sql, {
             url: avatarUrl,
-            u_id: userId // Updated key
+            u_id: userId
         }, { autoCommit: true });
 
         // C. Respond
@@ -111,4 +109,55 @@ async function updateAvatar(req, res) {
     }
 }
 
-module.exports = { updateProfile, updateAvatar };
+// ==========================================
+// 3. UPLOAD KYC DOCUMENT
+// ==========================================
+async function uploadKYC(req, res) {
+  let connection;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ msg: 'No file uploaded' });
+    }
+
+    // 1. Upload PDF to S3 'kyc' folder
+    console.log('📄 Uploading KYC Document...');
+    const kycUrl = await uploadToS3(req.file, 'kyc');
+
+    if (!kycUrl) {
+      throw new Error('Failed to upload to S3');
+    }
+
+    // 2. Update User Record in DB
+    connection = await oracledb.getConnection();
+    
+    await connection.execute(
+      `UPDATE users 
+       SET kyc_document_url = :kycUrl, 
+           kyc_status = 'pending' 
+       WHERE id = :id`,
+      { kycUrl, id: req.user.id },
+      { autoCommit: true }
+    );
+
+    res.json({ 
+      msg: 'KYC Document uploaded successfully', 
+      kycStatus: 'pending',
+      kycDocumentUrl: kycUrl 
+    });
+
+  } catch (err) {
+    console.error('❌ KYC Upload Error:', err);
+    res.status(500).send('Server Error during KYC upload');
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) { console.error(e); }
+    }
+  }
+}
+
+// ✅ EXPORT ALL FUNCTIONS CORRECTLY
+module.exports = { 
+    updateProfile, 
+    updateAvatar, 
+    uploadKYC 
+};
