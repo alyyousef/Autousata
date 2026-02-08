@@ -34,6 +34,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
 //import AdminPayoutsPage from "./pages/"
+
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
