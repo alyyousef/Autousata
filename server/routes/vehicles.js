@@ -3,6 +3,8 @@ const router = express.Router();
 const oracledb = require('oracledb');
 const { randomUUID } = require('crypto');
 const { authenticate: auth } = require('../middleware/auth');
+// 1. Import the upload middleware
+const { upload, uploadToS3 } = require('../middleware/uploadMiddleware');
 
 // GET /api/vehicles - List user's vehicles
 router.get('/', auth, async (req, res) => {
@@ -10,6 +12,7 @@ router.get('/', auth, async (req, res) => {
   try {
     connection = await oracledb.getConnection();
 
+    // 2. Updated SELECT to include 'images'
     const result = await connection.execute(
       `SELECT
         id,
@@ -30,7 +33,8 @@ router.get('/', auth, async (req, res) => {
         description,
         location_city,
         features,
-        status
+        status,
+        images
       FROM vehicles
       WHERE seller_id = :sellerId`,
       { sellerId: req.user.id },
@@ -52,6 +56,17 @@ router.get('/', auth, async (req, res) => {
           features = JSON.parse(featuresRaw);
         } catch (e) {
           features = [];
+        }
+      }
+
+      // 3. Parse Images safely
+      const imagesRaw = row.IMAGES;
+      let images = [];
+      if (typeof imagesRaw === 'string') {
+        try {
+          images = JSON.parse(imagesRaw);
+        } catch (e) {
+          images = [];
         }
       }
 
@@ -78,7 +93,7 @@ router.get('/', auth, async (req, res) => {
         description: row.DESCRIPTION || '',
         location: row.LOCATION_CITY || '',
         features,
-        images: [],
+        images: images, // Return the parsed images array
         status: row.STATUS
       };
     });
@@ -99,9 +114,21 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/vehicles - Create a new vehicle listing
-router.post('/', auth, async (req, res) => {
+// 4. Added upload.array to handle up to 10 images
+router.post('/', auth, upload.array('images', 10), async (req, res) => {
   let connection;
   try {
+    // 5. Upload Images to S3 Loop
+    const imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      console.log(`📸 Uploading ${req.files.length} images to S3...`);
+      for (const file of req.files) {
+        // 'vehicles' corresponds to your ARN folder structure
+        const url = await uploadToS3(file, 'vehicles');
+        if (url) imageUrls.push(url);
+      }
+    }
+
     const {
       make,
       model,
@@ -171,8 +198,19 @@ router.post('/', auth, async (req, res) => {
 
     const vehicleId = randomUUID();
     const conditionValue = typeof condition === 'string' ? condition.toLowerCase() : 'good';
-    const featuresJson = Array.isArray(features) ? JSON.stringify(features) : '[]';
+    
+    // Parse Features
+    let featuresJson = '[]';
+    if (typeof features === 'string') {
+        featuresJson = features; 
+    } else if (Array.isArray(features)) {
+        featuresJson = JSON.stringify(features);
+    }
 
+    // 6. Prepare Images JSON
+    const imagesJson = JSON.stringify(imageUrls);
+
+    // 7. Insert with Images
     await connection.execute(
       `INSERT INTO vehicles (
         id,
@@ -194,7 +232,8 @@ router.post('/', auth, async (req, res) => {
         currency,
         description,
         location_city,
-        features
+        features,
+        images
       ) VALUES (
         :id,
         :sellerId,
@@ -215,7 +254,8 @@ router.post('/', auth, async (req, res) => {
         :currency,
         :description,
         :locationCity,
-        :features
+        :features,
+        :images
       )`,
       {
         id: vehicleId,
@@ -237,7 +277,8 @@ router.post('/', auth, async (req, res) => {
         currency: 'EGP',
         description,
         locationCity: normalizedLocation,
-        features: featuresJson
+        features: featuresJson,
+        images: imagesJson // Bind the JSON string of URLs
       },
       { autoCommit: true }
     );
@@ -261,7 +302,7 @@ router.post('/', auth, async (req, res) => {
       description,
       location: normalizedLocation,
       features: Array.isArray(features) ? features : [],
-      images: [],
+      images: imageUrls, // Return the new URLs immediately
       status: 'draft'
     });
   } catch (err) {
@@ -284,6 +325,7 @@ router.get('/:id', auth, async (req, res) => {
   try {
     connection = await oracledb.getConnection();
 
+    // 8. Updated SELECT to include 'images'
     const result = await connection.execute(
       `SELECT
         id,
@@ -304,7 +346,8 @@ router.get('/:id', auth, async (req, res) => {
         price_egp,
         location_city,
         features,
-        status
+        status,
+        images
       FROM vehicles
       WHERE id = :vehicleId AND seller_id = :sellerId`,
       { vehicleId: req.params.id, sellerId: req.user.id },
@@ -323,6 +366,17 @@ router.get('/:id', auth, async (req, res) => {
         features = JSON.parse(featuresRaw);
       } catch (e) {
         features = [];
+      }
+    }
+
+    // 9. Parse Images safely
+    const imagesRaw = row.IMAGES;
+    let images = [];
+    if (typeof imagesRaw === 'string') {
+      try {
+        images = JSON.parse(imagesRaw);
+      } catch (e) {
+        images = [];
       }
     }
 
@@ -356,7 +410,7 @@ router.get('/:id', auth, async (req, res) => {
       description: row.DESCRIPTION || '',
       location: row.LOCATION_CITY || '',
       features,
-      images: [],
+      images: images,
       status: row.STATUS
     });
   } catch (err) {

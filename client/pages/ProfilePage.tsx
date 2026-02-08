@@ -49,6 +49,98 @@ const ProfilePage: React.FC = () => {
     }
   }, [user]);
 
+  // 3. MOVED UP: Load Seller Listings (Was causing the crash)
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSellerListings = async () => {
+      // Safety check inside the hook, not outside
+      if (!user) {
+        setListingsLoading(false);
+        setSellerListings([]);
+        return;
+      }
+
+      setListingsLoading(true);
+      setListingsError('');
+
+      try {
+        const [vehiclesResponse, auctionsResponse] = await Promise.all([
+            apiService.getSellerVehicles(),
+            apiService.getSellerAuctions()
+        ]);
+
+        if (!isMounted) return;
+
+        if (vehiclesResponse.error) {
+            setListingsError(vehiclesResponse.error);
+            setSellerListings([]);
+            return;
+        }
+
+        const vehicles = vehiclesResponse.data || [];
+        const auctions = auctionsResponse.data?.auctions || [];
+        const auctionMap = new Map(auctions.map((auction: any) => [auction.vehicleId, auction]));
+
+        const vehicleMap = new Map(vehicles.map((vehicle: any) => [vehicle._id || vehicle.id, vehicle]));
+
+        // Fetch missing vehicles if needed
+        const missingVehicleIds = Array.from(auctionMap.keys()).filter((vehicleId) => !vehicleMap.has(vehicleId));
+        if (missingVehicleIds.length > 0) {
+            const fetchedVehicles = await Promise.all(
+            missingVehicleIds.map((vehicleId) => apiService.getVehicleById(vehicleId))
+            );
+
+            fetchedVehicles.forEach((response) => {
+            if (response.data) {
+                const vehicleId = response.data._id || response.data.id;
+                if (vehicleId) {
+                vehicleMap.set(vehicleId, response.data);
+                }
+            }
+            });
+        }
+
+        const listings = Array.from(vehicleMap.values()).map((vehicle: any) => {
+            const vehicleId = vehicle._id || vehicle.id;
+            const auction = auctionMap.get(vehicleId);
+            return {
+            id: vehicleId,
+            vehicle: {
+                id: vehicleId,
+                make: vehicle?.make,
+                model: vehicle?.model,
+                year: vehicle?.year,
+                price: vehicle?.price,
+                status: vehicle?.status,
+                images: vehicle?.images || []
+            },
+            auctionStatus: auction?.status
+            };
+        });
+
+        setSellerListings(listings);
+        if (auctionsResponse.error) {
+            setListingsError(auctionsResponse.error);
+        }
+      } catch (err) {
+        if(isMounted) setListingsError("Failed to load listings");
+      } finally {
+        if(isMounted) setListingsLoading(false);
+      }
+    };
+
+    // Only run if user exists to avoid errors, but ALWAYS declare the hook
+    if (user) {
+        loadSellerListings();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  // 4. NOW it is safe to return early
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -62,14 +154,12 @@ const ProfilePage: React.FC = () => {
     navigate('/login');
   };
 
-  // 3. Updated Submit Logic (Sends separated fields)
   const handleUpdateProfile = async () => {
     setError('');
     setSuccess('');
     setLoading(true);
 
     try {
-      // Send fields separately to match Database columns
       const response = await apiService.updateProfile({
         firstName,
         lastName,
@@ -94,7 +184,7 @@ const ProfilePage: React.FC = () => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setLoading(true); // Show loading while uploading
+      setLoading(true); 
       try {
         const response = await apiService.updateAvatar(file);
         if (response.data?.avatar) {
@@ -149,87 +239,6 @@ const ProfilePage: React.FC = () => {
     };
     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSellerListings = async () => {
-      if (!user) {
-        setListingsLoading(false);
-        setSellerListings([]);
-        return;
-      }
-
-      setListingsLoading(true);
-      setListingsError('');
-
-      const [vehiclesResponse, auctionsResponse] = await Promise.all([
-        apiService.getSellerVehicles(),
-        apiService.getSellerAuctions()
-      ]);
-
-      if (!isMounted) return;
-
-      if (vehiclesResponse.error) {
-        setListingsError(vehiclesResponse.error);
-        setSellerListings([]);
-        setListingsLoading(false);
-        return;
-      }
-
-      const vehicles = vehiclesResponse.data || [];
-      const auctions = auctionsResponse.data?.auctions || [];
-      const auctionMap = new Map(auctions.map((auction: any) => [auction.vehicleId, auction]));
-
-      const vehicleMap = new Map(vehicles.map((vehicle: any) => [vehicle._id || vehicle.id, vehicle]));
-
-      const missingVehicleIds = Array.from(auctionMap.keys()).filter((vehicleId) => !vehicleMap.has(vehicleId));
-      if (missingVehicleIds.length > 0) {
-        const fetchedVehicles = await Promise.all(
-          missingVehicleIds.map((vehicleId) => apiService.getVehicleById(vehicleId))
-        );
-
-        fetchedVehicles.forEach((response) => {
-          if (response.data) {
-            const vehicleId = response.data._id || response.data.id;
-            if (vehicleId) {
-              vehicleMap.set(vehicleId, response.data);
-            }
-          }
-        });
-      }
-
-      const listings = Array.from(vehicleMap.values()).map((vehicle: any) => {
-        const vehicleId = vehicle._id || vehicle.id;
-        const auction = auctionMap.get(vehicleId);
-        return {
-          id: vehicleId,
-          vehicle: {
-            id: vehicleId,
-            make: vehicle?.make,
-            model: vehicle?.model,
-            year: vehicle?.year,
-            price: vehicle?.price,
-            status: vehicle?.status,
-            images: vehicle?.images || []
-          },
-          auctionStatus: auction?.status
-        };
-      });
-
-      setSellerListings(listings);
-      if (auctionsResponse.error) {
-        setListingsError(auctionsResponse.error);
-      }
-      setListingsLoading(false);
-    };
-
-    loadSellerListings();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page">

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5002/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -196,6 +196,42 @@ async verifyEmailOtp(email: string, otp: string) {
   async getVehicleById(vehicleId: string) {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
+
+
+async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+
+    // Append simple fields
+    Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+             // Stringify arrays (like features)
+             if(Array.isArray(data[key])) {
+                 formData.append(key, JSON.stringify(data[key]));
+             } else {
+                 formData.append(key, String(data[key]));
+             }
+        }
+    });
+
+    // Append Files (This matches backend: upload.array('images', 10))
+    files.forEach((file) => {
+        formData.append('images', file);
+    });
+
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData, // Sending FormData triggers the correct browser behavior
+    });
+  }
+
+  // ✅ NEW METHOD: Create Auction
+  async createAuction(data: any) {
+    return this.request<any>('/auctions', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+  }
+
 
   async getSellerAuctions() {
     return this.request<{ auctions: any[] }>('/auctions/seller');

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
-import { geminiService } from '../geminiService'; // Keeping AI service
+import { geminiService } from '../geminiService'; 
+import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -53,7 +53,7 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     startTime: z.string().optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
-    // AI Notes (Optional, not sent to DB directly but used for generation)
+    // AI Notes
     aiNotes: z.string().optional(),
   });
 
@@ -67,8 +67,12 @@ const CreateListingPage: React.FC = () => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
   const listingSchema = useMemo(() => createListingSchema(t), [t]);
+  
+  // ✅ FIX 1: Ensure this state is actually updated
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   const {
     register,
@@ -77,7 +81,7 @@ const CreateListingPage: React.FC = () => {
     setValue,
     trigger,
     getValues,
-    formState: { errors, isValid }
+    formState: { errors }
   } = useForm<ListingFormInput, unknown, ListingFormData>({
     resolver: zodResolver(listingSchema),
     mode: 'onChange',
@@ -96,8 +100,6 @@ const CreateListingPage: React.FC = () => {
   });
 
   const formData = watch();
-
-  // --- Handlers ---
 
   const handleAIHelp = async () => {
     setIsGeneratingAI(true);
@@ -119,11 +121,15 @@ const CreateListingPage: React.FC = () => {
       setIsGeneratingAI(false);
     }
   };
+
   const handleImagesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
-    // In a real app, upload to S3/Cloudinary here.
-    // For prototype, we convert to Base64.
+    // ✅ FIX 1: Add new files to the state so they can be uploaded
+    const newFiles = Array.from(files);
+    setImageFiles(prev => [...prev, ...newFiles]);
+
+    // Generate previews
     const readFile = (file: File) => new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -132,7 +138,8 @@ const CreateListingPage: React.FC = () => {
     });
 
     try {
-      const newImages = await Promise.all(Array.from(files).map(readFile));
+      const newImages = await Promise.all(newFiles.map(readFile));
+      // Update form data with previews for display
       setValue('images', [...(formData.images || []), ...newImages], { shouldValidate: true });
     } catch (err) {
       console.error(err);
@@ -152,8 +159,10 @@ const CreateListingPage: React.FC = () => {
   };
 
   const removeImage = (index: number) => {
+    // ✅ FIX 2: Remove from BOTH preview array and file array
     const current = getValues('images');
     setValue('images', current.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const validateStep = async (targetStep: number) => {
@@ -178,14 +187,6 @@ const CreateListingPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        setSubmitError(t('Please log in before creating a listing', 'يرجى تسجيل الدخول قبل انشاء اعلان'));
-        return;
-      }
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
       const normalizedMileage = Number(data.mileage) || 0;
       const normalizedReservePrice = Number(data.reservePrice) || 0;
       const normalizedStartingBid = Number(data.startingBid) || 0;
@@ -208,18 +209,24 @@ const CreateListingPage: React.FC = () => {
         fuelType: data.fuelType,
         seats: data.seats,
         condition: data.condition,
-        price: normalizedReservePrice, // Using reserve as list price reference
+        price: normalizedReservePrice,
         reservePrice: normalizedReservePrice,
         description: data.description,
         location: data.location,
         features: data.features,
-        images: data.images // Warning: Large payloads if Base64!
       };
 
-      const vehicleRes = await axios.post(`${baseUrl}/vehicles`, vehiclePayload, config);
+      // ✅ FIX 3: Use apiService (which handles Auth & Port 5002)
+      // Send vehiclePayload + imageFiles
+      const vehicleRes = await apiService.createVehicle(vehiclePayload, imageFiles);
+
+      if (vehicleRes.error || !vehicleRes.data?._id) {
+        throw new Error(vehicleRes.error || t('Failed to create vehicle', 'فشل انشاء السيارة'));
+      }
+      
       const vehicleId = vehicleRes.data._id;
 
-      // 2. Create Auction (Draft/Scheduled)
+      // 2. Create Auction
       const auctionPayload = {
         vehicleId: vehicleId,
         startTime: startDate.toISOString(),
@@ -228,23 +235,25 @@ const CreateListingPage: React.FC = () => {
         reservePrice: normalizedReservePrice
       };
 
-      await axios.post(`${baseUrl}/auctions`, auctionPayload, config);
+      // ✅ FIX 4: Use apiService for auction (Handles Token correctly)
+      const auctionRes = await apiService.createAuction(auctionPayload);
+
+      if (auctionRes.error) {
+         throw new Error(auctionRes.error || t('Failed to create auction', 'فشل انشاء المزاد'));
+      }
 
       // Success
-      navigate('/dashboard'); // Redirect to seller dashboard
+      navigate('/dashboard');
 
     } catch (err: any) {
       console.error(err);
-      const msg =
-        err.response?.data?.msg || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
+      const msg = err.message || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- UI Components ---
-  
   const steps = [
     { title: t('Vehicle Info', 'بيانات السيارة'), icon: Car },
     { title: t('Details & Photos', 'التفاصيل والصور'), icon: Camera },
