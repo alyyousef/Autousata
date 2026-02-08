@@ -5,7 +5,10 @@ const webhookService = require('./webhookService');
 
 /**
  * Auction Scheduler Service
- * Handles periodic checks for ending auctions, ended auctions, and notifications
+ * Handles periodic checks for:
+ * - Starting auctions (scheduled -> live)
+ * - Ending auctions (live -> ended)
+ * - Notifications
  */
 
 let schedulerTask = null;
@@ -78,6 +81,119 @@ async function createNotification(userId, type, title, body, auctionId = null) {
     }
   } catch (err) {
     console.error('Failed to create notification:', err);
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error('Connection close error:', err);
+      }
+    }
+  }
+}
+
+/**
+ * Check for auctions that should start now
+ * Change status from 'scheduled' to 'live'
+ */
+async function checkStartingAuctions() {
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    // Find auctions that should start (start_time has passed and status is 'scheduled')
+    const result = await connection.execute(
+      `SELECT
+        a.id,
+        a.seller_id,
+        a.vehicle_id,
+        a.start_time,
+        a.end_time,
+        a.starting_bid_egp,
+        v.make,
+        v.model,
+        v.year_mfg
+      FROM auctions a
+      JOIN vehicles v ON a.vehicle_id = v.id
+      WHERE a.status = 'scheduled'
+        AND a.start_time <= CURRENT_TIMESTAMP
+      FOR UPDATE`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    for (const auction of result.rows || []) {
+      const vehicleDesc = `${auction.YEAR_MFG} ${auction.MAKE} ${auction.MODEL}`;
+
+      // Update auction status to 'live'
+      await connection.execute(
+        `UPDATE auctions
+         SET status = 'live',
+             started_at = CURRENT_TIMESTAMP
+         WHERE id = :auctionId`,
+        { auctionId: auction.ID },
+        { autoCommit: false }
+      );
+
+      // Update vehicle status to 'active' if not already
+      await connection.execute(
+        `UPDATE vehicles
+         SET status = 'active'
+         WHERE id = :vehicleId
+           AND status != 'active'`,
+        { vehicleId: auction.VEHICLE_ID },
+        { autoCommit: false }
+      );
+
+      await connection.commit();
+
+      // Notify seller that auction has started
+      await createNotification(
+        auction.SELLER_ID,
+        'auction_started',
+        'Auction Started',
+        `Your auction for ${vehicleDesc} is now live! Starting bid: EGP ${Number(auction.STARTING_BID_EGP).toLocaleString()}`,
+        auction.ID
+      );
+
+      // Trigger webhook for auction started
+      await webhookService.triggerWebhook('auction.started', {
+        auctionId: auction.ID,
+        vehicle: vehicleDesc,
+        startingBid: Number(auction.STARTING_BID_EGP),
+        startTime: auction.START_TIME,
+        endTime: auction.END_TIME
+      });
+
+      // Emit Socket.IO event to auction room
+      if (io) {
+        io.to(`auction:${auction.ID}`).emit('auction_started', {
+          auctionId: auction.ID,
+          status: 'live',
+          startedAt: new Date().toISOString()
+        });
+
+        // Broadcast to all connected users
+        io.emit('new_auction_live', {
+          auctionId: auction.ID,
+          vehicle: vehicleDesc,
+          startingBid: Number(auction.STARTING_BID_EGP)
+        });
+      }
+
+      console.log(`[Scheduler] Started auction ${auction.ID} - ${vehicleDesc}`);
+    }
+
+    console.log(`[Scheduler] Checked starting auctions: ${(result.rows || []).length} activated`);
+  } catch (err) {
+    console.error('[Scheduler] Error checking starting auctions:', err);
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackErr) {
+        console.error('Rollback error:', rollbackErr);
+      }
+    }
   } finally {
     if (connection) {
       try {
@@ -310,6 +426,7 @@ async function checkEndedAuctions() {
  */
 async function runScheduler() {
   console.log('[Scheduler] Running periodic check...');
+  await checkStartingAuctions();  // NEW: Check for auctions that should start
   await checkEndingSoonAuctions();
   await checkEndedAuctions();
 }
@@ -352,6 +469,7 @@ module.exports = {
   setSocketIO,
   startScheduler,
   stopScheduler,
+  checkStartingAuctions,  
   checkEndingSoonAuctions,
   checkEndedAuctions,
   createNotification

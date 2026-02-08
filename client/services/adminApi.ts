@@ -538,25 +538,6 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
   return data.kycDocuments || data || [];
 };
 
-export const getLiveAuctions = async (token?: string): Promise<LiveAuction[]> => {
-  const headers: HeadersInit = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch('http://localhost:5000/api/admin/content/auctions/live', {
-    method: 'GET',
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch live auctions');
-  }
-
-  const data = await response.json();
-  return data.auctions || data || [];
-};
-
 export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
   const headers: HeadersInit = {};
   if (token) {
@@ -621,3 +602,173 @@ export const editreport = async (reportId: string, payload: Partial<CreateInspec
     return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
   }
 };
+
+// =============================================
+// AUCTION ADMIN FUNCTIONS
+// =============================================
+
+/**
+ * Get all auctions
+ */
+export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin/content/auctions', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch all auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Filter auctions by status
+ */
+export const filterAuctions = async (status: string, token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `http://localhost:5000/api/admin/content/auctions/filter?status=${encodeURIComponent(status)}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to filter auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Search auctions
+ */
+export const searchAuctions = async (searchTerm: string, token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `http://localhost:5000/api/admin/content/auctions/search?searchTerm=${encodeURIComponent(searchTerm)}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to search auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Update auction status
+ */
+export const updateAuctionStatus = async (
+  auctionId: string,
+  status: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/content/auctions/${auctionId}/status`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update auction status' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+/**
+ * Set auction start time
+ */
+export const setAuctionStartTime = async (
+  auctionId: string,
+  startTime: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/content/auctions/${auctionId}/start-time`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ startTime }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update auction start time' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const getAuctionById = async (auctionId: string, token?: string): Promise<LiveAuction | null> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`http://localhost:5000/api/admin/content/auctions/${auctionId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch auction details');
+  }
+  
+  const data = await response.json();
+  return data.data || data.auction || null;
+};
+
