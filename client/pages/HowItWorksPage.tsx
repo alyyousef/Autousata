@@ -10,9 +10,6 @@ import {
   UploadCloud,
   Wallet
 } from 'lucide-react';
-import ferrariBrochure from '../../assests/brouch/Ferrari-Testarossa-1984-INT.pdf';
-import bentleyBrochure from '../../assests/brouch/Bentley Continental Brochure.pdf';
-import porscheBrochure from '../../assests/brouch/911 GTS Grey.pdf';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const buyerFlow = [
@@ -81,23 +78,17 @@ const brochures = [
   {
     title: 'Ferrari Testarossa 1984',
     description: 'Classic Ferrari brochure with model details and specifications.',
-    fileName: 'Ferrari-Testarossa-1984-INT.pdf',
-    fileUrl: ferrariBrochure,
-    available: true
+    linkUrl: 'https://drive.google.com/drive/folders/1KkfSKkolzNjvKZhqqnCOr2XWYo1teVkk?usp=sharing',
   },
   {
     title: 'Bentley Continental',
     description: 'Official Bentley Continental brochure for customer reference.',
-    fileName: 'Bentley Continental Brochure.pdf',
-    fileUrl: bentleyBrochure,
-    available: true
+    linkUrl: 'https://drive.google.com/drive/folders/1KkfSKkolzNjvKZhqqnCOr2XWYo1teVkk?usp=sharing',
   },
   {
     title: 'Porsche 911 GTS Grey',
     description: 'Porsche 911 GTS brochure focused on the grey configuration.',
-    fileName: '911 GTS Grey.pdf',
-    fileUrl: porscheBrochure,
-    available: true
+    linkUrl: 'https://drive.google.com/drive/folders/1KkfSKkolzNjvKZhqqnCOr2XWYo1teVkk?usp=sharing',
   }
 ];
 
@@ -183,25 +174,15 @@ const HowItWorksPage: React.FC = () => {
               <div key={item.title} className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5">
                 <h3 className="text-lg font-semibold text-white">{item.title}</h3>
                 <p className="text-sm text-slate-300 mt-2 min-h-[44px]">{t(item.description, 'بروشور رسمي بالمواصفات والتفاصيل.')}</p>
-                {item.available ? (
-                  <a
-                    href={item.fileUrl}
-                    download
-                    className="brochure-download-btn mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors"
-                  >
-                    <Download size={16} />
-                    {t('Download PDF', 'حمل PDF')}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-700 text-slate-300 px-4 py-2 text-sm font-semibold cursor-not-allowed"
-                  >
-                    <Download size={16} />
-                    {t('Coming soon', 'قريبا')}
-                  </button>
-                )}
+                <a
+                  href={item.linkUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="brochure-download-btn mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors"
+                >
+                  <Download size={16} />
+                  {t('Open link', 'افتح الرابط')}
+                </a>
               </div>
             ))}
           </div>

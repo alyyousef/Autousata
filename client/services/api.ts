@@ -147,17 +147,28 @@
         body: formData,
       });
 
-      if (response.data?.accessToken) {
-        this.setTokens(response.data.accessToken, response.data.refreshToken);
-      }
-      return response;
+    if (response.data?.accessToken) {
+      this.setTokens(response.data.accessToken, response.data.refreshToken);
     }
+    return response;
+  }
+
   async verifyEmailOtp(email: string, otp: string) {
-      return this.request('/auth/verify-email-otp', {
-        method: 'POST',
-        body: JSON.stringify({ email, otp }),
-      });
-    }
+    return this.request('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file); 
+
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>('/profile/kyc', {
+      method: 'PUT',
+      body: formData,
+    });
+  }
 
     async login(email: string, password: string) {
       const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
@@ -171,10 +182,27 @@
       return response;
     }
 
-    async logout() {
-      this.clearTokens();
-      return { data: { success: true } }; // Just clear local state
-    }
+  async logout() {
+    this.clearTokens();
+    return { data: { success: true } }; // Just clear local state
+  }
+
+  // =========================================================
+  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // =========================================================
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
 
     // =========================================================
     // OTHER METHODS
@@ -216,9 +244,39 @@
       return this.request<any[]>('/vehicles');
     }
 
-    async getVehicleById(vehicleId: string) {
-      return this.request<any>(`/vehicles/${vehicleId}`);
-    }
+  async getVehicleById(vehicleId: string) {
+    return this.request<any>(`/vehicles/${vehicleId}`);
+  }
+
+  async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+
+    Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+             if(Array.isArray(data[key])) {
+                 formData.append(key, JSON.stringify(data[key]));
+             } else {
+                 formData.append(key, String(data[key]));
+             }
+        }
+    });
+
+    files.forEach((file) => {
+        formData.append('images', file);
+    });
+
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData, 
+    });
+  }
+
+  async createAuction(data: any) {
+    return this.request<any>('/auctions', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+  }
 
     async getSellerAuctions() {
       return this.request<{ auctions: any[] }>('/auctions/seller');
@@ -309,100 +367,85 @@
       }>(`/payments/auction/${auctionId}`);
     }
 
-    /**
-     * Get escrow details
-     */
-    async getEscrowDetails(escrowId: string) {
-      return this.request<{
-        success: boolean;
-        escrow: {
-          id: string;
-          auctionId: string;
-          totalAmountEGP: number;
-          commissionEGP: number;
-          sellerPayoutEGP: number;
-          status: string;
-          buyerReceived?: string;
-          vehicle: {
-            year: number;
-            make: string;
-            model: string;
-          };
-        };
-      }>(`/payments/escrows/${escrowId}`);
-    }
-
-    /**
-     * Buyer confirms vehicle receipt (releases escrow)
-     */
-    async confirmVehicleReceipt(escrowId: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        escrowId: string;
+  async getEscrowDetails(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      escrow: {
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        commissionEGP: number;
         sellerPayoutEGP: number;
-      }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
-        method: 'POST',
-      });
-    }
+        status: string;
+        buyerReceived?: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+      };
+    }>(`/payments/escrows/${escrowId}`);
+  }
 
-    /**
-     * Initiate dispute on escrow
-     */
-    async initiateDispute(escrowId: string, reason: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        escrowId: string;
-      }>(`/payments/escrows/${escrowId}/dispute`, {
-        method: 'POST',
-        body: JSON.stringify({ reason }),
-      });
-    }
+  async confirmVehicleReceipt(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+      sellerPayoutEGP: number;
+    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+      method: 'POST',
+    });
+  }
 
-    /**
-     * Admin: Get all disputed escrows
-     */
-    async getDisputedEscrows() {
-      return this.request<{
-        success: boolean;
-        disputes: Array<{
-          id: string;
-          auctionId: string;
-          totalAmountEGP: number;
-          disputeReason: string;
-          disputedAt: string;
-          vehicle: {
-            year: number;
-            make: string;
-            model: string;
-          };
-          buyer: {
-            name: string;
-            email: string;
-          };
-          seller: {
-            name: string;
-            email: string;
-          };
-        }>;
-      }>('/payments/escrows/disputed');
-    }
+  async initiateDispute(escrowId: string, reason: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+    }>(`/payments/escrows/${escrowId}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
 
-    /**
-     * Admin: Process refund
-     */
-    async processRefund(paymentId: string, reason: string, amount?: number) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        refundId: string;
-        amountRefundedEGP: number;
-      }>(`/payments/${paymentId}/refund`, {
-        method: 'POST',
-        body: JSON.stringify({ reason, amount }),
-      });
-    }
+  async getDisputedEscrows() {
+    return this.request<{
+      success: boolean;
+      disputes: Array<{
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        disputeReason: string;
+        disputedAt: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+        buyer: {
+          name: string;
+          email: string;
+        };
+        seller: {
+          name: string;
+          email: string;
+        };
+      }>;
+    }>('/payments/escrows/disputed');
+  }
+
+  async processRefund(paymentId: string, reason: string, amount?: number) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      refundId: string;
+      amountRefundedEGP: number;
+    }>(`/payments/${paymentId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, amount }),
+    });
+  }
 
     // ===================== Admin Content =====================
     async getPendingKYC() {

@@ -7,7 +7,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
-import { UserRole } from "./types";
+import ResetPasswordPage from './pages/ResetPasswordPage'; // <--- Add this importimport { UserRole } from "./types";
 
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
@@ -33,6 +33,7 @@ import PaymentConfirmationPage from "./pages/PaymentConfirmationPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
+import { UserRole } from "./types";
 //import AdminPayoutsPage from "./pages/"
 
 const ScrollToTop: React.FC = () => {
@@ -83,6 +84,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
