@@ -548,8 +548,51 @@ button.no-hover-rise:active {
   transform: scaleX(1);
 }
 
+.nav-link.nav-link-open::after {
+  transform: scaleX(1);
+}
+
 .nav-link.nav-link-active {
   color: var(--nav-link-active);
+}
+
+.primary-cta {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+}
+
+.primary-cta:hover {
+  background: #111827;
+}
+
+.theme-dark .primary-cta {
+  background: linear-gradient(135deg, #2563eb, #22c55e);
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+}
+
+.theme-dark .primary-cta:hover {
+  background: linear-gradient(135deg, #3b82f6, #22c55e);
+}
+
+.auth-primary-cta {
+  background: #0f172a;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.auth-primary-cta:hover {
+  background: #111827;
+}
+
+.theme-dark .auth-primary-cta {
+  background: #1f2937;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.theme-dark .auth-primary-cta:hover {
+  background: #334155;
 }
 
 .nav-link-glyph {

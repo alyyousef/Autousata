@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X } from 'lucide-react';
+import { Bell, Car, LayoutDashboard, LogOut, Menu, PlusCircle, Shield, X, Newspaper } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -39,6 +39,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
   const navigation = [
     { name: t('Browse', 'تصفح'), href: '/browse', icon: Car, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.ADMIN] },
     { name: t('Sell Your Car', 'بيع سيارتك'), href: '/sell', icon: PlusCircle, roles: [UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
+    { name: t('Press', 'الصحافة'), href: '/press', icon: Newspaper, roles: [UserRole.GUEST, UserRole.BUYER, UserRole.SELLER, UserRole.DEALER, UserRole.ADMIN] },
     { name: t('My Dashboard', 'لوحة التحكم'), href: '/dashboard', icon: LayoutDashboard, roles: [UserRole.SELLER, UserRole.DEALER] },
     { name: t('Admin', 'الإدارة'), href: '/admin', icon: Shield, roles: [UserRole.ADMIN] }
   ].filter(item => item.roles.includes(user.role));
@@ -250,9 +251,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
               </div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-3">
-                {t('Since 2026', 'منذ 2026')}
-              </p>
               <p className="text-sm leading-6 max-w-xs text-slate-200">
                 {t(
                   "The world's most trusted online marketplace for buying and selling exceptional vehicles. Secure, transparent, and built for enthusiasts.",
@@ -262,21 +260,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ user: userProp }) => {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
-                {t('Company', 'الشركة')}
-              </h3>
-              <ul className="space-y-3 text-sm text-slate-200">
-                <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
-                <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
                 {t('Marketplace', 'السوق')}
               </h3>
               <ul className="space-y-3 text-sm text-slate-200">
                 <li><Link to="/browse" className="hover:text-indigo-400">{t('Browse listings', 'تصفح العربيات')}</Link></li>
                 <li><Link to="/auctions" className="hover:text-indigo-400">{t('Live auctions', 'مزادات مباشرة')}</Link></li>
                 <li><Link to="/sell" className="hover:text-indigo-400">{t('Sell a car', 'بيع عربية')}</Link></li>
+                <li><Link to="/press" className="hover:text-indigo-400">{t('Press', 'الصحافة')}</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
+                {t('Company', 'الشركة')}
+              </h3>
+              <ul className="space-y-3 text-sm text-slate-200">
+                <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
+                <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
               </ul>
             </div>
             <div>

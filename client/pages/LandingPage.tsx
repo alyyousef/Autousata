@@ -349,6 +349,49 @@ const LandingPage: React.FC = () => {
         </section>
 
         <section className="section-texture section-divider border-y border-slate-200/70">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+              <div className="text-center mx-auto">
+                <p className="section-eyebrow">{t('Why AUTOUSATA', 'لماذا AUTOUSATA')}</p>
+                <h2 className="section-title">{t('A premium experience, end to end', 'تجربة فاخرة من البداية للنهاية')}</h2>
+                <p className="section-subtitle max-w-2xl mx-auto">
+                  {t(
+                    'We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.',
+                    'بنخلط دقة المزادات مع خدمة كونسييرج عشان تركز على العربية مش الورق.'
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              <ValueCard
+                icon={<ShieldCheck size={22} />}
+                title={t('Protected transactions', 'معاملات مؤمنة')}
+                description={t(
+                  'Escrow protection and verified seller profiles keep every purchase secure.',
+                  'حماية إسكرو وباعة موثقين بيخلوا كل عملية آمنة.'
+                )}
+              />
+              <ValueCard
+                icon={<Sparkles size={22} />}
+                title={t('Curated inventory', 'مخزون منسق بعناية')}
+                description={t(
+                  'Each listing is reviewed for authenticity, condition, and total cost of ownership.',
+                  'كل قائمة بتتراجع من ناحية الأصالة والحالة وتكلفة الملكية.'
+                )}
+              />
+              <ValueCard
+                icon={<Trophy size={22} />}
+                title={t('Concierge guidance', 'ارشاد متخصص')}
+                description={t(
+                  'Dedicated specialists help you bid, finance, and close with confidence.',
+                  'متخصصين بيساعدوك في المزايدة والتمويل والإغلاق بثقة.'
+                )}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="section-texture section-divider border-y border-slate-200/70">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10">
               <div className="text-center mx-auto">
@@ -410,49 +453,6 @@ const LandingPage: React.FC = () => {
                 })}
               </div>
             )}
-          </div>
-        </section>
-
-        <section className="section-texture section-divider border-y border-slate-200/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
-              <div className="text-center mx-auto">
-                <p className="section-eyebrow">{t('Why AUTOUSATA', 'لماذا AUTOUSATA')}</p>
-                <h2 className="section-title">{t('A premium experience, end to end', 'تجربة فاخرة من البداية للنهاية')}</h2>
-                <p className="section-subtitle max-w-2xl mx-auto">
-                  {t(
-                    'We combine auction-grade diligence with concierge-level service so you can focus on the car, not the paperwork.',
-                    'بنخلط دقة المزادات مع خدمة كونسييرج عشان تركز على العربية مش الورق.'
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-6 md:grid-cols-3">
-              <ValueCard
-                icon={<ShieldCheck size={22} />}
-                title={t('Protected transactions', 'معاملات مؤمنة')}
-                description={t(
-                  'Escrow protection and verified seller profiles keep every purchase secure.',
-                  'حماية إسكرو وباعة موثقين بيخلوا كل عملية آمنة.'
-                )}
-              />
-              <ValueCard
-                icon={<Sparkles size={22} />}
-                title={t('Curated inventory', 'مخزون منسق بعناية')}
-                description={t(
-                  'Each listing is reviewed for authenticity, condition, and total cost of ownership.',
-                  'كل قائمة بتتراجع من ناحية الأصالة والحالة وتكلفة الملكية.'
-                )}
-              />
-              <ValueCard
-                icon={<Trophy size={22} />}
-                title={t('Concierge guidance', 'ارشاد متخصص')}
-                description={t(
-                  'Dedicated specialists help you bid, finance, and close with confidence.',
-                  'متخصصين بيساعدوك في المزايدة والتمويل والإغلاق بثقة.'
-                )}
-              />
-            </div>
           </div>
         </section>
 

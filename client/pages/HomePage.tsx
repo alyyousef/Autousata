@@ -52,6 +52,7 @@ const HomePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
   const [now, setNow] = useState(() => Date.now());
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(true);
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
 
   const formatTimeRemaining = (endTime: string) => {
@@ -216,120 +217,19 @@ const HomePage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12">
-        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm hero-panel">
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
-                {t('Find your next car', 'ابحث عن سيارتك القادمة')}
-              </p>
-              <div className="relative">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder={t('Search by make, model, year, or location', 'ابحث بالمصنع او الموديل او السنة او الموقع')}
-                  className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                {t('Active listings', 'قوائم نشطة')}
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm">
-                  {formatNumber(activeCount)}
-                </span>
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">
-                {t('Delisted', 'قوائم موقوفة')}
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 shadow-sm">
-                  {formatNumber(delistedCount)}
-                </span>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div>
-                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
-                  <SlidersHorizontal size={14} />
-                  {t('Condition', 'الحالة')}
-                </label>
-                <div className="relative">
-                  <select
-                    value={conditionFilter}
-                    onChange={(event) => setConditionFilter(event.target.value)}
-                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  >
-                    {[
-                      { value: 'All', label: t('All', 'الكل') },
-                      { value: 'Mint', label: t('Mint', 'ممتاز جدا') },
-                      { value: 'Excellent', label: t('Excellent', 'ممتاز') },
-                      { value: 'Good', label: t('Good', 'جيد') },
-                      { value: 'Fair', label: t('Fair', 'مقبول') }
-                    ].map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                </div>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
-                  <SlidersHorizontal size={14} />
-                  {t('Sort by', 'ترتيب حسب')}
-                </label>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(event) => setSortBy(event.target.value as SortOption)}
-                    className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                  >
-                    <option value="relevance">{t('Relevance', 'الاكثر صلة')}</option>
-                    <option value="priceAsc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
-                    <option value="priceDesc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
-                    <option value="endingSoon">{t('Ending soon', 'ينتهي قريبا')}</option>
-                  </select>
-                  <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                </div>
-              </div>
-
-              {canManageListings && (
-                <button
-                  onClick={() => setShowDelisted(prev => !prev)}
-                  className="md:col-span-2 w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
-                >
-                  {showDelisted ? t('Hide delisted', 'اخف القوائم الموقوفة') : t('Show delisted', 'اظهر القوائم الموقوفة')}
-                </button>
-              )}
-            </div>
+        <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-3xl p-8 md:p-10 shadow-lg premium-card-hover">
+          <div className="mb-6 text-center">
+            <h3 className="text-xl font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
           </div>
-        </div>
-      </section>
-
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="buyer-insights-panel bg-white/95 border border-slate-200 rounded-2xl p-6 shadow-sm premium-card-hover">
-          <div className="mb-5 text-center">
-            <h3 className="text-lg font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-3 text-center">
+          <div className="grid gap-8 lg:grid-cols-3 text-left">
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Bid history', 'سجل المزايدات')}</h4>
-              <div className="space-y-3 text-sm">
+              <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Bid history', 'سجل المزايدات')}</h4>
+              <div className="space-y-4 text-sm">
                 {buyerBidHistory.map(entry => (
-                  <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <div>
+                  <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+                    <div className="space-y-2">
                       <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
-                      <span className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
                         entry.status === 'Leading'
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-rose-100 text-rose-700'
@@ -337,7 +237,7 @@ const HomePage: React.FC = () => {
                         {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'تم تجاوزك')}
                       </span>
                     </div>
-                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
                       {formatCurrencyEGP(entry.amount)}
                     </span>
                   </div>
@@ -345,27 +245,27 @@ const HomePage: React.FC = () => {
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Outbid notifications', 'اشعارات تجاوز المزايدة')}</h4>
-              <div className="space-y-3 text-sm text-slate-600">
+              <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Outbid notifications', 'اشعارات تجاوز المزايدة')}</h4>
+              <div className="space-y-4 text-sm text-slate-600">
                 {buyerNotifications.map((note, index) => (
-                  <div key={index} className="buyer-insights-note inline-flex w-full items-start rounded-full border border-slate-100 bg-slate-50 px-4 py-2 text-slate-700">
+                  <div key={index} className="buyer-insights-note w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-700">
                     {t(note, 'اتسبقت في المزايدة. زود الحد الأقصى عشان ترجع الأول.')}
                   </div>
                 ))}
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-slate-800 mb-3">{t('Payment status', 'حالة الدفع')}</h4>
-              <div className="space-y-3 text-sm">
+              <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Payment status', 'حالة الدفع')}</h4>
+              <div className="space-y-4 text-sm">
                 {buyerPayments.map(payment => (
-                  <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <div>
+                  <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+                    <div className="space-y-2">
                       <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
-                      <span className="mt-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                      <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
                         {payment.status === 'Unpaid' ? t('Unpaid', 'غير مدفوع') : payment.status}
                       </span>
                     </div>
-                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
                       {formatCurrencyEGP(payment.amount)}
                     </span>
                   </div>
@@ -378,6 +278,119 @@ const HomePage: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-8 md:p-10 backdrop-blur-sm hero-panel">
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
+                {t('Find your next car', 'ابحث عن سيارتك القادمة')}
+              </p>
+              <div className="relative flex flex-col sm:flex-row gap-3 sm:items-center">
+                <div className="relative flex-1">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder={t('Search by make, model, year, or location', 'ابحث بالمصنع او الموديل او السنة او الموقع')}
+                    className="w-full pl-12 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(prev => !prev)}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900 transition-colors"
+                >
+                  <SlidersHorizontal size={16} />
+                  {showFilters ? t('Hide filters', 'اخف الفلاتر') : t('Filters', 'فلاتر')}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                {t('Active listings', 'قوائم نشطة')}
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 shadow-sm">
+                  {formatNumber(activeCount)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-rose-100 bg-rose-50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-rose-600">
+                {t('Delisted', 'قوائم موقوفة')}
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-700 shadow-sm">
+                  {formatNumber(delistedCount)}
+                </span>
+              </span>
+            </div>
+
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <div>
+                  <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
+                    <SlidersHorizontal size={14} />
+                    {t('Condition', 'الحالة')}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={conditionFilter}
+                      onChange={(event) => setConditionFilter(event.target.value)}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      {[
+                        { value: 'All', label: t('All', 'الكل') },
+                        { value: 'Mint', label: t('Mint', 'ممتاز جدا') },
+                        { value: 'Excellent', label: t('Excellent', 'ممتاز') },
+                        { value: 'Good', label: t('Good', 'جيد') },
+                        { value: 'Fair', label: t('Fair', 'مقبول') }
+                      ].map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400 mb-3">
+                    <SlidersHorizontal size={14} />
+                    {t('Sort by', 'ترتيب حسب')}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(event) => setSortBy(event.target.value as SortOption)}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="relevance">{t('Relevance', 'الاكثر صلة')}</option>
+                      <option value="priceAsc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
+                      <option value="priceDesc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
+                      <option value="endingSoon">{t('Ending soon', 'ينتهي قريبا')}</option>
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+
+                {canManageListings && (
+                  <button
+                    onClick={() => setShowDelisted(prev => !prev)}
+                    className="md:col-span-2 w-full px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors"
+                  >
+                    {showDelisted ? t('Hide delisted', 'اخف القوائم الموقوفة') : t('Show delisted', 'اظهر القوائم الموقوفة')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>

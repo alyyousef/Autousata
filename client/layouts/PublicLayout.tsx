@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CircleHelp, Gavel, HandCoins, Menu, Moon, SearchCheck, Sun, X, User as UserIcon } from 'lucide-react';
+import { Bell, CircleHelp, Gavel, HandCoins, Menu, Moon, SearchCheck, Sun, X, User as UserIcon, Newspaper, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const { user, loading, logout } = useAuth();
   const { notifications, unreadCount, markAllRead, clearNotifications } = useNotifications();
@@ -22,6 +24,24 @@ const PublicLayout: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!moreMenuRef.current) return;
+      const target = event.target as Node;
+      if (!moreMenuRef.current.contains(target)) {
+        setIsMoreOpen(false);
+      }
+    };
+
+    if (isMoreOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMoreOpen]);
+
+  useEffect(() => {
     if (!isAuthPage) return;
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverflow = document.documentElement.style.overflow;
@@ -32,6 +52,10 @@ const PublicLayout: React.FC = () => {
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
   }, [isAuthPage]);
+
+  useEffect(() => {
+    setIsMoreOpen(false);
+  }, [location.pathname]);
   useEffect(() => {
     const root = document.documentElement;
     if (isDarkMode) {
@@ -57,8 +81,12 @@ const PublicLayout: React.FC = () => {
   const navItems = [
     { to: '/browse', label: t('Buy', 'شراء'), icon: SearchCheck },
     { to: '/sell', label: t('Sell', 'بيع'), icon: HandCoins },
-    { to: '/auctions', label: t('Auction', 'المزادات'), icon: Gavel },
-    { to: '/how-it-works', label: t('How it Works', 'الية العمل'), icon: CircleHelp }
+    { to: '/auctions', label: t('Auction', 'المزادات'), icon: Gavel }
+  ] as const;
+
+  const moreItems = [
+    { to: '/how-it-works', label: t('How it Works', 'الية العمل'), icon: CircleHelp },
+    { to: '/press', label: t('Press', 'الصحافة'), icon: Newspaper }
   ] as const;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -80,7 +108,7 @@ const PublicLayout: React.FC = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-8 px-6 py-2 rounded-full border nav-pill shadow-sm" aria-label="Primary">
+            <nav className="hidden md:flex items-center gap-6 px-6 py-2 rounded-full border nav-pill shadow-sm" aria-label="Primary">
               {navItems.map(item => (
                 <NavLink key={item.to} to={item.to} className={navLinkClass}>
                   <span className="nav-link-glyph">
@@ -89,6 +117,37 @@ const PublicLayout: React.FC = () => {
                   {item.label}
                 </NavLink>
               ))}
+              <div className="relative" ref={moreMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMoreOpen(prev => !prev)}
+                  className={`nav-link gap-2 ${isMoreOpen ? 'nav-link-open' : ''}`}
+                  aria-haspopup="menu"
+                  aria-expanded={isMoreOpen}
+                >
+                  <span className="nav-link-glyph">
+                    <MoreHorizontal size={16} />
+                  </span>
+                  {t('More', 'المزيد')}
+                </button>
+                {isMoreOpen && (
+                  <div className="absolute top-full mt-3 right-0 w-56 rounded-2xl border border-slate-200 bg-slate-900/95 shadow-lg overflow-hidden z-50 backdrop-blur">
+                    <div className="flex flex-col py-2">
+                      {moreItems.map(item => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-slate-100 hover:bg-white/10 hover:text-white"
+                          onClick={() => setIsMoreOpen(false)}
+                        >
+                          <item.icon size={16} className="text-slate-300" />
+                          {item.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Desktop User Actions */}
@@ -266,6 +325,21 @@ const PublicLayout: React.FC = () => {
                   {item.label}
                 </NavLink>
               ))}
+              <div className="pt-2 border-t border-slate-200">
+                {moreItems.map(item => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={navLinkClass}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <span className="nav-link-glyph">
+                      <item.icon size={14} />
+                    </span>
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
 
               <button
                 type="button"
@@ -377,9 +451,6 @@ const PublicLayout: React.FC = () => {
                   </div>
                   <span className="text-xl font-bold text-white tracking-tight uppercase">AUTOUSATA</span>
                 </div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-300 mb-3">
-                  {t('Since 2026', 'منذ 2026')}
-                </p>
                 <p className="text-sm leading-6 max-w-sm text-slate-200">
                   {t(
                     'A premium marketplace built for collectors and daily drivers alike. Transparent auctions, verified sellers, and concierge support from first click to final handover.',
@@ -389,21 +460,22 @@ const PublicLayout: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
-                  {t('Company', 'الشركة')}
-                </h3>
-                <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
-                  <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
                   {t('Explore', 'استكشف')}
                 </h3>
                 <ul className="space-y-3 text-sm text-slate-200">
                   <li><Link to="/browse" className="hover:text-indigo-400">{t('Buy a car', 'اشتري عربية')}</Link></li>
                   <li><Link to="/auctions" className="hover:text-indigo-400">{t('Live auctions', 'مزادات مباشرة')}</Link></li>
                   <li><Link to="/sell" className="hover:text-indigo-400">{t('Sell a Car', 'بيع عربية')}</Link></li>
+                  <li><Link to="/press" className="hover:text-indigo-400">{t('Press', 'الصحافة')}</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white tracking-wider uppercase mb-4">
+                  {t('Company', 'الشركة')}
+                </h3>
+                <ul className="space-y-3 text-sm text-slate-200">
+                  <li><Link to="/how-it-works" className="hover:text-indigo-400">{t('How it Works', 'الية العمل')}</Link></li>
+                  <li><Link to="/terms" className="hover:text-indigo-400">{t('Terms of Service', 'شروط الخدمة')}</Link></li>
                 </ul>
               </div>
             </div>
