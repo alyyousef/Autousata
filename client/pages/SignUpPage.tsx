@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Camera } from 'lucide-react'; // <--- Added Camera Icon
 import { useLanguage } from '../contexts/LanguageContext';
+import bentGif from '../../assests/carsPictures/bentG.gif';
 
 const SignUpPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -71,8 +72,12 @@ const SignUpPage: React.FC = () => {
 
   return (
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
-      <div className="fixed inset-0 bg-cover auth-bg-signup" aria-hidden="true" />
-      <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-cover"
+        style={{ backgroundImage: `url(${bentGif})`, backgroundPosition: '82% center', filter: 'none' }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 bg-transparent" aria-hidden="true" />
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-5 md:p-7 w-full max-w-lg my-auto max-h-[calc(100vh-140px)] overflow-y-auto">

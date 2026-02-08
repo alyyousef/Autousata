@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import bugattiGif from '../../assests/carsPictures/buggatiG.gif';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -43,8 +44,12 @@ const LoginPage: React.FC = () => {
 
   return (
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
-      <div className="fixed inset-0 bg-center bg-cover auth-bg-login" aria-hidden="true" />
-      <div className="fixed inset-0 bg-slate-950/55" aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-center bg-cover"
+        style={{ backgroundImage: `url(${bugattiGif})` }}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 bg-transparent" aria-hidden="true" />
 
       <div className="relative z-10 w-full max-w-6xl flex justify-end hero-fade-in">
         <div className="auth-card bg-gradient-to-br from-[#F4F7FF] via-[#EAF0FF] to-[#E1EAFF] rounded-3xl shadow-2xl border border-white/70 p-6 md:p-8 w-full max-w-lg my-auto">
