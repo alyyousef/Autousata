@@ -10,4 +10,32 @@ router.get(
   adminUsersController.searchUsers,
 );
 
+router.get(
+  "/:userId/transactions",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.getUserTransactionHistory,
+);
+
+router.patch(
+  "/:userId/suspend",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.suspendUser,
+);
+
+router.patch(
+  "/:userId/reactivate",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.reactivateUser,
+);
+
+router.patch(
+  "/:userId/ban",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.banUser,
+);
+
 module.exports = router;
