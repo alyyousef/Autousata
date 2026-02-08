@@ -40,11 +40,11 @@ const filterVehiclesByStatus = async (req, res) => {
 
 const searchVehiclesController = async (req, res) => {
     try {
-        const { query } = req.query;
-        if (!query) {
-            return res.status(400).json({ error: 'Query parameter is required' });
+        const { search } = req.query;
+        if (!search) {
+            return res.status(400).json({ error: 'Search parameter is required' });
         }
-        const searchResults = await searchVehicles(query);
+        const searchResults = await searchVehicles(search);
         res.status(200).json({ vehicles: searchResults });
     }
     catch (error) { 

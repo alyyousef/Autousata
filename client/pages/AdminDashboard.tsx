@@ -1,11 +1,10 @@
- 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload } from '../services/adminApi';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload } from '../services/adminApi';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -29,14 +28,23 @@ const AdminDashboard: React.FC = () => {
     }
   }, [adminToken]);
 
+  // Load vehicles based on search and filter
   useEffect(() => {
     const loadVehicles = async () => {
       setVehicleLoading(true);
       setVehicleError(null);
       try {
-        const data = vehicleStatusFilter
-          ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
-          : await getAdminVehicles(effectiveToken);
+        let data: VehicleItem[];
+        
+        // Priority: search > filter > all
+        if (vehicleSearch.trim()) {
+          data = await searchAdminVehicles(vehicleSearch.trim(), effectiveToken);
+        } else if (vehicleStatusFilter) {
+          data = await filterAdminVehicles(vehicleStatusFilter, effectiveToken);
+        } else {
+          data = await getAdminVehicles(effectiveToken);
+        }
+        
         setVehicles(data);
       } catch (e) {
         setVehicleError(e instanceof Error ? e.message : 'Failed to load vehicles');
@@ -44,18 +52,14 @@ const AdminDashboard: React.FC = () => {
         setVehicleLoading(false);
       }
     };
-    loadVehicles();
-  }, [vehicleStatusFilter, effectiveToken]);
+    
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      loadVehicles();
+    }, 300);
 
-  const filteredVehicles = useMemo(() => {
-    const q = vehicleSearch.trim().toLowerCase();
-    if (!q) return vehicles;
-    return vehicles.filter(v => (
-      [v.make, v.model, v.vin, v.plate_number, v.color, v.location]
-        .filter(Boolean)
-        .some(val => String(val).toLowerCase().includes(q))
-    ));
-  }, [vehicles, vehicleSearch]);
+    return () => clearTimeout(timeoutId);
+  }, [vehicleSearch, vehicleStatusFilter, effectiveToken]);
 
   return (
     <div className="bg-slate-50 min-h-screen py-12">
@@ -168,7 +172,7 @@ const AdminDashboard: React.FC = () => {
                       type="text" 
                       value={vehicleSearch}
                       onChange={(e) => setVehicleSearch(e.target.value)}
-                      placeholder="Search by make, model, VIN, plate, color..."
+                      placeholder="Search by make, model, or location..."
                       className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
                     />
                   </div>
@@ -205,10 +209,10 @@ const AdminDashboard: React.FC = () => {
                     {vehicleError && !vehicleLoading && (
                       <tr><td className="px-4 py-6 text-rose-600" colSpan={5}>{vehicleError}</td></tr>
                     )}
-                    {!vehicleLoading && !vehicleError && filteredVehicles.length === 0 && (
+                    {!vehicleLoading && !vehicleError && vehicles.length === 0 && (
                       <tr><td className="px-4 py-6 text-slate-500" colSpan={5}>No vehicles found.</td></tr>
                     )}
-                    {!vehicleLoading && !vehicleError && filteredVehicles.map((v) => {
+                    {!vehicleLoading && !vehicleError && vehicles.map((v) => {
                       const canEditStatus = !(v.inspection_req === 1 && !v.inspection_report);
                       const inspectionDone = Boolean(v.inspection_report);
                       return (
@@ -235,6 +239,14 @@ const AdminDashboard: React.FC = () => {
                                 if (!res.ok) {
                                   alert(res.message);
                                   e.target.value = String(v.status).toLowerCase();
+                                } else {
+                                  // Reload vehicles after status update
+                                  const data = vehicleSearch.trim() 
+                                    ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
+                                    : vehicleStatusFilter
+                                    ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
+                                    : await getAdminVehicles(effectiveToken);
+                                  setVehicles(data);
                                 }
                               }}
                             >
@@ -338,6 +350,13 @@ const AdminDashboard: React.FC = () => {
                             alert(res.message);
                           } else {
                             setShowInspectionModal({ open: false });
+                            // Reload vehicles after creating inspection
+                            const data = vehicleSearch.trim() 
+                              ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
+                              : vehicleStatusFilter
+                              ? await filterAdminVehicles(vehicleStatusFilter, effectiveToken)
+                              : await getAdminVehicles(effectiveToken);
+                            setVehicles(data);
                           }
                         }}>Save Report</button>
                       </div>

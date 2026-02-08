@@ -49,6 +49,7 @@ export interface CreateInspectionPayload {
   requiredRepairs?: string;
   estimatedRepairCost?: number;
   reportDocUrl?: string;
+  status?: string;
 }
 
 export const searchUsers = async (q: string): Promise<AdminUserSearchResult[]> => {
@@ -69,12 +70,8 @@ export const getAdminVehicles = async (token?: string): Promise<VehicleItem[]> =
     method: 'GET',
     headers,
   });
-  console.log('Admin vehicles response status:', response.status);
-  console.log(response)
 
   if (!response.ok) {
-    console.log('Admin vehicles response status:', response.status);
-  console.log(response)
     throw new Error('Failed to fetch vehicles');
   }
 
@@ -88,13 +85,32 @@ export const filterAdminVehicles = async (status: string, token?: string): Promi
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`http://localhost:5000/api/admin/vehicles?status=${encodeURIComponent(status)}`, {
+  const response = await fetch(`http://localhost:5000/api/admin/vehicles/filter?status=${encodeURIComponent(status)}`, {
     method: 'GET',
     headers,
   });
 
   if (!response.ok) {
     throw new Error('Failed to filter vehicles');
+  }
+
+  const data = await response.json();
+  return data.vehicles || data || [];
+};
+
+export const searchAdminVehicles = async (searchTerm: string, token?: string): Promise<VehicleItem[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`http://localhost:5000/api/admin/vehicles/search?search=${encodeURIComponent(searchTerm)}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search vehicles');
   }
 
   const data = await response.json();
@@ -135,7 +151,7 @@ export const updateVehicleStatus = async (
 export const createInspectionReport = async (
   payload: CreateInspectionPayload,
   token?: string
-): Promise<{ ok: boolean; message?: string }> => {
+): Promise<{ ok: boolean; message?: string; reportId?: string }> => {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -156,7 +172,7 @@ export const createInspectionReport = async (
       return { ok: false, message: data.error || 'Failed to create inspection report' };
     }
 
-    return { ok: true };
+    return { ok: true, reportId: data.reportId };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
   }
