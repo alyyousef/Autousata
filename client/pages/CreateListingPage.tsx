@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,6 +6,7 @@ import * as z from 'zod';
 import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { geminiService } from '../geminiService'; // Keeping AI service
+import { useLanguage } from '../contexts/LanguageContext';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,38 +16,49 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 // --- Zod Schema ---
-const listingSchema = z.object({
-  // Step 1: Vehicle Basics
-  year: z.coerce.number().min(1900).max(new Date().getFullYear() + 1, "Invalid year"),
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  mileage: z.coerce.number().min(0, "Mileage cannot be negative"),
-  vin: z.preprocess((val) => (val === '' ? undefined : val), z.string().length(17, "VIN must be exactly 17 characters").optional()),
-  plateNumber: z.preprocess((val) => (val === '' ? undefined : val), z.string().min(1, "Plate number is required").optional()),
-  color: z.string().min(1, "Color is required"),
-  bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
-  transmission: z.enum(['manual', 'automatic']),
-  fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
-  seats: z.coerce.number().min(1, "Seats is required"),
-  condition: z.enum(['excellent', 'good', 'fair', 'poor']),
-  
-  // Step 2: Details & Media
-  description: z.string().min(20, "Description should be at least 20 characters"),
-  features: z.array(z.string()).default([]),
-  images: z.array(z.string()).min(1, "At least one image is required"), // Storing URLs/Base64 for now
-  
-  // Step 3: Pricing & Location (Auction Config)
-  location: z.string().min(1, "Location is required"),
-  reservePrice: z.coerce.number().min(1, "Reserve price is required"),
-  startingBid: z.coerce.number().min(1, "Starting bid is required"),
-  startTime: z.string().optional(), // For scheduling
-  durationDays: z.enum(["1", "3", "7"]).default("3"),
-  
-  // AI Notes (Optional, not sent to DB directly but used for generation)
-  aiNotes: z.string().optional(),
-});
+const createListingSchema = (t: (en: string, ar: string) => string) =>
+  z.object({
+    // Step 1: Vehicle Basics
+    year: z.coerce
+      .number()
+      .min(1900, t('Year must be 1900 or newer', 'سنة الصنع يجب ان تكون 1900 او احدث'))
+      .max(new Date().getFullYear() + 1, t('Year cannot be in the far future', 'سنة الصنع لا يمكن ان تكون بعيدة')),
+    make: z.string().min(1, t('Make is required', 'الماركة مطلوبة')),
+    model: z.string().min(1, t('Model is required', 'الموديل مطلوب')),
+    mileage: z.coerce.number().min(0, t('Mileage must be 0 or more', 'المسافة يجب ان تكون صفر او اكثر')),
+    vin: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().length(17, t('VIN must be 17 characters', 'رقم الشاسيه يجب ان يكون 17 حرف')).optional()
+    ),
+    plateNumber: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().min(1, t('Plate number is required', 'رقم اللوحة مطلوب')).optional()
+    ),
+    color: z.string().min(1, t('Color is required', 'اللون مطلوب')),
+    bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
+    transmission: z.enum(['manual', 'automatic']),
+    fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
+    seats: z.coerce.number().min(1, t('Seats must be at least 1', 'عدد المقاعد يجب ان يكون واحد او اكثر')),
+    condition: z.enum(['excellent', 'good', 'fair', 'poor']),
 
-type ListingFormData = z.infer<typeof listingSchema>;
+    // Step 2: Details & Media
+    description: z.string().min(20, t('Description must be at least 20 characters', 'الوصف يجب ان يكون 20 حرف على الاقل')),
+    features: z.array(z.string()).default([]),
+    images: z.array(z.string()).min(1, t('Add at least one photo', 'اضف صورة واحدة على الاقل')),
+
+    // Step 3: Pricing & Location (Auction Config)
+    location: z.string().min(1, t('Location is required', 'الموقع مطلوب')),
+    reservePrice: z.coerce.number().min(1, t('Reserve price is required', 'سعر الحجز مطلوب')),
+    startingBid: z.coerce.number().min(1, t('Starting bid is required', 'سعر البداية مطلوب')),
+    startTime: z.string().optional(),
+    durationDays: z.enum(['1', '3', '7']).default('3'),
+
+    // AI Notes (Optional, not sent to DB directly but used for generation)
+    aiNotes: z.string().optional(),
+  });
+
+type ListingFormInput = z.input<ReturnType<typeof createListingSchema>>;
+type ListingFormData = z.infer<ReturnType<typeof createListingSchema>>;
 
 const CreateListingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -55,6 +67,8 @@ const CreateListingPage: React.FC = () => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
+  const listingSchema = useMemo(() => createListingSchema(t), [t]);
 
   const {
     register,
@@ -64,7 +78,7 @@ const CreateListingPage: React.FC = () => {
     trigger,
     getValues,
     formState: { errors, isValid }
-  } = useForm<ListingFormData>({
+  } = useForm<ListingFormInput, unknown, ListingFormData>({
     resolver: zodResolver(listingSchema),
     mode: 'onChange',
     defaultValues: {
@@ -92,9 +106,9 @@ const CreateListingPage: React.FC = () => {
       const basicInfo = {
         make: getValues('make'),
         model: getValues('model'),
-        year: getValues('year'),
+        year: Number(getValues('year')) || new Date().getFullYear(),
         condition: getValues('condition'),
-        notes: notes
+        notes: notes || ''
       };
       
       const generatedDescription = await geminiService.enhanceDescription(basicInfo);
@@ -166,7 +180,7 @@ const CreateListingPage: React.FC = () => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) {
-        setSubmitError('Please log in before creating a listing.');
+        setSubmitError(t('Please log in before creating a listing', 'يرجى تسجيل الدخول قبل انشاء اعلان'));
         return;
       }
       const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -221,7 +235,8 @@ const CreateListingPage: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.msg || 'Failed to create listing. Please try again.';
+      const msg =
+        err.response?.data?.msg || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
@@ -231,10 +246,10 @@ const CreateListingPage: React.FC = () => {
   // --- UI Components ---
   
   const steps = [
-    { title: 'Vehicle Info', icon: Car },
-    { title: 'Details & Photos', icon: Camera },
-    { title: 'Pricing & Auction', icon: DollarSign },
-    { title: 'Review', icon: CheckCircle2 }
+    { title: t('Vehicle Info', 'بيانات السيارة'), icon: Car },
+    { title: t('Details & Photos', 'التفاصيل والصور'), icon: Camera },
+    { title: t('Pricing & Auction', 'السعر والمزاد'), icon: DollarSign },
+    { title: t('Review', 'المراجعة'), icon: CheckCircle2 }
   ];
 
   return (
@@ -280,100 +295,100 @@ const CreateListingPage: React.FC = () => {
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="mb-8">
-                  <h2 className="text-2xl font-black text-slate-900">Tell us about your vehicle</h2>
-                  <p className="text-slate-500">Provide the basic details to get started.</p>
+                  <h2 className="text-2xl font-black text-slate-900">{t('Tell us about your vehicle', 'احكي لنا عن سيارتك')}</h2>
+                  <p className="text-slate-500">{t('Provide the basic details to get started', 'اكتب البيانات الاساسية للبدء')}</p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Year</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Year', 'سنة الصنع')}</label>
                     <input type="number" {...register('year')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.year ? "border-rose-300" : "border-slate-200")} />
                     {errors.year && <p className="text-xs text-rose-600">{errors.year.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Make</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Make', 'الماركة')}</label>
                     <input type="text" {...register('make')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.make ? "border-rose-300" : "border-slate-200")} />
                     {errors.make && <p className="text-xs text-rose-600">{errors.make.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Model</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Model', 'الموديل')}</label>
                     <input type="text" {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
                     {errors.model && <p className="text-xs text-rose-600">{errors.model.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Mileage</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Mileage', 'المسافة')}</label>
                     <input type="number" {...register('mileage')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.mileage ? "border-rose-300" : "border-slate-200")} />
                     {errors.mileage && <p className="text-xs text-rose-600">{errors.mileage.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">VIN</label>
-                    <input type="text" {...register('vin')} placeholder="17 alphanumeric characters" className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.vin ? "border-rose-300" : "border-slate-200")} />
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('VIN', 'رقم الشاسيه')}</label>
+                    <input type="text" {...register('vin')} placeholder={t('17 alphanumeric characters', 'سبعة عشر حرف او رقم')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.vin ? "border-rose-300" : "border-slate-200")} />
                     {errors.vin && <p className="text-xs text-rose-600">{errors.vin.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Plate Number</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Plate Number', 'رقم اللوحة')}</label>
                     <input type="text" {...register('plateNumber')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")} />
                     {errors.plateNumber && <p className="text-xs text-rose-600">{errors.plateNumber.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Color</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Color', 'اللون')}</label>
                     <input type="text" {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")} />
                     {errors.color && <p className="text-xs text-rose-600">{errors.color.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Body Type</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Body Type', 'نوع الهيكل')}</label>
                     <select {...register('bodyType')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.bodyType ? "border-rose-300" : "border-slate-200")}>
-                      <option value="sedan">Sedan</option>
-                      <option value="suv">SUV</option>
-                      <option value="truck">Truck</option>
-                      <option value="coupe">Coupe</option>
-                      <option value="hatchback">Hatchback</option>
-                      <option value="van">Van</option>
-                      <option value="convertible">Convertible</option>
+                      <option value="sedan">{t('Sedan', 'سيدان')}</option>
+                      <option value="suv">{t('SUV', 'دفع رباعي')}</option>
+                      <option value="truck">{t('Truck', 'بيك اب')}</option>
+                      <option value="coupe">{t('Coupe', 'كوبيه')}</option>
+                      <option value="hatchback">{t('Hatchback', 'هاتشباك')}</option>
+                      <option value="van">{t('Van', 'فان')}</option>
+                      <option value="convertible">{t('Convertible', 'مكشوفة')}</option>
                     </select>
                     {errors.bodyType && <p className="text-xs text-rose-600">{errors.bodyType.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Transmission</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Transmission', 'ناقل الحركة')}</label>
                     <select {...register('transmission')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.transmission ? "border-rose-300" : "border-slate-200")}>
-                      <option value="automatic">Automatic</option>
-                      <option value="manual">Manual</option>
+                      <option value="automatic">{t('Automatic', 'اوتوماتيك')}</option>
+                      <option value="manual">{t('Manual', 'يدوي')}</option>
                     </select>
                     {errors.transmission && <p className="text-xs text-rose-600">{errors.transmission.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Fuel Type</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Fuel Type', 'نوع الوقود')}</label>
                     <select {...register('fuelType')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.fuelType ? "border-rose-300" : "border-slate-200")}>
-                      <option value="petrol">Petrol</option>
-                      <option value="diesel">Diesel</option>
-                      <option value="electric">Electric</option>
-                      <option value="hybrid">Hybrid</option>
+                      <option value="petrol">{t('Petrol', 'بنزين')}</option>
+                      <option value="diesel">{t('Diesel', 'ديزل')}</option>
+                      <option value="electric">{t('Electric', 'كهرباء')}</option>
+                      <option value="hybrid">{t('Hybrid', 'هايبرد')}</option>
                     </select>
                     {errors.fuelType && <p className="text-xs text-rose-600">{errors.fuelType.message}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Seats</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Seats', 'عدد المقاعد')}</label>
                     <input type="number" {...register('seats')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")} />
                     {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Condition</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Condition', 'الحالة')}</label>
                     <select {...register('condition')} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none">
-                      <option value="excellent">Excellent</option>
-                      <option value="good">Good</option>
-                      <option value="fair">Fair</option>
-                      <option value="poor">Poor</option>
+                      <option value="excellent">{t('Excellent', 'ممتازة')}</option>
+                      <option value="good">{t('Good', 'جيدة')}</option>
+                      <option value="fair">{t('Fair', 'مقبولة')}</option>
+                      <option value="poor">{t('Poor', 'ضعيفة')}</option>
                     </select>
                   </div>
                 </div>
@@ -384,33 +399,33 @@ const CreateListingPage: React.FC = () => {
             {step === 2 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Photos & Details</h2>
-                  <p className="text-slate-500">Make your listing stand out.</p>
+                  <h2 className="text-2xl font-black text-slate-900">{t('Photos & Details', 'الصور والتفاصيل')}</h2>
+                  <p className="text-slate-500">{t('Make your listing stand out', 'خلي اعلانك يبان')}</p>
                 </div>
 
                 {/* Photos */}
                 <div className={cn("bg-slate-50 border border-dashed rounded-2xl p-6 transition-colors", errors.images ? "border-rose-300 bg-rose-50/10" : "border-slate-300")}>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h4 className="font-bold text-slate-900">Vehicle Photos</h4>
-                      <p className="text-xs text-slate-500">Upload at least one clear image.</p>
+                      <h4 className="font-bold text-slate-900">{t('Vehicle Photos', 'صور السيارة')}</h4>
+                      <p className="text-xs text-slate-500">{t('Upload at least one clear image', 'ارفع صورة واضحة على الاقل')}</p>
                       {errors.images && <p className="text-xs text-rose-600 font-bold mt-1">{errors.images.message}</p>}
                     </div>
                     <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-800 transition">
                       <Camera size={16} />
-                      Add photos
+                      {t('Add photos', 'اضف صور')}
                       <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImagesSelected(e.target.files)} />
                     </label>
                   </div>
                   
                   {formData.images?.length === 0 ? (
-                    <div className="text-sm text-slate-500 text-center py-10 italic">No photos uploaded yet.</div>
+                    <div className="text-sm text-slate-500 text-center py-10 italic">{t('No photos uploaded yet', 'لا توجد صور بعد')}</div>
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                       {formData.images?.map((img, idx) => (
                         <div key={idx} className="relative group aspect-square">
-                          <img src={img} alt="Vehicle" className="w-full h-full object-cover rounded-lg border border-slate-200" />
-                          <button type="button" aria-label="Remove photo" title="Remove photo" onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-white text-rose-500 border border-slate-200 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-50">
+                          <img src={img} alt={t('Vehicle', 'السيارة')} className="w-full h-full object-cover rounded-lg border border-slate-200" />
+                          <button type="button" aria-label={t('Remove photo', 'حذف الصورة')} title={t('Remove photo', 'حذف الصورة')} onClick={() => removeImage(idx)} className="absolute -top-2 -right-2 bg-white text-rose-500 border border-slate-200 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-50">
                             <X size={12} />
                           </button>
                         </div>
@@ -421,22 +436,22 @@ const CreateListingPage: React.FC = () => {
 
                 {/* Features */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6">
-                  <h4 className="font-bold text-slate-900 mb-4">Key Features</h4>
+                  <h4 className="font-bold text-slate-900 mb-4">{t('Key Features', 'المميزات الاساسية')}</h4>
                   <div className="flex gap-2 mb-4">
                     <input 
                       type="text" 
-                      placeholder="e.g., Sunroof, Navigation, Leather Seats" 
+                      placeholder={t('e.g., Sunroof, Navigation, Leather Seats', 'مثال فتحة سقف ملاحة مقاعد جلد')} 
                       value={featureInput}
                       onChange={(e) => setFeatureInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
                       className="flex-grow px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
                     />
-                    <button type="button" onClick={addFeature} className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition">Add</button>
+                    <button type="button" onClick={addFeature} className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition">{t('Add', 'اضف')}</button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {formData.features?.map((f, idx) => (
                       <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                        {f} <button type="button" aria-label="Remove feature" title="Remove feature" onClick={() => removeFeature(idx)}><X size={12} className="text-slate-400 hover:text-slate-600" /></button>
+                        {f} <button type="button" aria-label={t('Remove feature', 'حذف الميزة')} title={t('Remove feature', 'حذف الميزة')} onClick={() => removeFeature(idx)}><X size={12} className="text-slate-400 hover:text-slate-600" /></button>
                       </span>
                     ))}
                   </div>
@@ -447,12 +462,12 @@ const CreateListingPage: React.FC = () => {
                   <div className="flex items-start gap-4">
                     <div className="bg-indigo-600 p-2 rounded-lg text-white"><Wand2 size={24} /></div>
                     <div className="flex-grow">
-                      <h4 className="font-bold text-indigo-900">AutoWriter AI</h4>
-                      <p className="text-xs text-indigo-700 mb-4">Draft some notes and we'll write the full description.</p>
+                      <h4 className="font-bold text-indigo-900">{t('AutoWriter AI', 'كاتب تلقائي')}</h4>
+                      <p className="text-xs text-indigo-700 mb-4">{t('Draft some notes and we will write the full description', 'اكتب ملاحظات بسيطة وسنكتب الوصف الكامل')}</p>
                       <textarea 
                         {...register('aiNotes')}
                         className="w-full p-4 bg-white border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none min-h-[80px]"
-                        placeholder="e.g., M-Sport package, ceramic coating, new tires..."
+                        placeholder={t('e.g., M-Sport package, ceramic coating, new tires', 'مثال باقة ام سبورت طلاء سيراميك كاوتش جديد')}
                       />
                       <button 
                         type="button"
@@ -461,14 +476,14 @@ const CreateListingPage: React.FC = () => {
                         className="mt-3 flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
                       >
                         {isGeneratingAI ? <Loader2 className="animate-spin" size={14} /> : <Wand2 size={14} />}
-                        Generate Description
+                        {t('Generate Description', 'انشئ وصف')}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Full Description</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Full Description', 'الوصف الكامل')}</label>
                   <textarea 
                     {...register('description')}
                     className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none min-h-[200px] text-sm", errors.description ? "border-rose-300" : "border-slate-200")}
@@ -482,15 +497,15 @@ const CreateListingPage: React.FC = () => {
             {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Auction Settings</h2>
-                  <p className="text-slate-500">Set your price and duration.</p>
+                  <h2 className="text-2xl font-black text-slate-900">{t('Auction Settings', 'اعدادات المزاد')}</h2>
+                  <p className="text-slate-500">{t('Set your price and duration', 'حدد السعر والمدة')}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Starting Bid</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Starting Bid', 'سعر البداية')}</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input 
                         type="number"
                         {...register('startingBid')}
@@ -501,9 +516,9 @@ const CreateListingPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Reserve Price</label>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Reserve Price', 'سعر الحجز')}</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">EGP</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input 
                         type="number"
                         {...register('reservePrice')}
@@ -515,21 +530,21 @@ const CreateListingPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Location (City)</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Location (City)', 'الموقع المدينة')}</label>
                   <div className="relative">
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                       type="text"
                       {...register('location')}
                       className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.location ? "border-rose-300" : "border-slate-200")}
-                      placeholder="e.g. Cairo, Nasr City"
+                      placeholder={t('e.g. Cairo, Nasr City', 'مثال القاهرة مدينة نصر')}
                     />
                   </div>
                   {errors.location && <p className="text-xs text-rose-600">{errors.location.message}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Auction Duration</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Auction Duration', 'مدة المزاد')}</label>
                   <div className="grid grid-cols-3 gap-4">
                     {['1', '3', '7'].map((days) => (
                       <label key={days} className={cn(
@@ -537,7 +552,7 @@ const CreateListingPage: React.FC = () => {
                         formData.durationDays === days ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
                       )}>
                         <input type="radio" value={days} {...register('durationDays')} className="hidden" />
-                        <span className="text-lg font-bold">{days} Days</span>
+                        <span className="text-lg font-bold">{formatNumber(Number(days))} {t('Days', 'ايام')}</span>
                       </label>
                     ))}
                   </div>
@@ -551,15 +566,18 @@ const CreateListingPage: React.FC = () => {
                 <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 size={40} />
                 </div>
-                <h2 className="text-3xl font-black text-slate-900">Ready to Submit?</h2>
+                <h2 className="text-3xl font-black text-slate-900">{t('Ready to Submit?', 'جاهز للارسال')}</h2>
                 <p className="text-slate-500 max-w-md mx-auto">
-                  Your vehicle will be submitted for admin approval. Once approved, the auction will be scheduled.
+                  {t(
+                    'Your vehicle will be submitted for admin approval. Once approved, the auction will be scheduled.',
+                    'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيتم جدولة المزاد'
+                  )}
                 </p>
                 <div className="bg-slate-50 rounded-2xl p-6 text-left max-w-sm mx-auto space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">Vehicle:</span> <span className="font-bold">{formData.year} {formData.make} {formData.model}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Reserve:</span> <span className="font-bold">EGP {Number(formData.reservePrice).toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Duration:</span> <span className="font-bold">{formData.durationDays} Days</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Status:</span> <span className="font-bold text-amber-600">Pending Inspection</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Vehicle', 'السيارة')}</span> <span className="font-bold">{formatNumber(formData.year)} {formData.make} {formData.model}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Reserve', 'الحجز')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.reservePrice))}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Duration', 'المدة')}</span> <span className="font-bold">{formatNumber(Number(formData.durationDays))} {t('Days', 'ايام')}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Status', 'الحالة')}</span> <span className="font-bold text-amber-600">{t('Pending Inspection', 'قيد الفحص')}</span></div>
                 </div>
               </div>
             )}
@@ -572,7 +590,7 @@ const CreateListingPage: React.FC = () => {
                   onClick={() => setStep(step - 1)}
                   className="px-8 py-3 text-slate-600 font-bold flex items-center gap-2 hover:bg-slate-100 rounded-xl transition-all"
                 >
-                  <ArrowLeft size={18} /> Back
+                  <ArrowLeft size={18} /> {t('Back', 'رجوع')}
                 </button>
               ) : <div></div>}
 
@@ -584,7 +602,7 @@ const CreateListingPage: React.FC = () => {
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : (
                   <>
-                    {step === 4 ? 'Submit Listing' : 'Continue'}
+                    {step === 4 ? t('Submit Listing', 'ارسال الاعلان') : t('Continue', 'اكمل')}
                     {step < 4 && <ArrowRight size={18} />}
                   </>
                 )}

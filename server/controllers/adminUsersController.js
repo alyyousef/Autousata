@@ -1,17 +1,39 @@
 const adminUsersService = require("../services/adminUsersService");
 
+exports.listUsers = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limitRaw = parseInt(req.query.limit || "20", 10);
+    const limit = Math.min(Math.max(limitRaw, 1), 50);
+
+    const data = await adminUsersService.listUsers({ page, limit });
+    res.json(data); // { items, page, limit, total, totalPages }
+  } catch (err) {
+    console.error("Admin list users error:", err);
+    res.status(500).json({ error: "Failed to list users" });
+  }
+};
+
 exports.searchUsers = async (req, res) => {
   try {
     const { q } = req.query;
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limitRaw = parseInt(req.query.limit || "20", 10);
+    const limit = Math.min(Math.max(limitRaw, 1), 50);
 
-    if (!q || q.trim().length < 1) {
-      return res.status(400).json({
-        error: "Search query must be at least 1 character",
-      });
+    if (!q || String(q).trim().length < 1) {
+      return res
+        .status(400)
+        .json({ error: "Search query must be at least 1 character" });
     }
 
-    const users = await adminUsersService.searchUsers(q.trim());
-    res.json(users);
+    const data = await adminUsersService.searchUsers({
+      searchTerm: String(q).trim(),
+      page,
+      limit,
+    });
+
+    res.json(data); // { items, page, limit, total, totalPages }
   } catch (err) {
     console.error("Admin search users error:", err);
     res.status(500).json({ error: "Failed to search users" });

@@ -1,37 +1,62 @@
-const jwt = require('jsonwebtoken');
-const oracledb = require('oracledb');
-require('dotenv').config();
+const jwt = require("jsonwebtoken");
+const oracledb = require("oracledb");
+require("dotenv").config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
+const ACCESS_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "default-refresh-secret";
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "30d";
 
-// 1. Generate Token (Same as before)
-const generateToken = (user) => {
-  return jwt.sign( { userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+// =========================================================
+// 1. GENERATE TOKEN (Legacy support)
+// =========================================================
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, ACCESS_SECRET, {
+    expiresIn: LEGACY_TOKEN_EXPIRES_IN,
+  });
 };
 
-// 2. Authenticate Middleware (Uses direct SQL query instead of stored procedure)
+// =========================================================
+// 2. GENERATE TOKENS (Access + Refresh)
+// =========================================================
+const generateTokens = (userId) => {
+  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+  });
+  const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
+  return { accessToken, refreshToken };
+};
+
+// =========================================================
+// 3. VERIFY REFRESH TOKEN
+// =========================================================
+const verifyRefreshToken = (token) => {
+  try {
+    return jwt.verify(token, REFRESH_SECRET);
+  } catch (error) {
+    return null;
+  }
+};
+
+// =========================================================
+// 4. AUTHENTICATE & MAP DATA (The Critical Part)
+// =========================================================
 const authenticate = async (req, res, next) => {
   let connection;
   try {
-    // Get the token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ error: "No token provided" });
     }
 
-    // Verify token validity
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-      console.log('✅ Token decoded. User ID:', decoded.userId);
-    } catch (jwtError) {
-      console.error('❌ JWT Error:', jwtError.message);
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-    
-    // Connect to Oracle
+    // Verify Access Token
+    const decoded = jwt.verify(token, ACCESS_SECRET);
+
     connection = await oracledb.getConnection();
 
     // DIRECT SQL QUERY instead of stored procedure
@@ -46,29 +71,29 @@ const authenticate = async (req, res, next) => {
       FROM USERS
       WHERE ID = :userId`,
       { userId: decoded.userId },
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
 
-    console.log('📊 Query returned', result.rows?.length || 0, 'rows');
+    console.log("📊 Query returned", result.rows?.length || 0, "rows");
 
     // Check if user exists
     if (!result.rows || result.rows.length === 0) {
-      console.error('❌ User not found. ID:', decoded.userId);
-      return res.status(401).json({ error: 'User not found' });
+      console.error("❌ User not found. ID:", decoded.userId);
+      return res.status(401).json({ error: "User not found" });
     }
 
     const user = result.rows[0];
-    console.log('👤 User found:', user.EMAIL, '| Role:', user.ROLE);
+    console.log("👤 User found:", user.EMAIL, "| Role:", user.ROLE);
 
     // Check if user is banned or inactive
-    if (user.IS_BANNED === '1') {
-      console.error('🚫 User is banned');
-      return res.status(401).json({ error: 'Account is banned' });
+    if (user.IS_BANNED === "1") {
+      console.error("🚫 User is banned");
+      return res.status(401).json({ error: "Account is banned" });
     }
 
-    if (user.IS_ACTIVE === '0') {
-      console.error('⏸️ User is inactive');
-      return res.status(401).json({ error: 'Account is inactive' });
+    if (user.IS_ACTIVE === "0") {
+      console.error("⏸️ User is inactive");
+      return res.status(401).json({ error: "Account is inactive" });
     }
 
     // Attach user info to the request object
@@ -77,47 +102,59 @@ const authenticate = async (req, res, next) => {
       id: user.ID,
       name: user.NAME,
       email: user.EMAIL,
-      role: user.ROLE
+      role: user.ROLE,
     };
-    
-    req.token = token;
-    console.log('✅ Auth success:', user.EMAIL);
-    next();
 
+    req.token = token;
+    console.log("✅ Auth success:", user.EMAIL);
+    next();
   } catch (error) {
-    console.error('Auth Middleware Error:', error);
-    res.status(401).json({ error: 'Authentication failed: ' + error.message });
+    if (error.name === "TokenExpiredError") {
+      return res
+        .status(401)
+        .json({ error: "TokenExpired", message: "Access token expired" });
+    }
+    console.error("Auth Middleware Error:", error.message);
+    res.status(401).json({ error: "Invalid token" });
   } finally {
     if (connection) {
-      try { await connection.close(); } catch (e) { console.error(e); }
+      try {
+        await connection.close();
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 };
 
-// 3. Authorization (Same as before)
+// =========================================================
+// 5. AUTHORIZATION
+// =========================================================
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ error: "Authentication required" });
     }
-    
-    const userRole = String(req.user.role || '').toLowerCase();
+
+    const userRole = String(req.user.role || "").toLowerCase();
     const allowedRoles = roles.map((r) => String(r).toLowerCase());
-    
-    console.log('🔑 Auth check - User:', userRole, '| Required:', allowedRoles);
-    
+
+    console.log("🔑 Auth check - User:", userRole, "| Required:", allowedRoles);
+
     if (!allowedRoles.includes(userRole)) {
-      console.error('❌ Insufficient permissions');
-      return res.status(403).json({ error: 'Insufficient permissions' });
+      console.error("❌ Insufficient permissions");
+      return res.status(403).json({ error: "Insufficient permissions" });
     }
-    
-    console.log('✅ Authorization passed');
+
+    console.log("✅ Authorization passed");
     next();
   };
 };
 
 module.exports = {
-  generateToken,
+  generateToken, // Legacy
+  generateTokens,
+  verifyRefreshToken,
   authenticate,
-  authorize
+  authorize,
 };

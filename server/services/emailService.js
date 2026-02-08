@@ -1,54 +1,88 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Gmail Transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, 
+        pass: process.env.EMAIL_PASS,
     },
 });
 
-async function sendVerificationEmail(toEmail, token) {
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173'; 
-    const verificationLink = `${baseUrl}/verify-email?token=${token}`;
-    const heroImage = "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1000&q=80";
-
+async function sendVerificationEmail(toEmail, otpCode) {
+    // High-End Porsche Interior Image
+// A reliable, fast-loading luxury car image
+const heroImage = 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1000&q=80';
     const mailOptions = {
-        from: `"AutoUsata" <${process.env.EMAIL_USER}>`,
+        from: `"AUTOUSATA Concierge" <${process.env.EMAIL_USER}>`,
         to: toEmail,
-        subject: '🏁 Start your engine! Verify your AutoUsata account',
+        subject: '🔒 Your Access Code: ' + otpCode,
         html: `
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <style>
-                body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; color: #333; }
-                .wrapper { padding: 40px 0; width: 100%; }
-                .container { background-color: #ffffff; margin: 0 auto; max-width: 600px; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-                .logo-bar { background-color: #111827; padding: 20px; text-align: center; }
-                .logo-text { color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
-                .header-image { width: 100%; height: 200px; object-fit: cover; display: block; background-color: #111; }
+                body { margin: 0; padding: 0; background-color: #0f172a; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #e2e8f0; }
+                .wrapper { width: 100%; padding: 40px 0; background-color: #0f172a; }
+                .container { max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); border: 1px solid #334155; }
+                
+                /* Header */
+                .header-img { width: 100%; height: 240px; object-fit: cover; display: block; }
+                .logo-bar { background-color: #0f172a; padding: 25px; text-align: center; border-bottom: 1px solid #334155; }
+                .logo-text { font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: 6px; text-transform: uppercase; }
+                
+                /* Content */
                 .content { padding: 40px; text-align: center; }
-                h1 { font-size: 26px; font-weight: 800; margin: 0 0 15px 0; color: #111827; }
-                p { font-size: 16px; line-height: 1.6; color: #4b5563; margin: 0 0 25px 0; }
-                .btn { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: #ffffff !important; font-size: 18px; font-weight: 700; text-decoration: none; padding: 18px 45px; border-radius: 50px; display: inline-block; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4); }
-                .footer { background-color: #f9fafb; padding: 30px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb; }
+                h1 { color: #ffffff; font-size: 28px; font-weight: 700; margin: 0 0 15px 0; letter-spacing: -0.5px; }
+                p { font-size: 16px; line-height: 1.6; color: #94a3b8; margin: 0 0 30px 0; }
+                
+                /* OTP Box - The Star of the Show */
+                .otp-wrapper { margin: 30px 0; }
+                .otp-code { 
+                    font-family: 'Courier New', monospace;
+                    font-size: 42px; 
+                    font-weight: 700; 
+                    color: #ffffff; 
+                    background: #334155; 
+                    padding: 20px 40px; 
+                    border-radius: 8px; 
+                    letter-spacing: 12px; 
+                    display: inline-block;
+                    border: 1px solid #475569;
+                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+                }
+                
+                /* Footer */
+                .footer { background-color: #0f172a; padding: 30px; text-align: center; border-top: 1px solid #334155; }
+                .footer p { font-size: 12px; color: #64748b; margin: 0; }
+                .accent { color: #6366f1; font-weight: 600; }
             </style>
         </head>
         <body>
             <div class="wrapper">
                 <div class="container">
-                    <div class="logo-bar"><span class="logo-text">AUTOUSATA</span></div>
-                    <img src="${heroImage}" class="header-image" alt="Luxury Car">
-                    <div class="content">
-                        <h1>You're almost in the driver's seat.</h1>
-                        <p>Welcome to the premium circle of AutoUsata. Please verify your email to start bidding.</p>
-                        <a href="${verificationLink}" class="btn">VERIFY MY EMAIL</a>
+                    <div class="logo-bar">
+                        <span class="logo-text">AUTOUSATA</span>
                     </div>
-                    <div class="footer">&copy; ${new Date().getFullYear()} AutoUsata Inc.</div>
+                    
+                    <img src="${heroImage}" class="header-img" alt="Luxury Interior">
+                    
+                    <div class="content">
+                        <h1>Start Your Engine</h1>
+                        <p>You are seconds away from accessing the world's most curated marketplace. Use the secure code below to verify your identity.</p>
+                        
+                        <div class="otp-wrapper">
+                            <div class="otp-code">${otpCode}</div>
+                        </div>
+                        
+                        <p>This code is valid for <span class="accent">15 minutes</span>.<br>For your security, do not share this code.</p>
+                    </div>
+                    
+                    <div class="footer">
+                        <p>&copy; ${new Date().getFullYear()} AUTOUSATA Inc. • Cairo, Egypt</p>
+                        <p style="margin-top: 10px;">Driven by passion. Verified by us.</p>
+                    </div>
                 </div>
             </div>
         </body>
@@ -58,10 +92,10 @@ async function sendVerificationEmail(toEmail, token) {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Email sent to ${toEmail}`);
+        console.log(`✅ Premium OTP sent to ${toEmail}`);
         return true;
     } catch (error) {
-        console.error("❌ Email Error:", error);
+        console.error('❌ Email error:', error);
         return false;
     }
 }

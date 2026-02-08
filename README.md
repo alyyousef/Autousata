@@ -1,6 +1,6 @@
 <div align="center">
 
-# Autousata
+# AUTOUSATA
 
 ### European excellence, powered by Egyptian spirit
 
@@ -19,13 +19,13 @@
 
 </div>
 
-Autousata is Egypt's most trusted used car auction platform, combining European-grade discipline with Egyptian spirit to transform how Egyptians buy, sell, and auction vehicles. We replace uncertainty with verified information, fair pricing, integrated financing, and transparent ownership transfers—turning "Ya Rab" into "I'm sure."
+AUTOUSATA is Egypt's most trusted used car auction platform, combining European-grade discipline with Egyptian spirit to transform how Egyptians buy, sell, and auction vehicles. We replace uncertainty with verified information, fair pricing, integrated financing, and transparent ownership transfers—turning "Ya Rab" into "I'm sure."
 
 ## Motivation
 
 Egypt's used car market worth EGP 282-301 billion (USD 6.0-6.4 billion) remains fragmented, undigitized, and plagued by trust issues. Traditional dealerships operate with opacity, hidden defects go undisclosed, financing reaches only 5% of buyers, and ownership transfers involve bureaucratic nightmares.
 
-Autousata solves these challenges through:
+AUTOUSATA solves these challenges through:
 
 - Rigorous third-party vehicle inspections with 200-point condition reports
 - Transparent auction mechanics with real-time bidding and fair pricing algorithms
@@ -157,7 +157,7 @@ The project uses a professional palette reflecting trust and clarity:
 - **Sentry** - Error tracking and monitoring (free tier)
 - **UptimeRobot** - Uptime monitoring
 
-# Autousata - Feature List
+# AUTOUSATA - Feature List
 
 ## Authentication & User Management
 
@@ -387,7 +387,7 @@ The project uses a professional palette reflecting trust and clarity:
 ### Bank Partnership Network
 
 - **Partner Banks:** CIB (Commercial International Bank), Banque Misr, NBE (National Bank of Egypt), Crédit Agricole Egypt, Carofi, Valu Shift
-- **Financing Model:** Autousata acts as facilitator/broker, does NOT lend directly
+- **Financing Model:** AUTOUSATA acts as facilitator/broker, does NOT lend directly
 - **Pre-Approval Process:** Buyers submit income, employment, credit info; bank approves/rejects
 - **Loan Terms:** 60% LTV (Loan-to-Value) typical; 3-5 year terms; interest rates set by bank
 
@@ -843,8 +843,8 @@ export default function AuctionCard({ auction }) {
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/autousata.git
-   cd autousata
+   git clone https://github.com/your-org/AUTOUSATA.git
+   cd AUTOUSATA
    ```
 
 2. **Install Backend Dependencies**
@@ -866,7 +866,7 @@ export default function AuctionCard({ auction }) {
 4. **Set up Oracle/PostgreSQL Database**
    ```bash
    # Create database
-   createdb autousata_db
+   createdb AUTOUSATA_db
    
    # Run migrations (SQLAlchemy)
    cd ../backend
@@ -878,7 +878,7 @@ export default function AuctionCard({ auction }) {
    Create `.env` file in `backend/` directory:
    ```env
    DATABASE_URL=oracle://user:password@localhost:1521/ORCL
-   # Or for PostgreSQL: postgresql://user:password@localhost:5432/autousata_db
+   # Or for PostgreSQL: postgresql://user:password@localhost:5432/AUTOUSATA_db
    JWT_SECRET_KEY=your-secret-key-here
    PAYMOB_API_KEY=your-paymob-api-key
    PAYMOB_INTEGRATION_ID=your-integration-id
@@ -1069,7 +1069,7 @@ export default function AuctionCard({ auction }) {
 6. Ban users for violations
 7. Generate revenue and performance reports
 
-**Detailed Usage Instructions:** Comprehensive video tutorials and user guides available at `docs.autousata.com` (coming soon)
+**Detailed Usage Instructions:** Comprehensive video tutorials and user guides available at `docs.AUTOUSATA.com` (coming soon)
 
 ## Contribute
 
@@ -1136,7 +1136,7 @@ This project was developed as part of MLG Internship Program 2026.
 We would like to sincerely thank:
 
 - **MLG Engineers** Eng Elgohary, Eng Ashraf, Eng George
-- **Open-Source Community:** For the incredible frameworks and tools that power Autousata
+- **Open-Source Community:** For the incredible frameworks and tools that power AUTOUSATA
 
 **Inspiration & Resources:**
 
@@ -1164,19 +1164,19 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-**Project Repository:** [github.com/your-org/autousata](https://github.com/your-org/autousata)
+**Project Repository:** [github.com/your-org/AUTOUSATA](https://github.com/your-org/AUTOUSATA)
 
-**Documentation:** [docs.autousata.com](https://docs.autousata.com) (coming soon)
+**Documentation:** [docs.AUTOUSATA.com](https://docs.AUTOUSATA.com) (coming soon)
 
 **Contact:** 
-- **General Inquiries:** info@autousata.com
-- **Technical Support:** support@autousata.com
-- **Business Partnerships:** partnerships@autousata.com
+- **General Inquiries:** info@AUTOUSATA.com
+- **Technical Support:** support@AUTOUSATA.com
+- **Business Partnerships:** partnerships@AUTOUSATA.com
 
 **Social Media:**
-- Twitter: [@autousata](https://twitter.com/autousata)
-- LinkedIn: [Autousata](https://linkedin.com/company/autousata)
-- Instagram: [@autousata_egypt](https://instagram.com/autousata_egypt)
+- Twitter: [@AUTOUSATA](https://twitter.com/AUTOUSATA)
+- LinkedIn: [AUTOUSATA](https://linkedin.com/company/AUTOUSATA)
+- Instagram: [@AUTOUSATA_egypt](https://instagram.com/AUTOUSATA_egypt)
 
 **Last Updated:** January 2026
 

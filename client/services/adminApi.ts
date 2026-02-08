@@ -8,8 +8,17 @@ export interface AdminUserSearchResult {
   lastName?: string;
   phone?: string;
   role?: string;
+  isActive?: string;   // ✅ add this (you need it for SUSPENDED vs ACTIVE)
   isBanned?: string;
   kycStatus?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 export interface VehicleItem {
@@ -53,6 +62,27 @@ export interface CreateInspectionPayload {
   reportDocUrl?: string;
   status?: string;
 }
+
+
+export const listUsers = async (
+  page = 1,
+  limit = 20
+): Promise<PaginatedResponse<AdminUserSearchResult>> => {
+  const response = await apiService.adminListUsers(page, limit);
+  if (response.error) throw new Error(response.error);
+
+  const data = response.data as PaginatedResponse<AdminUserSearchResult> | undefined;
+
+  return (
+    data ?? {
+      items: [],
+      page,
+      limit,
+      total: 0,
+      totalPages: 1,
+    }
+  );
+};
 
 export interface KYCDocument {
   userId: string;
@@ -129,13 +159,37 @@ export interface PendingPayment {
   refundedAt?: Date;
 }
 
-export const searchUsers = async (q: string): Promise<AdminUserSearchResult[]> => {
-  const response = await apiService.adminSearchUsers(q);
-  if (response.error) {
-    throw new Error(response.error);
+
+
+
+export const searchUsers = async (
+  q: string,
+  page = 1,
+  limit = 20
+): Promise<PaginatedResponse<AdminUserSearchResult>> => {
+  const query = q.trim();
+  if (query.length < 1) {
+    return { items: [], page: 1, limit, total: 0, totalPages: 1 };
   }
-  return response.data ?? [];
+
+  const response = await apiService.adminSearchUsers(query, page, limit);
+
+  if (response.error) throw new Error(response.error);
+
+  // ✅ force correct shape
+  const data = response.data as PaginatedResponse<AdminUserSearchResult> | undefined;
+
+  return (
+    data ?? {
+      items: [],
+      page,
+      limit,
+      total: 0,
+      totalPages: 1,
+    }
+  );
 };
+
 
 export const getAdminVehicles = async (token?: string): Promise<VehicleItem[]> => {
   const headers: HeadersInit = {};
@@ -313,6 +367,100 @@ export const createInspectionReport = async (
   }
 };
 
+
+
+// Add near your other interfaces
+
+export type TransactionType = "payment" | "escrow" | "bid";
+
+export interface UserTransactionItem {
+  type: TransactionType;
+  id: string;
+  occurredAt: string;      // ISO string or timestamp string from backend
+  status: string;
+  auctionId?: string | null;
+  amountEgp?: number | null;
+  role?: string | null;    // buyer/seller/bidder/related
+  details?: Record<string, any>;
+}
+
+export interface TransactionsResponse {
+  page: number;
+  limit: number;
+  items: UserTransactionItem[];
+  // optional later if you add total:
+  // total?: number;
+  // totalPages?: number;
+}
+
+export const getUserTransactions = async (
+  userId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    type?: TransactionType | "";
+    status?: string | "";
+  }
+): Promise<TransactionsResponse> => {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+
+  const qs = new URLSearchParams();
+  qs.set("page", String(page));
+  qs.set("limit", String(limit));
+
+  if (params?.type) qs.set("type", params.type);
+  if (params?.status) qs.set("status", params.status);
+
+  const response = await apiService.adminGetUserTransactions(userId, qs.toString());
+
+  if (response.error) throw new Error(response.error);
+
+  // backend returns { page, limit, items }
+  return (
+    response.data ?? {
+      page,
+      limit,
+      items: [],
+    }
+  );
+};
+
+
+
+export interface ModerateUserResponse {
+  message?: string;
+  user?: {
+    id: string;
+    isActive?: string;
+    isBanned?: string;
+    banReason?: string | null;
+  };
+};
+
+export const suspendUser = async (
+  userId: string,
+  reason: string
+): Promise<ModerateUserResponse> => {
+  const response = await apiService.adminSuspendUser(userId, { reason });
+  if (response.error) throw new Error(response.error);
+  return response.data ?? { message: "User suspended" };
+};
+
+export const reactivateUser = async (userId: string): Promise<ModerateUserResponse> => {
+  const response = await apiService.adminReactivateUser(userId);
+  if (response.error) throw new Error(response.error);
+  return response.data ?? { message: "User reactivated" };
+};
+
+export const banUser = async (
+  userId: string,
+  payload: { reason: string; evidence?: any }
+): Promise<ModerateUserResponse> => {
+  const response = await apiService.adminBanUser(userId, payload);
+  if (response.error) throw new Error(response.error);
+  return response.data ?? { message: "User banned" };
+};
 export const acceptInspectionReport = async (
   inspectionId: string,
   token?: string

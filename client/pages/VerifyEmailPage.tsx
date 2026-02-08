@@ -1,90 +1,225 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { ShieldCheck, ArrowRight, Mail, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const VerifyEmailPage: React.FC = () => {
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const { updateUser } = useAuth();
   const [searchParams] = useSearchParams();
+  const { t } = useLanguage();
+  
   const token = searchParams.get('token');
   
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'otp'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
 
+  // Handle token-based verification (email link)
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid verification link.');
-      return;
-    }
+    if (token) {
+      const verifyToken = async () => {
+        try {
+          const response = await fetch(`/api/auth/verify-email?token=${token}`);
+          const data = await response.json();
 
-    // Call the Backend API
-    const verify = async () => {
-      try {
-        const response = await fetch('http://localhost:5001/api/auth/verify-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          setStatus('success');
-          setMessage(data.message);
-        } else {
+          if (response.ok) {
+            setStatus('success');
+            setMessage(data.message || t('Email verified successfully!', 'تم تفعيل الإيميل بنجاح!'));
+            setTimeout(() => navigate('/login'), 2000);
+          } else {
+            setStatus('error');
+            setMessage(data.error || t('Verification failed.', 'فشل التفعيل.'));
+          }
+        } catch (error) {
           setStatus('error');
-          setMessage(data.error || 'Verification failed.');
+          setMessage(t('Network error. Please try again.', 'حصل خطأ في الشبكة. جرب تاني.'));
         }
-      } catch (error) {
-        setStatus('error');
-        setMessage('Network error. Please try again.');
-      }
-    };
+      };
+      verifyToken();
+    } else if (!state?.email) {
+      // No token and no email in state - redirect to signup
+      navigate('/signup');
+    } else {
+      // Has email in state - show OTP form
+      setStatus('otp');
+    }
+  }, [token, state, navigate, t]);
 
-    verify();
-  }, [token]);
+  const email = state?.email || '';
+
+  // Handle OTP verification
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // 1. Verify the Code
+      const response = await apiService.verifyEmailOtp(email, otp);
+
+      if (response.data && (response.data as any).success) {
+        setSuccess(true);
+
+        // 2. Fetch the FRESH user profile (which now has is_verified = 1)
+        try {
+          const userResponse = await apiService.getCurrentUser();
+          if (userResponse.data?.user) {
+             // 3. Force the app to update the user state immediately
+             updateUser(userResponse.data.user);
+          }
+        } catch (fetchError) {
+          console.error("Could not refresh user profile", fetchError);
+        }
+
+        // 4. Redirect after a brief moment
+        setTimeout(() => {
+          navigate('/browse');
+        }, 1500);
+
+      } else {
+        setError(response.error || 'Invalid code. Please try again.');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-slate-100">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-slate-50 px-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
         
+        {/* Token Verification: Loading State */}
         {status === 'loading' && (
-          <div className="flex flex-col items-center">
-            <Loader className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900">Verifying...</h2>
-            <p className="text-slate-500 mt-2">Please wait while we activate your account.</p>
+          <div className="px-8 py-16">
+            <div className="flex flex-col items-center">
+              <Loader className="w-16 h-16 text-indigo-600 animate-spin mb-4" />
+              <h2 className="text-2xl font-bold text-slate-900">{t('Verifying...', 'جاري التفعيل...')}</h2>
+              <p className="text-slate-500 mt-2 text-center">{t('Please wait while we activate your account.', 'استنى شوية وإحنا بنفعل حسابك.')}</p>
+            </div>
           </div>
         )}
 
+        {/* Token Verification: Success State */}
         {status === 'success' && (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="px-8 py-16">
+            <div className="flex flex-col items-center">
+              <CheckCircle className="w-16 h-16 text-emerald-600 mb-4" />
+              <h2 className="text-2xl font-bold text-slate-900">{t('Email Verified!', 'تم تفعيل الإيميل!')}</h2>
+              <p className="text-slate-600 mt-2 mb-6 text-center">{message}</p>
+              <Link 
+                to="/login" 
+                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-center"
+              >
+                {t('Go to Login', 'روح لتسجيل الدخول')}
+              </Link>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Email Verified!</h2>
-            <p className="text-slate-600 mt-2 mb-6">{message}</p>
-            <Link 
-              to="/login" 
-              className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all block"
-            >
-              Go to Login
-            </Link>
           </div>
         )}
 
+        {/* Token Verification: Error State */}
         {status === 'error' && (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <XCircle className="w-8 h-8 text-red-600" />
+          <div className="px-8 py-16">
+            <div className="flex flex-col items-center">
+              <XCircle className="w-16 h-16 text-red-600 mb-4" />
+              <h2 className="text-2xl font-bold text-slate-900">{t('Verification Failed', 'فشل التفعيل')}</h2>
+              <p className="text-slate-600 mt-2 mb-6 text-center">{message}</p>
+              <Link 
+                to="/login" 
+                className="text-indigo-600 font-semibold hover:underline"
+              >
+                {t('Back to Login', 'ارجع لتسجيل الدخول')}
+              </Link>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Verification Failed</h2>
-            <p className="text-slate-600 mt-2 mb-6">{message}</p>
-            <Link 
-              to="/login" 
-              className="text-indigo-600 font-semibold hover:underline"
-            >
-              Back to Login
-            </Link>
           </div>
+        )}
+
+        {/* OTP Entry Form */}
+        {status === 'otp' && (
+          <>
+            {/* Header Section */}
+            <div className="bg-slate-900 px-8 py-8 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+              <div className="mx-auto w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
+                {success ? <ShieldCheck className="text-emerald-400 w-8 h-8" /> : <Mail className="text-white w-8 h-8" />}
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">{success ? "Account Verified!" : "Check your inbox"}</h2>
+              <p className="text-slate-400 text-sm">
+                We sent a secure code to <br />
+                <span className="text-white font-semibold">{email}</span>
+              </p>
+            </div>
+
+            {/* Body Section */}
+            <div className="px-8 py-10">
+              <form onSubmit={handleVerify} className="space-y-6">
+                
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl text-center font-medium animate-pulse">
+                    {error}
+                  </div>
+                )}
+
+                {success && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-xl text-center font-bold">
+                    Verification successful. Redirecting...
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="otp" className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">
+                    Enter 6-Digit Code
+                  </label>
+                  <input
+                    type="text"
+                    id="otp"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                    placeholder="000000"
+                    className="w-full text-center text-3xl font-bold tracking-[0.5em] py-4 rounded-xl border-2 border-slate-200 focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-200 text-slate-800"
+                    autoFocus
+                    disabled={success}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || otp.length < 6 || success}
+                  className={`w-full py-4 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group ${success ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'}`}
+                >
+                  {loading ? (
+                    'Verifying...'
+                  ) : success ? (
+                    'Verified'
+                  ) : (
+                    <>
+                      Verify Account <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {!success && (
+                <div className="mt-8 text-center">
+                  <p className="text-sm text-slate-500">
+                    Didn't receive the email?{' '}
+                    <button className="text-indigo-600 font-semibold hover:underline">
+                      Resend Code
+                    </button>
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
       </div>

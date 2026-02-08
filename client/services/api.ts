@@ -3,8 +3,18 @@ const API_BASE_URL = 'http://localhost:5000/api';
 interface ApiResponse<T> {
   data?: T;
   error?: string;
-  message?: string;
 }
+type TransactionsResponse = {
+  page: number;
+  limit: number;
+  items: any[];
+};
+
+
+
+
+
+
 
 export interface KycItem {
   id: string;
@@ -19,22 +29,39 @@ export interface KycItem {
 
 
 class ApiService {
-  private getAuthToken(): string | null {
-    return localStorage.getItem('authToken');
+  // 1. Get tokens from storage
+  private getAccessToken(): string | null {
+    return localStorage.getItem('accessToken');
   }
 
+  private getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
+  }
+
+  // 2. Helper to save both tokens
+  private setTokens(accessToken: string, refreshToken: string) {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+  }
+
+  private clearTokens() {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
+
+  // =========================================================
+  // CORE REQUEST HANDLER (With Auto-Refresh Logic)
+  // =========================================================
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    isRetry = false // Prevents infinite loops
   ): Promise<ApiResponse<T>> {
-    const token = this.getAuthToken();
     
-    // CHECK: Is this a file upload?
-    // If it is FormData, we MUST NOT set 'Content-Type'. The browser does it automatically.
+    const token = this.getAccessToken();
     const isFormData = options.body instanceof FormData;
 
     const headers: HeadersInit = {
-      // Only set JSON header if it's NOT a file upload
       ...(!isFormData && { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
@@ -46,100 +73,112 @@ class ApiService {
         headers,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return { error: data.error || 'Request failed' };
+      // A. If Success, return data
+      if (response.ok) {
+        return { data: await response.json() };
       }
 
-      return { data };
+      const errorData = await response.json();
+
+      // B. If Token Expired (401), try to refresh!
+      if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
+        const success = await this.refreshAccessToken();
+        if (success) {
+          // Retry the ORIGINAL request with the NEW token
+          return this.request<T>(endpoint, options, true);
+        } else {
+          // Refresh failed -> Logout user
+          this.logout();
+          window.location.href = '/login'; 
+          return { error: 'Session expired. Please login again.' };
+        }
+      }
+
+      return { error: errorData.error || 'Request failed' };
+
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Network error' };
     }
   }
 
   // =========================================================
-  // UPDATED REGISTER METHOD (Supports Images)
+  // HELPER: Call the Backend to Swap Refresh Token
   // =========================================================
-  async register(
-    firstName: string, 
-    lastName: string, 
-    email: string, 
-    phone: string, 
-    password: string, 
-    profileImage?: File // <--- New Optional Parameter
-  ) {
-    // 1. Create FormData container
+  private async refreshAccessToken(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.setTokens(data.accessToken, data.refreshToken);
+        return true;
+      }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    }
+    
+    this.clearTokens();
+    return false;
+  }
+
+  // =========================================================
+  // AUTH METHODS
+  // =========================================================
+  
+  async register(firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) {
     const formData = new FormData();
     formData.append('firstName', firstName);
     formData.append('lastName', lastName);
     formData.append('email', email);
     formData.append('phone', phone);
     formData.append('password', password);
+    if (profileImage) formData.append('profileImage', profileImage);
 
-    // 2. Add the file if it exists
-    if (profileImage) {
-      formData.append('profileImage', profileImage);
-    }
-
-    // 3. Send as FormData (not JSON)
-    const response = await this.request<{ token: string; user: any }>('/auth/register', {
+    // Note: We expect accessToken/refreshToken now
+    const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
       method: 'POST',
-      body: formData, 
+      body: formData,
     });
 
-    if (response.data?.token) {
-      localStorage.setItem('authToken', response.data.token);
+    if (response.data?.accessToken) {
+      this.setTokens(response.data.accessToken, response.data.refreshToken);
     }
-
     return response;
+  }
+async verifyEmailOtp(email: string, otp: string) {
+    return this.request('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
   }
 
   async login(email: string, password: string) {
-    const response = await this.request<{ token: string; user: any }>('/auth/login', {
+    const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
 
-    if (response.data?.token) {
-      localStorage.setItem('authToken', response.data.token);
+    if (response.data?.accessToken) {
+      this.setTokens(response.data.accessToken, response.data.refreshToken);
     }
-
     return response;
   }
 
   async logout() {
-    const response = await this.request('/auth/logout', {
-      method: 'POST',
-    });
-
-    localStorage.removeItem('authToken');
-    return response;
+    this.clearTokens();
+    return { data: { success: true } }; // Just clear local state
   }
 
-  async logoutAll() {
-    const response = await this.request('/auth/logout-all', {
-      method: 'POST',
-    });
-
-    localStorage.removeItem('authToken');
-    return response;
-  }
-
-  async forgotPassword(email: string) {
-    return this.request('/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }
-
-  async resetPassword(resetToken: string, newPassword: string) {
-    return this.request('/auth/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({ resetToken, newPassword }),
-    });
-  }
-
+  // =========================================================
+  // OTHER METHODS
+  // =========================================================
   async getCurrentUser() {
     return this.request<{ user: any }>('/auth/me');
   }
@@ -157,6 +196,22 @@ class ApiService {
     return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
   }
 
+  async getAuctionById(auctionId: string) {
+    return this.request<any>(`/auctions/${auctionId}`);
+  }
+
+  async getAuctionBids(auctionId: string, limit = 20) {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    return this.request<{ bids: any[] }>(`/auctions/${auctionId}/bids?${queryParams.toString()}`);
+  }
+
+  async placeBid(auctionId: string, amount: number) {
+    return this.request<{ bid: any; currentBid: number }>(`/auctions/${auctionId}/bids`, {
+      method: 'POST',
+      body: JSON.stringify({ amount })
+    });
+  }
+
   async getSellerVehicles() {
     return this.request<any[]>('/vehicles');
   }
@@ -170,42 +225,182 @@ class ApiService {
   }
 
   // Profile endpoints
-  async updateProfile(data: { name?: string; location?: { city: string; country?: string } }) {
+  async updateProfile(data: { name?: string; firstName?: string; lastName?: string; phone?: string; location?: { city: string; country?: string } }) {
     return this.request<{ user: any }>('/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
- // IN src/services/api.ts
-async updateAvatar(file: File) {
-  const formData = new FormData();
-  formData.append('avatar', file); // Field name must match backend 'upload.single("avatar")'
-
-  return this.request<{ avatar: string }>('/profile/avatar', {
-    method: 'PUT',
-    body: formData,
-  });
-}
-
-  async updateLocation(city: string, country?: string) {
-    return this.request<{ location: any }>('/profile/location', {
+  // Update Avatar Image
+  async updateAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return this.request<{ avatar: string }>('/profile/avatar', {
       method: 'PUT',
-      body: JSON.stringify({ city, country }),
+      body: formData,
     });
   }
 
-  async verifyPhone(phone: string, code?: string) {
-    return this.request('/profile/verify-phone', {
+  // =========================================================
+  // PAYMENT METHODS
+  // =========================================================
+  
+  /**
+   * Create a Stripe Payment Intent for an auction
+   */
+  async createPaymentIntent(auctionId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        bidAmount: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      auction: {
+        id: string;
+        vehicle: string;
+        deadline: string;
+      };
+    }>('/payments/create-intent', {
       method: 'POST',
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ auctionId }),
     });
   }
 
-  async verifyEmail(token?: string) {
-    return this.request('/profile/verify-email', {
+  /**
+   * Confirm payment completion
+   */
+  async confirmPayment(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      paymentId: string;
+      escrowId: string;
+    }>(`/payments/${paymentId}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ token }),
+    });
+  }
+
+  /**
+   * Get payment details by auction ID
+   */
+  async getPaymentByAuction(auctionId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/auction/${auctionId}`);
+  }
+
+  /**
+   * Get escrow details
+   */
+  async getEscrowDetails(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      escrow: {
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        commissionEGP: number;
+        sellerPayoutEGP: number;
+        status: string;
+        buyerReceived?: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+      };
+    }>(`/payments/escrows/${escrowId}`);
+  }
+
+  /**
+   * Buyer confirms vehicle receipt (releases escrow)
+   */
+  async confirmVehicleReceipt(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+      sellerPayoutEGP: number;
+    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Initiate dispute on escrow
+   */
+  async initiateDispute(escrowId: string, reason: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+    }>(`/payments/escrows/${escrowId}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  /**
+   * Admin: Get all disputed escrows
+   */
+  async getDisputedEscrows() {
+    return this.request<{
+      success: boolean;
+      disputes: Array<{
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        disputeReason: string;
+        disputedAt: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+        buyer: {
+          name: string;
+          email: string;
+        };
+        seller: {
+          name: string;
+          email: string;
+        };
+      }>;
+    }>('/payments/escrows/disputed');
+  }
+
+  /**
+   * Admin: Process refund
+   */
+  async processRefund(paymentId: string, reason: string, amount?: number) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      refundId: string;
+      amountRefundedEGP: number;
+    }>(`/payments/${paymentId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, amount }),
     });
   }
 
@@ -230,11 +425,70 @@ async updateAvatar(file: File) {
 
 
 
-  async adminSearchUsers(q: string) {
-  return this.request<any[]>(`/admin/users/search?q=${encodeURIComponent(q)}`);
+
+
+  // Inside ApiService class
+
+public adminListUsers(page = 1, limit = 20) {
+  return this.request<{
+    items: any[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
 }
 
+public adminSearchUsers(q: string, page = 1, limit = 20) {
+  return this.request<{
+    items: any[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(
+    `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+    { method: "GET" }
+  );
 }
+
+
+
+adminGetUserTransactions(userId: string, queryString: string) {
+  const qs = queryString ? `?${queryString}` : "";
+  return this.request<TransactionsResponse>(
+    `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
+    { method: "GET" }
+  );
+
+}
+
+
+adminSuspendUser(userId: string, body: { reason: string }) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+adminReactivateUser(userId: string) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
+    method: "PATCH",
+  });
+}
+
+adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
+  return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+
+
+}
+
+
 
 
 
