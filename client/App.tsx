@@ -9,6 +9,7 @@ import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
+import PressNewsPage from './pages/PressNewsPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -51,6 +52,7 @@ const AppRoutes: React.FC = () => {
         <Route element={<PublicLayout />}>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/press" element={<PressNewsPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} /> {/* <--- Route added correctly here */}
           <Route path="/browse" element={<HomePage />} />
           <Route path="/auctions" element={<AuctionsPage />} />

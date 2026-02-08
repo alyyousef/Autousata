@@ -73,6 +73,12 @@ const CreateListingPage: React.FC = () => {
   
   // ✅ FIX 1: Ensure this state is actually updated
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const currentYear = new Date().getFullYear();
+  const blockInvalidNumberInput = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-', '.'].includes(event.key)) {
+      event.preventDefault();
+    }
+  };
 
   const {
     register,
@@ -311,7 +317,17 @@ const CreateListingPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Year', 'سنة الصنع')}</label>
-                    <input type="number" {...register('year')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.year ? "border-rose-300" : "border-slate-200")} />
+                    <input
+                      type="number"
+                      min={1900}
+                      max={currentYear + 1}
+                      step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      onKeyDown={blockInvalidNumberInput}
+                      {...register('year')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.year ? "border-rose-300" : "border-slate-200")}
+                    />
                     {errors.year && <p className="text-xs text-rose-600">{errors.year.message}</p>}
                   </div>
                   
@@ -329,7 +345,16 @@ const CreateListingPage: React.FC = () => {
                   
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Mileage', 'المسافة')}</label>
-                    <input type="number" {...register('mileage')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.mileage ? "border-rose-300" : "border-slate-200")} />
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      onKeyDown={blockInvalidNumberInput}
+                      {...register('mileage')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.mileage ? "border-rose-300" : "border-slate-200")}
+                    />
                     {errors.mileage && <p className="text-xs text-rose-600">{errors.mileage.message}</p>}
                   </div>
                   
@@ -387,7 +412,17 @@ const CreateListingPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Seats', 'عدد المقاعد')}</label>
-                    <input type="number" {...register('seats')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")} />
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      step={1}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      onKeyDown={blockInvalidNumberInput}
+                      {...register('seats')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")}
+                    />
                     {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
                   </div>
                   
@@ -517,6 +552,11 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input 
                         type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onKeyDown={blockInvalidNumberInput}
                         {...register('startingBid')}
                         className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.startingBid ? "border-rose-300" : "border-slate-200")}
                       />
@@ -530,6 +570,11 @@ const CreateListingPage: React.FC = () => {
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
                       <input 
                         type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        onKeyDown={blockInvalidNumberInput}
                         {...register('reservePrice')}
                         className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.reservePrice ? "border-rose-300" : "border-slate-200")}
                       />

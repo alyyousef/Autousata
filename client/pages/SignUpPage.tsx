@@ -244,7 +244,7 @@ const SignUpPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-lg shadow-slate-900/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="auth-primary-cta w-full rounded-xl py-3 text-sm font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? t('Creating account...', 'جاري إنشاء الحساب...') : t('Create account', 'اعمل حساب')}
             </button>
