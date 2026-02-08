@@ -1,9 +1,10 @@
 const oracledb = require("oracledb");
+const db = require("../config/db");
 
 exports.searchUsers = async (searchTerm) => {
   let connection;
   try {
-    connection = await oracledb.getConnection();
+    connection = await db.getConnection();
 
     const result = await connection.execute(
       `

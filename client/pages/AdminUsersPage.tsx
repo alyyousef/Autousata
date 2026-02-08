@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Users } from 'lucide-react';
 
@@ -9,13 +9,19 @@ const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<AdminUserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSearch = async () => {
-    if (q.trim().length < 2) return;
+  const handleSearch = async (searchQuery: string) => {
+    if (searchQuery.trim().length < 1) {
+      setUsers([]);
+      setError('');
+      return;
+    }
+    
     setError('');
     setLoading(true);
     try {
-      const data = await searchUsers(q.trim());
+      const data = await searchUsers(searchQuery.trim());
       setUsers(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to search users');
@@ -24,6 +30,28 @@ const AdminUsersPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Debounced search that triggers when user stops typing
+  useEffect(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    if (q.trim().length >= 1) {
+      debounceTimeoutRef.current = setTimeout(() => {
+        handleSearch(q);
+      }, 300); // 300ms delay
+    } else {
+      setUsers([]);
+      setError('');
+    }
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [q]);
 
   return (
     <div className="bg-slate-50 min-h-screen py-12">
@@ -58,15 +86,15 @@ const AdminUsersPage: React.FC = () => {
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      handleSearch();
+                      handleSearch(q);
                     }
                   }}
                   className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600"
                 />
               </div>
               <button
-                onClick={handleSearch}
-                disabled={loading || q.trim().length < 2}
+                onClick={() => handleSearch(q)}
+                disabled={loading || q.trim().length < 1}
                 className="px-6 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Users size={18} />
@@ -101,15 +129,7 @@ const AdminUsersPage: React.FC = () => {
                     </tr>
                   )}
 
-                  {!loading && q.trim().length > 0 && q.trim().length < 2 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-sm text-slate-500">
-                        Type at least 2 characters to search.
-                      </td>
-                    </tr>
-                  )}
-
-                  {!loading && q.trim().length >= 2 && users.length === 0 && !error && (
+                  {!loading && q.trim().length >= 1 && users.length === 0 && !error && (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-sm text-slate-500">
                         No users found.
