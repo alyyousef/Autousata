@@ -12,6 +12,17 @@ require('dotenv').config();
 // ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
+
+const phoneRegex = /^[0-9]{10,15}$/;
+if (!phoneRegex.test(phone)) {
+    return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
+}
+
+// 2. Password Strength (Min 8 chars)
+if (password.length < 8) {
+    return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
+}
+
     const file = req.file; 
     let connection;
 
