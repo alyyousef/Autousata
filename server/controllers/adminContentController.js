@@ -1,4 +1,3 @@
-const { get } = require('mongoose');
 const { getPendingKYCService,getLiveAuctionService,getPendingPaymentsService } = require('../services/adminContentService');
 
 const getPendingKYC = async (req, res) => {
@@ -13,7 +12,6 @@ const getPendingKYC = async (req, res) => {
 
 const getLiveAuction = async (req, res) => {
     try {
-        console.log(req.user);
         const liveAuctions = await getLiveAuctionService();
         res.status(200).json({ data: liveAuctions });
     }

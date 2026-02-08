@@ -10,7 +10,7 @@ const generateToken = (user) => {
   return jwt.sign( { userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
-// 2. Authenticate Middleware (Now uses ORACLE)
+// 2. Authenticate Middleware (Uses direct SQL query instead of stored procedure)
 const authenticate = async (req, res, next) => {
   let connection;
   try {
@@ -22,47 +22,71 @@ const authenticate = async (req, res, next) => {
     }
 
     // Verify token validity
-    const decoded = jwt.verify(token, JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      console.log('✅ Token decoded. User ID:', decoded.userId);
+    } catch (jwtError) {
+      console.error('❌ JWT Error:', jwtError.message);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
     
     // Connect to Oracle
     connection = await oracledb.getConnection();
 
-    // Call our new Procedure to find the user
+    // DIRECT SQL QUERY instead of stored procedure
     const result = await connection.execute(
-      `BEGIN 
-         sp_get_user_by_id(:id, :name, :email, :role, :status); 
-       END;`,
-      {
-        id: decoded.userId,
-        name:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        email:  { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        role:   { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
-      }
+      `SELECT 
+        ID,
+        FIRST_NAME || ' ' || LAST_NAME AS NAME,
+        EMAIL,
+        ROLE,
+        IS_ACTIVE,
+        IS_BANNED
+      FROM USERS
+      WHERE ID = :userId`,
+      { userId: decoded.userId },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
 
-    const userData = result.outBinds;
+    console.log('📊 Query returned', result.rows?.length || 0, 'rows');
 
     // Check if user exists
-    if (userData.status !== 'SUCCESS') {
+    if (!result.rows || result.rows.length === 0) {
+      console.error('❌ User not found. ID:', decoded.userId);
       return res.status(401).json({ error: 'User not found' });
     }
 
-    // Attach user info to the request object so routes can use it
+    const user = result.rows[0];
+    console.log('👤 User found:', user.EMAIL, '| Role:', user.ROLE);
+
+    // Check if user is banned or inactive
+    if (user.IS_BANNED === '1') {
+      console.error('🚫 User is banned');
+      return res.status(401).json({ error: 'Account is banned' });
+    }
+
+    if (user.IS_ACTIVE === '0') {
+      console.error('⏸️ User is inactive');
+      return res.status(401).json({ error: 'Account is inactive' });
+    }
+
+    // Attach user info to the request object
     req.user = {
-      _id: decoded.userId, // Keeping _id for compatibility with your old code
-      id: decoded.userId,
-      name: userData.name,
-      email: userData.email,
-      role: userData.role
+      _id: user.ID,
+      id: user.ID,
+      name: user.NAME,
+      email: user.EMAIL,
+      role: user.ROLE
     };
     
     req.token = token;
+    console.log('✅ Auth success:', user.EMAIL);
     next();
 
   } catch (error) {
     console.error('Auth Middleware Error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Authentication failed: ' + error.message });
   } finally {
     if (connection) {
       try { await connection.close(); } catch (e) { console.error(e); }
@@ -77,13 +101,17 @@ const authorize = (...roles) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    // Check if user role matches one of the allowed roles
     const userRole = String(req.user.role || '').toLowerCase();
     const allowedRoles = roles.map((r) => String(r).toLowerCase());
+    
+    console.log('🔑 Auth check - User:', userRole, '| Required:', allowedRoles);
+    
     if (!allowedRoles.includes(userRole)) {
+      console.error('❌ Insufficient permissions');
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     
+    console.log('✅ Authorization passed');
     next();
   };
 };

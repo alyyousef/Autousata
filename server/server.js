@@ -42,7 +42,9 @@ app.use("/api/admin/users", adminUsersRoutes);
 //app.use("/api/admin/content", adminContentRoutes);
 
 const adminContentRoutes = require('./routes/adminContent');
-app.use('/api/admin', adminContentRoutes);
+app.use('/api/admin/content', adminContentRoutes);
+const adminRoutes = require('./routes/admin');
+app.use('/api/admin', adminRoutes);
 
 // Test Route
 app.get("/", (req, res) => {
