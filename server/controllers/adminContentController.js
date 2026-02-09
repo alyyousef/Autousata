@@ -9,7 +9,8 @@ const { getPendingKYCService,
     updateStatusKYC,
     searchKYC,
     filterKYCByStatus,
-    viewKYCDetails
+    viewKYCDetails,
+    viewuser
 } = require('../services/adminContentService');
 
 //kyc
@@ -24,10 +25,10 @@ const getPendingKYC = async (req, res) => {
 };
 
 const updateKYCcontroller = async (req, res) => {
-    const { kycId } = req.params;
+    const { userId } = req.params;
     const { status } = req.body;
     try {
-        await updateStatusKYC(kycId, status);
+        await updateStatusKYC(userId, status);
         res.status(200).json({ message: 'KYC status updated successfully' });
     }
     catch (error) {
@@ -156,4 +157,20 @@ const getAuctionController = async (req, res) => {
 };
 
 
-module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController};
+const viewUserController = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const user = await viewuser(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+       
+        res.status(200).json({ data: user });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user details' });
+    }
+};
+
+
+module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController, viewUserController};

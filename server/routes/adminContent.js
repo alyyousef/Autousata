@@ -11,7 +11,8 @@ const {
   updateKYCcontroller,
   searchKYCController,
   filterKYCByStatusController, 
-  viewKYCDetailsController
+  viewKYCDetailsController,
+    viewUserController
 
 } = require("../controllers/adminContentController");
 const router = express.Router();
@@ -27,10 +28,10 @@ router.patch('/auctions/:auctionId/start-time', authenticate,authorize("admin"),
 router.get('/auctions/filter', authenticate,authorize("admin"), filterAuctions);
 router.get('/auctions/search', authenticate,authorize("admin"), searchAuctionsController);
 router.get('/auctions/:auctionId', authenticate,authorize("admin"), getAuctionController);
-router.patch('/kyc/:kycId/status', authenticate,authorize("admin"), updateKYCcontroller);
+router.patch('/kyc/:userId/status', authenticate,authorize("admin"), updateKYCcontroller);
 router.get('/kyc/search', authenticate,authorize("admin"), searchKYCController);
 router.get('/kyc/filter', authenticate,authorize("admin"), filterKYCByStatusController);
 router.get('/kyc/:kycId', authenticate,authorize("admin"), viewKYCDetailsController);
-
+router.get('/users/:userId', authenticate,authorize("admin"), viewUserController);
 
 module.exports = router;

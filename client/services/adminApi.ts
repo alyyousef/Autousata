@@ -93,6 +93,7 @@ export interface KYCDocument {
   isActive?: number;
   isBanned?: number;
   kycStatus?: string;
+  role?: string;
   kycId: string;
   documentType?: string;
   documentNumber?: string;
@@ -361,7 +362,7 @@ export const createInspectionReport = async (
     const data = await response.json();
 
     if (!response.ok) {
-      return { ok: false, message: data.error || 'Failed to create inspection report' };
+      return { ok: false, message: data.details || data.error || 'Failed to create inspection report' };
     }
 
     return { ok: true, reportId: data.reportId };
@@ -893,3 +894,47 @@ export const getRevenueDashboard = async (
   return response.data as RevenueDashboardResponse;
 };
 
+export const updateKYC = async (
+  kycId: string,
+  payload: Partial<KYCDocument>,
+    token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+    const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    };
+    if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    }
+    try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update KYC document' };
+    }
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const viewuser = async (userId: string, token?: string): Promise<AdminUserSearchResult | null> => {
+  const headers: HeadersInit = {};
+    if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`http://localhost:5000/api/admin/content/users/${userId}`, {
+
+    method: 'GET',
+    headers,
+  });
+    if (!response.ok) {
+    throw new Error('Failed to fetch user details');
+    }
+    const result = await response.json();
+    return result.data || null;
+};

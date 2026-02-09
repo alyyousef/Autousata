@@ -4,9 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
-  MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
+  MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3, Download, Eye
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, approveKYC, rejectKYC, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, updateKYC, viewuser, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -23,9 +23,13 @@ const AdminDashboard: React.FC = () => {
   const [showInspectionModal, setShowInspectionModal] = useState<{ open: boolean; vehicle?: VehicleItem; viewMode?: boolean }>(() => ({ open: false }));
   const [inspectionForm, setInspectionForm] = useState<CreateInspectionPayload | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [inspectionErrors, setInspectionErrors] = useState<string[]>([]);
+  const [inspectionTouched, setInspectionTouched] = useState<Set<string>>(new Set());
   const [kycDocuments, setKycDocuments] = useState<KYCDocument[]>([]);
   const [kycLoading, setKycLoading] = useState(false);
   const [kycError, setKycError] = useState<string | null>(null);
+  const [selectedKYC, setSelectedKYC] = useState<KYCDocument | null>(null);
+  const [showKYCModal, setShowKYCModal] = useState(false);
   const [auctions, setAuctions] = useState<LiveAuction[]>([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
   const [auctionsError, setAuctionsError] = useState<string | null>(null);
@@ -482,8 +486,8 @@ const AdminDashboard: React.FC = () => {
                     <thead className="bg-slate-50/50">
                       <tr>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">User</th>
-                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Document Type</th>
-                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">KYC Document</th>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                         <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
                       </tr>
@@ -494,9 +498,9 @@ const AdminDashboard: React.FC = () => {
                           const firstName = doc.firstName || 'N/A';
                           const lastName = doc.lastName || '';
                           const email = doc.email || 'N/A';
-                          const docType = doc.documentType ? doc.documentType.replace(/_/g, ' ') : 'N/A';
-                          const submittedDate = doc.submittedAt ? new Date(doc.submittedAt).toLocaleDateString() : 'N/A';
-                          const status = doc.kycDocStatus || 'pending';
+                          const role = doc.role || 'user';
+                          const status = doc.kycStatus || 'pending';
+                          const documentUrl = doc.kycDocumentUrl || doc.documentFrontUrl || doc.documentBackUrl || doc.selfieWithDocUrl;
                           
                           return (
                             <tr key={doc.kycId || doc.userId || `kyc-${index}`} className="hover:bg-slate-50/50 transition-all group">
@@ -511,70 +515,73 @@ const AdminDashboard: React.FC = () => {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-6 text-sm text-slate-600 capitalize">{docType}</td>
-                              <td className="px-4 py-6 text-sm text-slate-500">{submittedDate}</td>
                               <td className="px-4 py-6">
                                 <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
-                                  status === 'pending' ? 'bg-amber-50 text-amber-600' : 
-                                  status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 
-                                  'bg-rose-50 text-rose-600'
+                                  role === 'admin' ? 'bg-purple-50 text-purple-600' : 
+                                  role === 'seller' ? 'bg-blue-50 text-blue-600' : 
+                                  'bg-slate-50 text-slate-600'
                                 }`}>
-                                  {status}
+                                  {role}
                                 </span>
                               </td>
+                              <td className="px-4 py-6">
+                                {documentUrl ? (
+                                  <a 
+                                    href={documentUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all"
+                                  >
+                                    <Download size={14} />
+                                    View Document
+                                  </a>
+                                ) : (
+                                  <span className="text-sm text-slate-400">No document</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-6">
+                                <select
+                                  value={status}
+                                  disabled={!documentUrl}
+                                  onChange={async (e) => {
+                                    const newStatus = e.target.value;
+                                    if (!doc.userId) return;
+                                    const result = await updateKYC(doc.userId, { kycStatus: newStatus }, effectiveToken);
+                                    if (result.ok) {
+                                      const data = await getPendingKYC(effectiveToken);
+                                      setKycDocuments(data || []);
+                                    } else {
+                                      alert(result.message || 'Failed to update status');
+                                    }
+                                  }}
+                                  className={`px-2.5 py-2 rounded-lg text-[12px] font-bold uppercase tracking-wider border ${
+                                    !documentUrl ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-200 text-slate-900'
+                                  }`}
+                                >
+                                  <option value="pending">Pending</option>
+                                  <option value="approved">Approved</option>
+                                  <option value="rejected">Rejected</option>
+                                </select>
+                              </td>
                               <td className="px-4 py-6 text-right">
-                                <div className="flex justify-end gap-2">
-                                  <button 
-                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" 
-                                    title="Approve"
-                                    onClick={async () => {
-                                      if (!doc.kycId) {
-                                        alert('KYC ID is missing');
-                                        return;
+                                <button 
+                                  className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" 
+                                  title="View details"
+                                  onClick={async () => {
+                                    if (!doc.userId) return;
+                                    try {
+                                      const userDetails = await viewuser(doc.userId, effectiveToken);
+                                      if (userDetails) {
+                                        setSelectedKYC({ ...doc, ...userDetails });
+                                        setShowKYCModal(true);
                                       }
-                                      if (!confirm(`Approve KYC document for ${firstName} ${lastName}?`)) return;
-                                      
-                                      const result = await approveKYC(doc.kycId, effectiveToken);
-                                      if (result.ok) {
-                                        alert('KYC document approved successfully');
-                                        // Reload KYC documents
-                                        const data = await getPendingKYC(effectiveToken);
-                                        setKycDocuments(data || []);
-                                      } else {
-                                        alert(result.message || 'Failed to approve KYC document');
-                                      }
-                                    }}
-                                  >
-                                    <CheckCircle size={18} />
-                                  </button>
-                                  <button 
-                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
-                                    title="Reject"
-                                    onClick={async () => {
-                                      if (!doc.kycId) {
-                                        alert('KYC ID is missing');
-                                        return;
-                                      }
-                                      const reason = prompt(`Enter rejection reason for ${firstName} ${lastName}:`);
-                                      if (!reason) return;
-                                      
-                                      const result = await rejectKYC(doc.kycId, reason, effectiveToken);
-                                      if (result.ok) {
-                                        alert('KYC document rejected successfully');
-                                        // Reload KYC documents
-                                        const data = await getPendingKYC(effectiveToken);
-                                        setKycDocuments(data || []);
-                                      } else {
-                                        alert(result.message || 'Failed to reject KYC document');
-                                      }
-                                    }}
-                                  >
-                                    <XCircle size={18} />
-                                  </button>
-                                  <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="More actions">
-                                    <MoreVertical size={18} />
-                                  </button>
-                                </div>
+                                    } catch (error) {
+                                      alert('Error fetching user details');
+                                    }
+                                  }}
+                                >
+                                  <ArrowUpRight size={18} />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1165,33 +1172,75 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{showInspectionModal.viewMode ? 'View Inspection Report' : 'Create Inspection Report'}</p>
                   <h3 className="text-xl font-black text-slate-900">{showInspectionModal.vehicle.make} {showInspectionModal.vehicle.model} {showInspectionModal.vehicle.year}</h3>
                 </div>
-                <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all" onClick={() => setShowInspectionModal({ open: false })}>✕</button>
+                <button className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all" onClick={() => {
+                  setShowInspectionModal({ open: false });
+                  setInspectionErrors([]);
+                  setInspectionTouched(new Set());
+                }}>✕</button>
               </div>
 
               {/* Content - Scrollable */}
               <div className="overflow-y-auto max-h-[calc(100vh-280px)] p-6">
+                {/* Error Messages */}
+                {inspectionErrors.length > 0 && (
+                  <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="text-red-600 mt-0.5" size={18} />
+                      <div className="flex-1">
+                        {/* <p className="text-sm font-bold text-red-900 mb-1">Please fix the following errors:</p> */}
+                        <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                          {inspectionErrors.map((error, idx) => (
+                            <li key={idx}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-5">
                   {/* Basic Info Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label className="flex flex-col">
                       <span className="text-xs font-bold text-slate-700 mb-2">Inspector ID *</span>
                       <input 
-                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+                          inspectionTouched.has('inspectorId') && !inspectionForm.inspectorId
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500'
+                            : 'border-slate-200 focus:ring-indigo-500'
+                        }`}
                         placeholder="Enter inspector ID"
                         value={inspectionForm.inspectorId} 
-                        onChange={(e) => setInspectionForm({ ...inspectionForm, inspectorId: e.target.value })} 
+                        onChange={(e) => {
+                          setInspectionForm({ ...inspectionForm, inspectorId: e.target.value });
+                          setInspectionTouched(new Set(inspectionTouched).add('inspectorId'));
+                        }}
+                        onBlur={() => setInspectionTouched(new Set(inspectionTouched).add('inspectorId'))}
                         disabled={showInspectionModal.viewMode && !editMode}
                       />
+                      {inspectionTouched.has('inspectorId') && !inspectionForm.inspectorId && (
+                        <span className="text-xs text-red-600 mt-1">Inspector ID is required</span>
+                      )}
                     </label>
                     <label className="flex flex-col">
                       <span className="text-xs font-bold text-slate-700 mb-2">Inspection Date *</span>
                       <input 
                         type="date" 
-                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+                          inspectionTouched.has('inspectionDate') && !inspectionForm.inspectionDate
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500'
+                            : 'border-slate-200 focus:ring-indigo-500'
+                        }`}
                         value={inspectionForm.inspectionDate} 
-                        onChange={(e) => setInspectionForm({ ...inspectionForm, inspectionDate: e.target.value })} 
+                        onChange={(e) => {
+                          setInspectionForm({ ...inspectionForm, inspectionDate: e.target.value });
+                          setInspectionTouched(new Set(inspectionTouched).add('inspectionDate'));
+                        }}
+                        onBlur={() => setInspectionTouched(new Set(inspectionTouched).add('inspectionDate'))}
                         disabled={showInspectionModal.viewMode && !editMode}
                       />
+                      {inspectionTouched.has('inspectionDate') && !inspectionForm.inspectionDate && (
+                        <span className="text-xs text-red-600 mt-1">Inspection date is required</span>
+                      )}
                     </label>
                   </div>
 
@@ -1200,23 +1249,45 @@ const AdminDashboard: React.FC = () => {
                     <label className="flex flex-col">
                       <span className="text-xs font-bold text-slate-700 mb-2">Location City *</span>
                       <input 
-                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+                          inspectionTouched.has('locationCity') && !inspectionForm.locationCity
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500'
+                            : 'border-slate-200 focus:ring-indigo-500'
+                        }`}
                         placeholder="Enter city"
                         value={inspectionForm.locationCity} 
-                        onChange={(e) => setInspectionForm({ ...inspectionForm, locationCity: e.target.value })} 
+                        onChange={(e) => {
+                          setInspectionForm({ ...inspectionForm, locationCity: e.target.value });
+                          setInspectionTouched(new Set(inspectionTouched).add('locationCity'));
+                        }}
+                        onBlur={() => setInspectionTouched(new Set(inspectionTouched).add('locationCity'))}
                         disabled={showInspectionModal.viewMode && !editMode}
                       />
+                      {inspectionTouched.has('locationCity') && !inspectionForm.locationCity && (
+                        <span className="text-xs text-red-600 mt-1">Location city is required</span>
+                      )}
                     </label>
                     <label className="flex flex-col">
                       <span className="text-xs font-bold text-slate-700 mb-2">Odometer Reading (km) *</span>
                       <input 
                         type="number" 
-                        className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                        className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+                          inspectionTouched.has('odometerReading') && (!inspectionForm.odometerReading || inspectionForm.odometerReading <= 0)
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500'
+                            : 'border-slate-200 focus:ring-indigo-500'
+                        }`}
                         placeholder="0"
                         value={inspectionForm.odometerReading} 
-                        onChange={(e) => setInspectionForm({ ...inspectionForm, odometerReading: Number(e.target.value) })} 
+                        onChange={(e) => {
+                          setInspectionForm({ ...inspectionForm, odometerReading: Number(e.target.value) });
+                          setInspectionTouched(new Set(inspectionTouched).add('odometerReading'));
+                        }}
+                        onBlur={() => setInspectionTouched(new Set(inspectionTouched).add('odometerReading'))}
                         disabled={showInspectionModal.viewMode && !editMode}
                       />
+                      {inspectionTouched.has('odometerReading') && (!inspectionForm.odometerReading || inspectionForm.odometerReading <= 0) && (
+                        <span className="text-xs text-red-600 mt-1">Valid odometer reading is required</span>
+                      )}
                     </label>
                   </div>
 
@@ -1357,7 +1428,11 @@ const AdminDashboard: React.FC = () => {
                   <>
                     <button 
                       className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
-                      onClick={() => setShowInspectionModal({ open: false })}
+                      onClick={() => {
+                        setShowInspectionModal({ open: false });
+                        setInspectionErrors([]);
+                        setInspectionTouched(new Set());
+                      }}
                     >
                       Close
                     </button>
@@ -1373,19 +1448,54 @@ const AdminDashboard: React.FC = () => {
                   <>
                     <button 
                       className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
-                      onClick={() => setEditMode(false)}
+                      onClick={() => {
+                        setEditMode(false);
+                        setInspectionErrors([]);
+                        setInspectionTouched(new Set());
+                      }}
                     >
                       Cancel
                     </button>
                     <button 
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all" 
                       onClick={async () => {
-                        // setShowInspectionModal({ open: false });
                         if (!inspectionForm || !showInspectionModal.vehicle?.inspection_report) return;
+                        
+                        // Validate required fields
+                        const errors: string[] = [];
+                        const touched = new Set<string>();
+                        
+                        if (!inspectionForm.inspectorId?.trim()) {
+                          errors.push('Inspector ID is required');
+                          touched.add('inspectorId');
+                        }
+                        if (!inspectionForm.inspectionDate) {
+                          errors.push('Inspection Date is required');
+                          touched.add('inspectionDate');
+                        }
+                        if (!inspectionForm.locationCity?.trim()) {
+                          errors.push('Location City is required');
+                          touched.add('locationCity');
+                        }
+                        if (!inspectionForm.odometerReading || inspectionForm.odometerReading <= 0) {
+                          errors.push('Valid Odometer Reading is required');
+                          touched.add('odometerReading');
+                        }
+                        
+                        if (errors.length > 0) {
+                          setInspectionErrors(errors);
+                          setInspectionTouched(touched);
+                          return;
+                        }
+                        
+                        setInspectionErrors([]);
                         const res = await editreport(showInspectionModal.vehicle.inspection_report, inspectionForm, effectiveToken);
                         if (!res.ok) {
+                          setInspectionErrors([res.message || 'Failed to update inspection report']);
                         } else {
                           setEditMode(false);
+                          setInspectionErrors([]);
+                          setInspectionTouched(new Set());
                           // Reload vehicles after editing
                           const data = vehicleSearch.trim() 
                             ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
@@ -1404,7 +1514,11 @@ const AdminDashboard: React.FC = () => {
                   <>
                     <button 
                       className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all" 
-                      onClick={() => setShowInspectionModal({ open: false })}
+                      onClick={() => {
+                        setShowInspectionModal({ open: false });
+                        setInspectionErrors([]);
+                        setInspectionTouched(new Set());
+                      }}
                     >
                       Cancel
                     </button>
@@ -1412,12 +1526,43 @@ const AdminDashboard: React.FC = () => {
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all" 
                       onClick={async () => {
                         if (!inspectionForm) return;
-                        setShowInspectionModal({ open: false });
+                        
+                        // Validate required fields
+                        const errors: string[] = [];
+                        const touched = new Set<string>();
+                        
+                        if (!inspectionForm.inspectorId?.trim()) {
+                          errors.push('Inspector ID is required');
+                          touched.add('inspectorId');
+                        }
+                        if (!inspectionForm.inspectionDate) {
+                          errors.push('Inspection Date is required');
+                          touched.add('inspectionDate');
+                        }
+                        if (!inspectionForm.locationCity?.trim()) {
+                          errors.push('Location City is required');
+                          touched.add('locationCity');
+                        }
+                        if (!inspectionForm.odometerReading || inspectionForm.odometerReading <= 0) {
+                          errors.push('Valid Odometer Reading is required');
+                          touched.add('odometerReading');
+                        }
+                        
+                        if (errors.length > 0) {
+                          setInspectionErrors(errors);
+                          setInspectionTouched(touched);
+                          return;
+                        }
+                        
+                        setInspectionErrors([]);
                         const res = await createInspectionReport(inspectionForm, effectiveToken);
                         
                         if (!res.ok) {
+                          setInspectionErrors([res.message || 'Failed to create inspection report']);
                         } else {
                           setShowInspectionModal({ open: false });
+                          setInspectionErrors([]);
+                          setInspectionTouched(new Set());
                           // Reload vehicles after creating inspection
                           const data = vehicleSearch.trim() 
                             ? await searchAdminVehicles(vehicleSearch.trim(), effectiveToken)
@@ -1432,6 +1577,182 @@ const AdminDashboard: React.FC = () => {
                     </button>
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* KYC Details Modal */}
+        {showKYCModal && selectedKYC && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-8">
+              {/* Header */}
+              <div className="sticky top-0 px-8 py-6 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between rounded-t-3xl">
+                <div>
+                  <p className="text-xs text-indigo-100 font-bold uppercase tracking-widest mb-1">KYC Details</p>
+                  <h3 className="text-2xl font-black text-white">{selectedKYC.firstName} {selectedKYC.lastName}</h3>
+                </div>
+                <button 
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-xl transition-all" 
+                  onClick={() => {
+                    setShowKYCModal(false);
+                    setSelectedKYC(null);
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-8">
+                {/* Profile Picture or Avatar */}
+                <div className="mb-8 flex justify-center">
+                  {selectedKYC.profileurl ? (
+                    <img 
+                      src={selectedKYC.profileurl} 
+                      alt={`${selectedKYC.firstName} ${selectedKYC.lastName}`}
+                      className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = `<div class="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-4xl font-black shadow-lg">${selectedKYC.firstName?.[0] || 'U'}${selectedKYC.lastName?.[0] || ''}</div>`;
+                      }}
+                    />
+                  ) : (
+                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-4xl font-black shadow-lg">
+                      {selectedKYC.firstName?.[0] || 'U'}{selectedKYC.lastName?.[0] || ''}
+                    </div>
+                  )}
+                </div>
+
+                {/* User Info Card */}
+                <div className="mb-8 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">User Profile</p>
+                      <h4 className="text-2xl font-black text-slate-900">{selectedKYC.firstName} {selectedKYC.lastName}</h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 font-mono mb-6">User ID: {selectedKYC.id || selectedKYC.userId}</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedKYC.email || 'N/A'}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Phone Number</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedKYC.phone || 'N/A'}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Location</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedKYC.locationCity || 'N/A'}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Role</p>
+                      <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${
+                        selectedKYC.role === 'admin' ? 'bg-purple-100 text-purple-700' : 
+                        selectedKYC.role === 'seller' ? 'bg-blue-100 text-blue-700' : 
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {selectedKYC.role || 'user'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Status Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  <div className={`rounded-xl p-5 border ${
+                    selectedKYC.isActive ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200'
+                  }`}>
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Account Status</p>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${selectedKYC.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                      <p className={`text-lg font-bold ${selectedKYC.isActive ? 'text-emerald-700' : 'text-slate-700'}`}>
+                        {selectedKYC.isActive ? 'Active' : 'Inactive'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`rounded-xl p-5 border ${
+                    selectedKYC.kycStatus === 'approved' ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' : 
+                    selectedKYC.kycStatus === 'rejected' ? 'bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200' : 
+                    'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200'
+                  }`}>
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">KYC Status</p>
+                    <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-bold uppercase ${
+                      selectedKYC.kycStatus === 'approved' ? 'bg-emerald-500 text-white' : 
+                      selectedKYC.kycStatus === 'rejected' ? 'bg-rose-500 text-white' : 
+                      'bg-amber-500 text-white'
+                    }`}>
+                      <span className="w-2 h-2 bg-white rounded-full"></span>
+                      {selectedKYC.kycStatus || 'pending'}
+                    </span>
+                  </div>
+
+                  <div className={`rounded-xl p-5 border ${
+                    selectedKYC.isBanned ? 'bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200' : 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200'
+                  }`}>
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Ban Status</p>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${selectedKYC.isBanned ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
+                      <p className={`text-lg font-bold ${selectedKYC.isBanned ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {selectedKYC.isBanned ? 'Banned' : 'Not Banned'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bio Section */}
+                {selectedKYC.bio && (
+                  <div className="mb-8 bg-white rounded-xl p-6 border border-slate-200">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-3">Bio</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{selectedKYC.bio}</p>
+                  </div>
+                )}
+
+                {/* Ban Reason */}
+                {selectedKYC.isBanned && selectedKYC.banreason && (
+                  <div className="mb-8 bg-rose-50 rounded-xl p-6 border border-rose-200">
+                    <h4 className="text-sm font-bold text-rose-700 uppercase tracking-widest mb-3">Ban Reason</h4>
+                    <p className="text-sm text-rose-600 leading-relaxed">{selectedKYC.banreason}</p>
+                  </div>
+                )}
+
+                {/* KYC Document Section */}
+                {selectedKYC.kycDocumentUrl && (
+                  <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FileCheck className="w-5 h-5 text-indigo-600" />
+                      <h4 className="text-sm font-bold text-slate-700 uppercase tracking-widest">KYC Document</h4>
+                    </div>
+                    <a 
+                      href={selectedKYC.kycDocumentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg"
+                    >
+                      <Download size={18} />
+                      Download KYC Document
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-8 py-6 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100 rounded-b-3xl flex justify-end gap-3">
+                <button 
+                  className="px-8 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl text-sm font-bold hover:from-slate-800 hover:to-black transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  onClick={() => {
+                    setShowKYCModal(false);
+                    setSelectedKYC(null);
+                  }}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
