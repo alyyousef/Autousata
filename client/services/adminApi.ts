@@ -86,6 +86,7 @@ export const listUsers = async (
 };
 
 export interface KYCDocument {
+  id?: string;
   userId: string;
   email?: string;
   phone?: string;
@@ -94,6 +95,7 @@ export interface KYCDocument {
   isActive?: number;
   isBanned?: number;
   kycStatus?: string;
+  status?: string;
   role?: string;
   kycId: string;
   documentType?: string;
@@ -525,7 +527,9 @@ export const rejectInspectionReport = async (
 };
 
 export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
-  const headers: HeadersInit = {};
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -533,6 +537,7 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
   const response = await fetch('http://localhost:5000/api/admin/content/kyc', {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -742,7 +747,9 @@ export interface RevenueDashboardResponse {
  * Get all auctions
  */
 export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => {
-  const headers: HeadersInit = {};
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -750,6 +757,7 @@ export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => 
   const response = await fetch('http://localhost:5000/api/admin/content/auctions', {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {

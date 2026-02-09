@@ -554,7 +554,7 @@ const updateStatusKYC = async (userId, action = null) => {
     let connection;
     try {
         connection = await oracledb.getConnection();
-        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        const newStatus = action === 'approved' ? 'approved' : 'rejected';
         const res= await connection.execute(
             `UPDATE DIP.USERS
             SET KYC_STATUS = :newStatus

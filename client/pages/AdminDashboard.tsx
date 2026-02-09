@@ -602,8 +602,9 @@ const AdminDashboard: React.FC = () => {
                                   disabled={!documentUrl}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
-                                    if (!doc.id) return;
-                                    const result = await updateKYC(doc.id, { kycStatus: newStatus }, effectiveToken);
+                                    const userId = doc.id || doc.userId;
+                                    if (!userId) return;
+                                    const result = await updateKYC(userId, { status: newStatus }, effectiveToken);
                                     if (result.ok) {
                                       const data = await getPendingKYC(effectiveToken);
                                       setKycDocuments(data || []);
