@@ -258,7 +258,7 @@ const createInspectionReportController = async (req, res) => {
         }
     } catch (error) {
         console.error('Controller - Create inspection report error:', error);
-        res.status(500).json({ error: 'Failed to create inspection report' });
+        res.status(500).json({ error: 'Failed to create inspection report', details: error.message });
     }
 };
 

@@ -508,33 +508,17 @@ const getPendingKYCService = async () => {
         
         const result = await connection.execute(
             `SELECT 
-                U.ID as USER_ID,
-                U.EMAIL,
-                U.PHONE,
-                U.FIRST_NAME,
-                U.LAST_NAME,
-                U.IS_ACTIVE,
-                U.IS_BANNED,
-                U.KYC_STATUS,
-                K.ID as KYC_ID,
-                K.DOCUMENT_TYPE,
-                K.DOCUMENT_NUMBER,
-                K.FULL_NAME_ON_DOC,
-                K.DATE_OF_BIRTH,
-                K.ISSUE_DATE,
-                K.EXPIRY_DATE,
-                K.DOCUMENT_FRONT_URL,
-                K.DOCUMENT_BACK_URL,
-                K.SELFIE_WITH_DOC_URL,
-                K.STATUS as KYC_DOC_STATUS,
-                K.REJECTION_REASON,
-                K.VERIFICATION_METHOD,
-                K.SUBMITTED_AT,
-                K.REVIEWED_AT,
-                K.REVIEWED_BY_ADMIN_ID
-            FROM DIP.KYC_DOCUMENTS K
-            RIGHT JOIN DIP.USERS U ON K.USER_ID = U.ID
-            WHERE U.KYC_STATUS = 'pending'`,
+                ID as USER_ID,
+                EMAIL,
+                PHONE,
+                FIRST_NAME,
+                LAST_NAME,
+                IS_ACTIVE,
+                IS_BANNED,
+                KYC_STATUS,
+                KYC_DOCUMENT_URL
+            FROM DIP.USERS 
+            WHERE KYC_STATUS = 'pending'`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -548,22 +532,7 @@ const getPendingKYCService = async () => {
             isActive: row.IS_ACTIVE,
             isBanned: row.IS_BANNED,
             kycStatus: row.KYC_STATUS,
-            kycId: row.KYC_ID,
-            documentType: row.DOCUMENT_TYPE,
-            documentNumber: row.DOCUMENT_NUMBER,
-            fullNameOnDoc: row.FULL_NAME_ON_DOC,
-            dateOfBirth: row.DATE_OF_BIRTH,
-            issueDate: row.ISSUE_DATE,
-            expiryDate: row.EXPIRY_DATE,
-            documentFrontUrl: row.DOCUMENT_FRONT_URL,
-            documentBackUrl: row.DOCUMENT_BACK_URL,
-            selfieWithDocUrl: row.SELFIE_WITH_DOC_URL,
-            kycDocStatus: row.KYC_DOC_STATUS,
-            rejectionReason: row.REJECTION_REASON,
-            verificationMethod: row.VERIFICATION_METHOD,
-            submittedAt: row.SUBMITTED_AT,
-            reviewedAt: row.REVIEWED_AT,
-            reviewedByAdminId: row.REVIEWED_BY_ADMIN_ID
+            kycDocumentUrl: row.KYC_DOCUMENT_URL
         }));
     } catch (error) {
         console.error('Error fetching pending KYC documents:', error);
@@ -580,29 +549,19 @@ const getPendingKYCService = async () => {
 };
 
 
-const updateStatusKYC = async (kycId, adminId, action, rejectionReason = null) => {
+const updateStatusKYC = async (userId, action = null) => {
     let connection;
     try {
         connection = await oracledb.getConnection();
         const newStatus = action === 'approve' ? 'approved' : 'rejected';
-        const result = await connection.execute(
-            `UPDATE DIP.KYC_DOCUMENTS
-            SET STATUS = :newStatus,
-                REJECTION_REASON = :rejectionReason,
-                REVIEWED_AT = SYSTIMESTAMP,
-                REVIEWED_BY_ADMIN_ID = :adminId
-            WHERE ID = :kycId`,
-            { newStatus, rejectionReason, adminId, kycId },
-            { autoCommit: true }
-        );
         const res= await connection.execute(
             `UPDATE DIP.USERS
             SET KYC_STATUS = :newStatus
-            WHERE ID = (SELECT USER_ID FROM DIP.KYC_DOCUMENTS WHERE ID = :kycId)`,
-            { newStatus, kycId },
+            WHERE ID = :userId`,
+            { newStatus, userId },
             { autoCommit: true }
         );
-        return result.rowsAffected === 1 && res.rowsAffected === 1;
+        return res.rowsAffected === 1;
     }
     catch (error) {
         console.error('Error updating KYC status:', error);
@@ -637,32 +596,14 @@ const searchKYC = async (searchTerm) => {
                 U.BIO,
                 U.LOCATION_CITY,
                 U.ROLE,
-                K.ID as KYC_ID,
-                K.DOCUMENT_TYPE,
-                K.DOCUMENT_NUMBER,
-                K.FULL_NAME_ON_DOC,
-                K.DATE_OF_BIRTH,
-                K.ISSUE_DATE,
-                K.EXPIRY_DATE,
-                K.DOCUMENT_FRONT_URL,
-                K.DOCUMENT_BACK_URL,
-                K.SELFIE_WITH_DOC_URL,
-                K.STATUS as KYC_DOC_STATUS,
-                K.REJECTION_REASON,
-                K.VERIFICATION_METHOD,
-                K.SUBMITTED_AT,
-                K.REVIEWED_AT,
-                K.REVIEWED_BY_ADMIN_ID
-            FROM DIP.KYC_DOCUMENTS K
-            RIGHT JOIN DIP.USERS U ON K.USER_ID = U.ID
+                U.KYC_DOCUMENT_URL,
+            FROM DIP.USERS U 
             WHERE LOWER(U.EMAIL) LIKE LOWER(:search)
                 OR LOWER(U.FIRST_NAME || ' ' || U.LAST_NAME) LIKE LOWER(:search)
                 OR LOWER(U.PHONE) LIKE LOWER(:search)
                 OR LOWER(U.ROLE) LIKE LOWER(:search)
                 OR LOWER(U.LOCATION_CITY) LIKE LOWER(:search)
-                OR LOWER(K.DOCUMENT_TYPE) LIKE LOWER(:search)
-                OR LOWER(K.DOCUMENT_NUMBER) LIKE LOWER(:search)
-                OR LOWER(K.FULL_NAME_ON_DOC) LIKE LOWER(:search)`,
+               OR LOWER(U.KYC_DOCUMENT_URL) LIKE LOWER(:search)`,
             { search: `%${searchTerm}%` },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -678,22 +619,7 @@ const searchKYC = async (searchTerm) => {
             bio: row.BIO,
             locationCity: row.LOCATION_CITY,
             role: row.ROLE,
-            kycId: row.KYC_ID,
-            documentType: row.DOCUMENT_TYPE,
-            documentNumber: row.DOCUMENT_NUMBER,
-            fullNameOnDoc: row.FULL_NAME_ON_DOC,
-            dateOfBirth: row.DATE_OF_BIRTH,
-            issueDate: row.ISSUE_DATE,
-            expiryDate: row.EXPIRY_DATE,
-            documentFrontUrl: row.DOCUMENT_FRONT_URL,
-            documentBackUrl: row.DOCUMENT_BACK_URL,
-            selfieWithDocUrl: row.SELFIE_WITH_DOC_URL,
-            kycDocStatus: row.KYC_DOC_STATUS,
-            rejectionReason: row.REJECTION_REASON,
-            verificationMethod: row.VERIFICATION_METHOD,
-            submittedAt: row.SUBMITTED_AT,
-            reviewedAt: row.REVIEWED_AT,
-            reviewedByAdminId: row.REVIEWED_BY_ADMIN_ID
+            kycDocumentUrl: row.KYC_DOCUMENT_URL
         }));
     } catch (error) {
         console.error('Error searching KYC documents:', error);
@@ -726,24 +652,8 @@ const filterKYCByStatus = async (status) => {
                 U.BIO,
                 U.LOCATION_CITY,
                 U.ROLE,
-                K.ID as KYC_ID,
-                K.DOCUMENT_TYPE,
-                K.DOCUMENT_NUMBER,
-                K.FULL_NAME_ON_DOC,
-                K.DATE_OF_BIRTH,
-                K.ISSUE_DATE,
-                K.EXPIRY_DATE,
-                K.DOCUMENT_FRONT_URL,
-                K.DOCUMENT_BACK_URL,
-                K.SELFIE_WITH_DOC_URL,
-                K.STATUS as KYC_DOC_STATUS,
-                K.REJECTION_REASON,
-                K.VERIFICATION_METHOD,
-                K.SUBMITTED_AT,
-                K.REVIEWED_AT,
-                K.REVIEWED_BY_ADMIN_ID
-            FROM DIP.KYC_DOCUMENTS K
-            RIGHT JOIN DIP.USERS U ON K.USER_ID = U.ID
+                U.KYC_DOCUMENT_URL
+            FROM DIP.USERS U 
             WHERE U.KYC_STATUS = :status
             ORDER BY U.FIRST_NAME, U.LAST_NAME`,
             { status },
@@ -761,22 +671,7 @@ const filterKYCByStatus = async (status) => {
             bio: row.BIO,
             locationCity: row.LOCATION_CITY,
             role: row.ROLE,
-            kycId: row.KYC_ID,
-            documentType: row.DOCUMENT_TYPE,
-            documentNumber: row.DOCUMENT_NUMBER,
-            fullNameOnDoc: row.FULL_NAME_ON_DOC,
-            dateOfBirth: row.DATE_OF_BIRTH,
-            issueDate: row.ISSUE_DATE,
-            expiryDate: row.EXPIRY_DATE,
-            documentFrontUrl: row.DOCUMENT_FRONT_URL,
-            documentBackUrl: row.DOCUMENT_BACK_URL,
-            selfieWithDocUrl: row.SELFIE_WITH_DOC_URL,
-            kycDocStatus: row.KYC_DOC_STATUS,
-            rejectionReason: row.REJECTION_REASON,
-            verificationMethod: row.VERIFICATION_METHOD,
-            submittedAt: row.SUBMITTED_AT,
-            reviewedAt: row.REVIEWED_AT,
-            reviewedByAdminId: row.REVIEWED_BY_ADMIN_ID
+            kycDocumentUrl: row.KYC_DOCUMENT_URL
         }));
     }
     catch (error) {
@@ -881,6 +776,56 @@ const viewKYCDetails = async (kycId) => {
     }
 };
 
+const viewuser= async (userId) => {
+    let connection;
+    try {
+
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT *
+            FROM DIP.USERS
+            WHERE ID = :userId`,
+            { userId },
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        if (result.rows.length === 0) {
+            return null;
+        }
+        const u = result.rows[0];
+        return {
+            id: u.ID,
+            email: u.EMAIL,
+            phone: u.PHONE,
+            firstName: u.FIRST_NAME,
+            lastName: u.LAST_NAME,
+            isActive: u.IS_ACTIVE,
+            isBanned: u.IS_BANNED,
+            banreason: u.BAN_REASON,
+            bio: u.BIO,
+            locationCity: u.LOCATION_CITY,
+            profileurl: u.PROFILE_PIC_URL,
+            kycStatus: u.KYC_STATUS,
+            kycDocumentUrl: u.KYC_DOCUMENT_URL
+        };
+        
+    }
+
+    catch (error) {
+        console.error('Error fetching user by ID:', error);
+        throw error;
+    }
+    finally {
+        if (connection) {
+            try {
+                await connection.close();
+            }
+            catch (err) {
+                console.error('Error closing connection:', err);
+            }
+        }
+    }
+};
+
 module.exports = {
     getPendingKYCService,
     getAllAuctionService,
@@ -893,5 +838,6 @@ module.exports = {
     updateStatusKYC,
     searchKYC,
     filterKYCByStatus,
-    viewKYCDetails
+    viewKYCDetails,
+    viewuser
 };
