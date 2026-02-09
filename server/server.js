@@ -104,7 +104,6 @@ app.use("/api/admin/content", adminContentRoutes);
 const adminFinanceRoutes = require("./routes/adminFinance");
 app.use("/api/admin/finance", adminFinanceRoutes);
 
-const adminRoutes = require("./routes/admin");
 app.use("/api/admin", adminRoutes);
 
 // Stripe redirect handler for 3D Secure / hash router compatibility
