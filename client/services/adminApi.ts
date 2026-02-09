@@ -661,30 +661,7 @@ export const editreport = async (reportId: string, payload: Partial<CreateInspec
 
 
 
-export type RevenueGroupBy = "day" | "week" | "month";
 
-export interface RevenueDashboardResponse {
-  range: { from: string; to: string; groupBy: RevenueGroupBy };
-  kpis: {
-    commissionEgp: number;
-    processorFeesEgp: number;
-    gmvEgp: number;
-    sellerPayoutEgp: number;
-    completedPaymentsCount: number;
-    refundedAmountEgp: number;
-  };
-  series: Array<{
-    bucket: string;
-    commissionEgp: number;
-    gmvEgp: number;
-    releasedEscrowsCount: number;
-  }>;
-  escrowsByStatus: Array<{
-    status: string;
-    count: number;
-    totalAmountEgp: number;
-  }>;
-}
 
 
   
@@ -713,18 +690,6 @@ export interface RevenueDashboardResponse {
 }
 
 
-export const getRevenueDashboard = async (
-  from: string,
-  to: string,
-  groupBy: RevenueGroupBy = "day"
-): Promise<RevenueDashboardResponse> => {
-  const response = await apiService.adminGetRevenueDashboard({ from, to, groupBy });
-
-  if (response.error) throw new Error(response.error);
-  if (!response.data) throw new Error("No data returned");
-
-  return response.data as RevenueDashboardResponse;
-};
 
 
 // =============================================
@@ -899,28 +864,7 @@ export const getAuctionById = async (auctionId: string, token?: string): Promise
 
 export type RevenueGroupBy = "day" | "week" | "month";
 
-export interface RevenueDashboardResponse {
-  range: { from: string; to: string; groupBy: RevenueGroupBy };
-  kpis: {
-    commissionEgp: number;
-    processorFeesEgp: number;
-    gmvEgp: number;
-    sellerPayoutEgp: number;
-    completedPaymentsCount: number;
-    refundedAmountEgp: number;
-  };
-  series: Array<{
-    bucket: string;
-    commissionEgp: number;
-    gmvEgp: number;
-    releasedEscrowsCount: number;
-  }>;
-  escrowsByStatus: Array<{
-    status: string;
-    count: number;
-    totalAmountEgp: number;
-  }>;
-}
+
 
 
   

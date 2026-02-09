@@ -78,29 +78,30 @@
             return { data: await response.json() };
           }
 
-          const errorData = await response.json();
+         
 
-          // B. If Token Expired (401), try to refresh!
-          if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
-            const success = await this.refreshAccessToken();
-            if (success) {
-              // Retry the ORIGINAL request with the NEW token
-              return this.request<T>(endpoint, options, true);
-            } else {
-              // Refresh failed -> Logout user
-              this.logout();
-              window.location.href = '/login'; 
-              return { error: 'Session expired. Please login again.' };
-            }
+        const errorData = await response.json();
+
+        // B. If Token Expired (401), try to refresh!
+        if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
+          const success = await this.refreshAccessToken();
+          if (success) {
+            // Retry the ORIGINAL request with the NEW token
+            return this.request<T>(endpoint, options, true);
+          } else {
+            // Refresh failed -> Logout user
+            this.logout();
+            window.location.href = '/login'; 
+            return { error: 'Session expired. Please login again.' };
           }
-
-          return { error: errorData.error || 'Request failed' };
-
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : 'Network error' };
         }
-      }
 
+        return { error: errorData.error || 'Request failed' };
+
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : 'Network error' };
+      }
+    };
       // =========================================================
       // HELPER: Call the Backend to Swap Refresh Token
       // =========================================================
@@ -198,6 +199,23 @@
     
 
     
+
+      
+      // =========================================================
+      // OTHER METHODS
+      // =========================================================
+   
+
+   
+  
+
+ 
+  
+
+    // =========================================================
+    // AUTH METHODS
+    // =========================================================
+    
     async register(firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) {
       const formData = new FormData();
       formData.append('firstName', firstName);
@@ -207,51 +225,51 @@
       formData.append('password', password);
       if (profileImage) formData.append('profileImage', profileImage);
 
-        // Note: We expect accessToken/refreshToken now
-        const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
-          method: 'POST',
-          body: formData,
-        });
+      // Note: We expect accessToken/refreshToken now
+      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
+        method: 'POST',
+        body: formData,
+      });
 
-        if (response.data?.accessToken) {
-          this.setTokens(response.data.accessToken, response.data.refreshToken);
-        }
-        return response;
+      if (response.data?.accessToken) {
+        this.setTokens(response.data.accessToken, response.data.refreshToken);
       }
-    async verifyEmailOtp(email: string, otp: string) {
-        return this.request('/auth/verify-email-otp', {
-          method: 'POST',
-          body: JSON.stringify({ email, otp }),
-        });
-      }
+      return response;
+    }
+  async verifyEmailOtp(email: string, otp: string) {
+      return this.request('/auth/verify-email-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp }),
+      });
+    }
 
-      async login(email: string, password: string) {
-        const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
+    async login(email: string, password: string) {
+      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
 
-        if (response.data?.accessToken) {
-          this.setTokens(response.data.accessToken, response.data.refreshToken);
-        }
-        return response;
+      if (response.data?.accessToken) {
+        this.setTokens(response.data.accessToken, response.data.refreshToken);
       }
+      return response;
+    }
 
-      async logout() {
-        this.clearTokens();
-        return { data: { success: true } }; // Just clear local state
-      }
+    async logout() {
+      this.clearTokens();
+      return { data: { success: true } }; // Just clear local state
+    }
 
-      // =========================================================
-      // OTHER METHODS
-      // =========================================================
-      async getCurrentUser() {
-        return this.request<{ user: any }>('/auth/me');
-      }
+    // =========================================================
+    // OTHER METHODS
+    // =========================================================
+    async getCurrentUser() {
+      return this.request<{ user: any }>('/auth/me');
+    }
 
-      async getLoginHistory() {
-        return this.request<{ loginHistory: any[] }>('/auth/login-history');
-      }
+    async getLoginHistory() {
+      return this.request<{ loginHistory: any[] }>('/auth/login-history');
+    }
 
     async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
       const queryParams = new URLSearchParams({
@@ -325,7 +343,8 @@
           platformCommission: number;
           stripeFee: number;
           totalAmount: number;
-          sellerPayout: number;   };
+          sellerPayout: number;
+        };
         auction: {
           id: string;
           vehicle: string;
@@ -337,12 +356,8 @@
       });
     }
 
-     
- 
-    /**
-     * Confirm payment completion
-     */
- 
+  
+
     /**
      * Get payment details by auction ID
      */
@@ -407,7 +422,9 @@
       }>(`/payments/escrows/${escrowId}`);
     }
 
-      /**
+
+
+     /**
        * Buyer confirms vehicle receipt (releases escrow)
        */
       async confirmVehicleReceipt(escrowId: string) {
@@ -422,24 +439,7 @@
       }
 
 
-    /**
-     * Initiate dispute on escrow
-     */
-    async initiateDispute(escrowId: string, reason: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        escrowId: string;
-      }>(`/payments/escrows/${escrowId}/dispute`, {
-        method: 'POST',
-        body: JSON.stringify({ reason }),
-      });
-    }
-
-    /**
-     * Admin: Get all disputed escrows
-     */
-    async getDisputedEscrows() {
+         async getDisputedEscrows() {
       return this.request<{
         success: boolean;
         disputes: Array<{
@@ -464,6 +464,12 @@
         }>;
       }>('/payments/escrows/disputed');
     }
+
+
+    /**
+     * Admin: Get all disputed escrows
+     */
+ 
 
     /**
      * Admin: Process refund
@@ -515,18 +521,6 @@
     }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
   }
 
-  public adminSearchUsers(q: string, page = 1, limit = 20) {
-    return this.request<{
-      items: any[];
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    }>(
-      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
-      { method: "GET" }
-    );
-  }
 
 
 
@@ -538,13 +532,7 @@
     );
 
   }
-
-
-
-
-
-
-
+  
 
 
   adminSuspendUser(userId: string, body: { reason: string }) {
@@ -561,6 +549,8 @@
       method: "PATCH",
     });
   }
+
+
 
   adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
@@ -581,6 +571,48 @@
 
   return this.request(`/admin/finance/revenue?${qs}`, { method: "GET" });
 }
+
+
+ public adminSearchUsers(q: string, page = 1, limit = 20) {
+    return this.request<{
+      items: any[];
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }>(
+      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+      { method: "GET" }
+    );
+  }
+
+
+
+async initiateDispute(escrowId: string, reason: string) {
+
+    return this.request<{
+
+      success: boolean;
+
+      message: string;
+
+      escrowId: string;
+
+    }>(`/payments/escrows/${escrowId}/dispute`, {
+
+      method: 'POST',
+
+      body: JSON.stringify({ reason }),
+
+    });
+
+  }
+
+
+
+
+
+
 
 
   }
