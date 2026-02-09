@@ -1,14 +1,19 @@
 // App.tsx (full file)
 import React, { useEffect, useLayoutEffect } from "react";
-import { HashRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import {
+  HashRouter,
+  Routes,
+  Route,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 
-import ResetPasswordPage from './pages/ResetPasswordPage'; // <--- Add this importimport { UserRole } from "./types";
-
+import ResetPasswordPage from "./pages/ResetPasswordPage"; // <--- Add this importimport { UserRole } from "./types";
 
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
@@ -46,7 +51,11 @@ const ScrollToTop: React.FC = () => {
     }
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
     const raf = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "instant" as ScrollBehavior,
+      });
     });
     return () => window.cancelAnimationFrame(raf);
   }, [pathname]);
@@ -54,7 +63,9 @@ const ScrollToTop: React.FC = () => {
   return null;
 };
 
-const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({
+  children,
+}) => {
   const { user, loading } = useAuth();
 
   if (loading) return null;
@@ -89,7 +100,10 @@ const AppRoutes: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
-          <Route path="/payment/:id/confirmation" element={<PaymentConfirmationPage />} />
+          <Route
+            path="/payment/:id/confirmation"
+            element={<PaymentConfirmationPage />}
+          />
         </Route>
 
         {/* ===================== PROTECTED (Layout) ===================== */}
@@ -124,7 +138,6 @@ const AppRoutes: React.FC = () => {
               </RequireAdmin>
             }
           />
-          
 
           <Route
             path="/admin/finance/revenue"

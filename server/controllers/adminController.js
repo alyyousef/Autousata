@@ -107,12 +107,15 @@ const acceptVehicleController = async (req, res) => {
         
         if (result.success) {
             res.status(200).json({ 
-                message: 'Vehicle accepted successfully',
+                message: result.auctionActivated
+                    ? 'Vehicle accepted and auction is now live'
+                    : 'Vehicle accepted successfully (fixed-price listing)',
                 vehicleId,
-                status: 'active'
+                status: 'active',
+                auctionActivated: result.auctionActivated || false
             });
         } else {
-            res.status(404).json({ error: 'Vehicle not found' });
+            res.status(404).json({ error: 'Vehicle not found or not in draft status' });
         }
     } catch (error) {
         console.error('Controller - Accept vehicle error:', error);
@@ -134,7 +137,7 @@ const rejectVehicleController = async (req, res) => {
         
         if (result.success) {
             res.status(200).json({ 
-                message: 'Vehicle rejected successfully',
+                message: 'Vehicle rejected and any linked auction cancelled',
                 vehicleId,
                 status: 'delisted'
             });

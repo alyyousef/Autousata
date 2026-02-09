@@ -11,11 +11,14 @@ export enum UserRole {
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone?: string;
   role: UserRole;
   isKycVerified: boolean;
   avatar?: string;
+  profileImage?: string;
   location?: {
     city?: string;
     country?: string;
@@ -26,6 +29,8 @@ export interface User {
 
 export type VehicleStatus = 'draft' | 'active' | 'sold' | 'delisted';
 
+export type SaleType = 'fixed_price' | 'auction';
+
 export interface Vehicle {
   id: string;
   make: string;
@@ -33,7 +38,7 @@ export interface Vehicle {
   year: number;
   mileage: number;
   vin: string;
-  condition: 'Mint' | 'Excellent' | 'Good' | 'Fair';
+  condition: 'Excellent' | 'Good' | 'Fair' | 'Poor';
   description: string;
   images: string[];
   location: string;
@@ -41,6 +46,14 @@ export interface Vehicle {
   price?: number;
   plateNumber?: string;
   sellerId?: string;
+  sellerName?: string;
+  saleType?: SaleType;
+  bodyType?: string;
+  transmission?: string;
+  fuelType?: string;
+  seats?: number;
+  color?: string;
+  features?: string[];
 }
 
 export type ListingStatus = 'DRAFT' | 'PUBLISHED' | 'DELISTED';

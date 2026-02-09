@@ -7,7 +7,11 @@ const getVehicles = async () => {
     try {
         connection = await oracledb.getConnection();
         const result = await connection.execute(
-            `SELECT * FROM DIP.VEHICLES ORDER BY CREATED_AT DESC`,
+            `SELECT v.*, 
+                    CASE WHEN a.ID IS NOT NULL THEN 'auction' ELSE 'fixed_price' END AS SALE_TYPE
+             FROM DIP.VEHICLES v
+             LEFT JOIN DIP.AUCTIONS a ON a.VEHICLE_ID = v.ID AND a.STATUS NOT IN ('cancelled')
+             ORDER BY v.CREATED_AT DESC`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -40,6 +44,7 @@ const getVehicles = async () => {
             publishedAt: v.PUBLISHED_AT,
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
+            sale_type: v.SALE_TYPE,
         }));
     } catch (error) {
         console.error('Error fetching vehicles:', error);
@@ -62,10 +67,12 @@ const filterstatusVehicles = async (filter) => {
     try {
         connection = await oracledb.getConnection();
         const result = await connection.execute(
-            `SELECT * 
-             FROM DIP.VEHICLES
-             WHERE LOWER(STATUS) = LOWER(:status)
-             ORDER BY CREATED_AT DESC`,
+            `SELECT v.*, 
+                    CASE WHEN a.ID IS NOT NULL THEN 'auction' ELSE 'fixed_price' END AS SALE_TYPE
+             FROM DIP.VEHICLES v
+             LEFT JOIN DIP.AUCTIONS a ON a.VEHICLE_ID = v.ID AND a.STATUS NOT IN ('cancelled')
+             WHERE LOWER(v.STATUS) = LOWER(:status)
+             ORDER BY v.CREATED_AT DESC`,
             { status: filter },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -98,6 +105,7 @@ const filterstatusVehicles = async (filter) => {
             publishedAt: v.PUBLISHED_AT,
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
+            sale_type: v.SALE_TYPE,
         }));
     } catch (error) {
         console.error('Error filtering vehicles by status:', error);
@@ -118,15 +126,17 @@ const searchVehicles = async (searchTerm) => {
     try {
         connection = await oracledb.getConnection();
         const result = await connection.execute(
-            `SELECT *
-                FROM DIP.VEHICLES
-                WHERE LOWER(MAKE) LIKE LOWER(:search)
-                    OR LOWER(MODEL) LIKE LOWER(:search)
-                    OR LOWER(LOCATION_CITY) LIKE LOWER(:search)
-                    OR LOWER(BODY_TYPE) LIKE LOWER(:search)
-                    OR LOWER(COLOR) LIKE LOWER(:search)
-                    OR LOWER(FUEL_TYPE) LIKE LOWER(:search)
-                ORDER BY CREATED_AT DESC`,
+            `SELECT v.*,
+                    CASE WHEN a.ID IS NOT NULL THEN 'auction' ELSE 'fixed_price' END AS SALE_TYPE
+                FROM DIP.VEHICLES v
+                LEFT JOIN DIP.AUCTIONS a ON a.VEHICLE_ID = v.ID AND a.STATUS NOT IN ('cancelled')
+                WHERE LOWER(v.MAKE) LIKE LOWER(:search)
+                    OR LOWER(v.MODEL) LIKE LOWER(:search)
+                    OR LOWER(v.LOCATION_CITY) LIKE LOWER(:search)
+                    OR LOWER(v.BODY_TYPE) LIKE LOWER(:search)
+                    OR LOWER(v.COLOR) LIKE LOWER(:search)
+                    OR LOWER(v.FUEL_TYPE) LIKE LOWER(:search)
+                ORDER BY v.CREATED_AT DESC`,
             { search: `%${searchTerm}%` },
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -158,6 +168,7 @@ const searchVehicles = async (searchTerm) => {
             publishedAt: v.PUBLISHED_AT,
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
+            sale_type: v.SALE_TYPE,
         }));
     }
     catch (error) {
@@ -217,14 +228,119 @@ const updateVehicleStatus = async (vehicleId, newStatus) => {
 
 
 const acceptVehicle = async (vehicleId) => {
-    return updateVehicleStatus(vehicleId, 'active');
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+
+        // 1. Set vehicle status to 'active'
+        const vehicleResult = await connection.execute(
+            `UPDATE DIP.VEHICLES
+             SET STATUS = 'active', UPDATED_AT = CURRENT_TIMESTAMP, PUBLISHED_AT = CURRENT_TIMESTAMP
+             WHERE ID = :vehicleId AND STATUS = 'draft'`,
+            { vehicleId },
+            { autoCommit: false }
+        );
+
+        if (vehicleResult.rowsAffected === 0) {
+            await connection.rollback();
+            return { success: false, rowsAffected: 0 };
+        }
+
+        // 2. Check if vehicle has a linked draft auction
+        const auctionResult = await connection.execute(
+            `SELECT ID, DURATION_DAYS FROM DIP.AUCTIONS
+             WHERE VEHICLE_ID = :vehicleId AND LOWER(STATUS) = 'draft'`,
+            { vehicleId },
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        let auctionActivated = false;
+        if (auctionResult.rows && auctionResult.rows.length > 0) {
+            const auction = auctionResult.rows[0];
+            const durationDays = Number(auction.DURATION_DAYS) || 3;
+
+            // Recalculate start/end time based on NOW + durationDays
+            await connection.execute(
+                `UPDATE DIP.AUCTIONS
+                 SET STATUS = 'live',
+                     START_TIME = CURRENT_TIMESTAMP,
+                     END_TIME = CURRENT_TIMESTAMP + NUMTODSINTERVAL(:durationDays, 'DAY'),
+                     ORIGINAL_END_TIME = CURRENT_TIMESTAMP + NUMTODSINTERVAL(:durationDays2, 'DAY'),
+                     STARTED_AT = CURRENT_TIMESTAMP
+                 WHERE ID = :auctionId`,
+                {
+                    durationDays: durationDays,
+                    durationDays2: durationDays,
+                    auctionId: auction.ID
+                },
+                { autoCommit: false }
+            );
+            auctionActivated = true;
+        }
+
+        await connection.commit();
+
+        return {
+            success: true,
+            rowsAffected: vehicleResult.rowsAffected,
+            auctionActivated
+        };
+    } catch (error) {
+        if (connection) {
+            try { await connection.rollback(); } catch (e) { console.error('Rollback error:', e); }
+        }
+        console.error('Error accepting vehicle:', error);
+        throw error;
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (err) { console.error('Error closing connection:', err); }
+        }
+    }
 };
 
 
 
 
 const rejectVehicle = async (vehicleId) => {
-    return updateVehicleStatus(vehicleId, 'delisted');
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+
+        // 1. Set vehicle status to 'delisted'
+        const vehicleResult = await connection.execute(
+            `UPDATE DIP.VEHICLES
+             SET STATUS = 'delisted', UPDATED_AT = CURRENT_TIMESTAMP
+             WHERE ID = :vehicleId`,
+            { vehicleId },
+            { autoCommit: false }
+        );
+
+        // 2. Cancel any linked draft auction
+        await connection.execute(
+            `UPDATE DIP.AUCTIONS
+             SET STATUS = 'cancelled'
+             WHERE VEHICLE_ID = :vehicleId AND LOWER(STATUS) = 'draft'`,
+            { vehicleId },
+            { autoCommit: false }
+        );
+
+        await connection.commit();
+
+        return {
+            success: vehicleResult.rowsAffected > 0,
+            rowsAffected: vehicleResult.rowsAffected
+        };
+    } catch (error) {
+        if (connection) {
+            try { await connection.rollback(); } catch (e) { console.error('Rollback error:', e); }
+        }
+        console.error('Error rejecting vehicle:', error);
+        throw error;
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (err) { console.error('Error closing connection:', err); }
+        }
+    }
 };
 
 

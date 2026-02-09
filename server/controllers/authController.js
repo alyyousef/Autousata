@@ -1,10 +1,13 @@
 const bcrypt = require("bcrypt");
 const oracledb = require("oracledb");
-const crypto = require('crypto'); // ✅ FIXED: Added missing import
+const crypto = require("crypto");
 const db = require("../config/db");
 const { generateTokens, verifyRefreshToken } = require("../middleware/auth");
 const { uploadToS3 } = require("../middleware/uploadMiddleware");
-const { sendVerificationEmail, sendPasswordResetEmail } = require("../services/emailService");
+const {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} = require("../services/emailService");
 require("dotenv").config();
 
 // ==========================================
@@ -14,6 +17,23 @@ async function register(req, res) {
   const { firstName, lastName, email, phone, password } = req.body;
   const file = req.file;
   let connection;
+
+  // Phone validation
+  const phoneRegex = /^[0-9]{10,15}$/;
+  if (!phoneRegex.test(phone)) {
+    return res
+      .status(400)
+      .json({
+        error: "Invalid phone format. Only numbers allowed (10-15 digits).",
+      });
+  }
+
+  // Password strength (min 8 chars)
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password too weak. Minimum 8 characters." });
+  }
 
   try {
     console.log(`👉 Registering: ${email}`);
@@ -76,10 +96,12 @@ async function register(req, res) {
       sendVerificationEmail(email, otpCode).catch((err) =>
         console.error("Email failed in background:", err),
       );
-            sendVerificationEmail(email, otpCode)
-                .catch(err => console.error("Email failed:", err));
+      sendVerificationEmail(email, otpCode).catch((err) =>
+        console.error("Email failed:", err),
+      );
 
-            const { accessToken, refreshToken } = generateTokens(newUserId);
+      // G. Generate Tokens (So user is logged in, but unverified)
+      const { accessToken, refreshToken } = generateTokens(newUserId);
 
       res.status(201).json({
         message: "User registered successfully. Please verify your email.",
@@ -92,7 +114,7 @@ async function register(req, res) {
           email,
           role: "client",
           profileImage: profilePicUrl,
-          emailVerified: false, // Flag for Frontend to redirect to OTP page
+          emailVerified: false,
         },
       });
     } else {
@@ -156,7 +178,6 @@ async function login(req, res) {
     const match = await bcrypt.compare(password, userData.hash);
 
     if (match) {
-      //  const token = generateToken({ id: userData.id, role: userData.role });
       const { accessToken, refreshToken } = generateTokens(userData.id);
 
       res.json({
@@ -214,7 +235,6 @@ async function verifyEmailOtp(req, res) {
     if (status === "SUCCESS") {
       res.json({ success: true, message: "Email verified successfully!" });
     } else {
-      // Map DB errors to friendly messages
       let errorMsg = "Verification failed";
       if (status === "INVALID_OTP")
         errorMsg = "Invalid code. Please try again.";
@@ -266,106 +286,129 @@ async function refreshToken(req, res) {
 // 5. GET CURRENT USER
 // ==========================================
 async function getMe(req, res) {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    res.json({ user: req.user });
+  if (!req.user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  res.json({
+    user: req.user,
+  });
 }
 
 // ==========================================
-// 6. FORGOT PASSWORD (Updated Logic)
-// ==========================================
-// ==========================================
-// 6. FORGOT PASSWORD (Updated for Transparency)
+// 6. FORGOT PASSWORD
 // ==========================================
 async function forgotPassword(req, res) {
-    const { email } = req.body;
-    let connection;
-    try {
-        connection = await db.getConnection();
-        
-        // 1. Check if user exists
-        const check = await connection.execute(
-            `SELECT id FROM users WHERE email = :email`,
-            [email]
-        );
+  const { email } = req.body;
+  let connection;
 
-        // ✅ LOGIC UPDATE: Explicitly tell frontend if user is missing
-        if (check.rows.length === 0) {
-            return res.status(404).json({ 
-                error: 'Email not found', 
-                code: 'USER_NOT_FOUND',
-                message: 'This email is not registered with us.' 
-            });
-        }
+  try {
+    connection = await db.getConnection();
 
-        const userId = check.rows[0][0];
-        const resetToken = crypto.randomBytes(32).toString('hex');
+    // 1. Check if user exists
+    const check = await connection.execute(
+      `SELECT id FROM users WHERE email = :email`,
+      [email],
+    );
 
-        // 2. Save token
-        await connection.execute(
-            `UPDATE users 
-             SET reset_password_token = :token,
-                 reset_password_expiry = CURRENT_TIMESTAMP + INTERVAL '1' HOUR
-             WHERE id = :id`,
-            { token: resetToken, id: userId },
-            { autoCommit: true }
-        );
-
-        // 3. Send Premium Email
-        await sendPasswordResetEmail(email, resetToken);
-
-        res.json({ success: true, message: 'Password reset link sent to your email.' });
-
-    } catch (err) {
-        console.error('Forgot Password Error:', err);
-        res.status(500).json({ error: 'Server error' });
-    } finally {
-        if (connection) { try { await connection.close(); } catch (e) {} }
+    if (check.rows.length === 0) {
+      return res.status(404).json({
+        error: "Email not found",
+        code: "USER_NOT_FOUND",
+        message: "This email is not registered with us.",
+      });
     }
+
+    const userId = check.rows[0][0];
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // 2. Save token
+    await connection.execute(
+      `UPDATE users 
+       SET reset_password_token = :token,
+           reset_password_expiry = CURRENT_TIMESTAMP + INTERVAL '1' HOUR
+       WHERE id = :id`,
+      { token: resetToken, id: userId },
+      { autoCommit: true },
+    );
+
+    // 3. Send Reset Email
+    await sendPasswordResetEmail(email, resetToken);
+
+    res.json({
+      success: true,
+      message: "Password reset link sent to your email.",
+    });
+  } catch (err) {
+    console.error("Forgot Password Error:", err);
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
 }
 
 // ==========================================
 // 7. RESET PASSWORD
 // ==========================================
 async function resetPassword(req, res) {
-    const { token, newPassword } = req.body;
-    let connection;
+  const { token, newPassword } = req.body;
+  let connection;
 
-    try {
-        connection = await db.getConnection();
+  try {
+    connection = await db.getConnection();
 
-        const result = await connection.execute(
-            `SELECT id FROM users 
-             WHERE reset_password_token = :token 
-             AND reset_password_expiry > CURRENT_TIMESTAMP`,
-            [token]
-        );
+    const result = await connection.execute(
+      `SELECT id FROM users 
+       WHERE reset_password_token = :token 
+       AND reset_password_expiry > CURRENT_TIMESTAMP`,
+      [token],
+    );
 
-        if (result.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid or expired reset token.' });
-        }
-
-        const userId = result.rows[0][0];
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-        await connection.execute(
-            `UPDATE users 
-             SET password_hash = :pw,
-                 reset_password_token = NULL,
-                 reset_password_expiry = NULL
-             WHERE id = :id`,
-            { pw: hashedPassword, id: userId },
-            { autoCommit: true }
-        );
-
-        res.json({ message: 'Password has been reset successfully.' });
-
-    } catch (err) {
-        console.error('Reset Password Error:', err);
-        res.status(500).json({ error: 'Server error' });
-    } finally {
-        if (connection) { try { await connection.close(); } catch (e) {} }
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "Invalid or expired reset token." });
     }
+
+    const userId = result.rows[0][0];
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    await connection.execute(
+      `UPDATE users 
+       SET password_hash = :pw,
+           reset_password_token = NULL,
+           reset_password_expiry = NULL
+       WHERE id = :id`,
+      { pw: hashedPassword, id: userId },
+      { autoCommit: true },
+    );
+
+    res.json({ message: "Password has been reset successfully." });
+  } catch (err) {
+    console.error("Reset Password Error:", err);
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
 }
 
-module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword };
+module.exports = {
+  register,
+  login,
+  verifyEmailOtp,
+  refreshToken,
+  getMe,
+  forgotPassword,
+  resetPassword,
+};

@@ -39,6 +39,7 @@ export interface VehicleItem {
   status: string;
   inspection_req?: number;
   inspection_report?: string | null;
+  sale_type?: 'auction' | 'fixed_price';
 }
 
 export interface CreateInspectionPayload {

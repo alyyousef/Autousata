@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Camera, Car, MapPin, DollarSign, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
-import { geminiService } from '../geminiService'; 
-import { apiService } from '../services/api';
+import axios from 'axios';
+import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
+import { geminiService } from '../geminiService'; // Keeping AI service
 import { useLanguage } from '../contexts/LanguageContext';
+import { apiService } from '../services/api';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -32,11 +33,14 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     ),
     plateNumber: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().min(1, t('Plate number is required', 'رقم اللوحة مطلوب')).optional()
+      z
+        .string()
+        .regex(/^[A-Za-z]{1,3}[1-9]{1,4}$/, t('Plate number must be 1-3 letters then 1-4 numbers (no zeros)', 'رقم اللوحة يجب ان يكون 1-3 حروف وبعدها 1-4 أرقام (دون صفر)'))
+        .optional()
     ),
     color: z.string().min(1, t('Color is required', 'اللون مطلوب')),
     bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
-    transmission: z.enum(['manual', 'automatic']),
+    transmission: z.enum(['manual', 'automatic', 'other']),
     fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
     seats: z.coerce.number().min(1, t('Seats must be at least 1', 'عدد المقاعد يجب ان يكون واحد او اكثر')),
     condition: z.enum(['excellent', 'good', 'fair', 'poor']),
@@ -46,16 +50,29 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     features: z.array(z.string()).default([]),
     images: z.array(z.string()).min(1, t('Add at least one photo', 'اضف صورة واحدة على الاقل')),
 
-    // Step 3: Pricing & Location (Auction Config)
+    // Step 3: Pricing & Sale Type
     location: z.string().min(1, t('Location is required', 'الموقع مطلوب')),
-    reservePrice: z.coerce.number().min(1, t('Reserve price is required', 'سعر الحجز مطلوب')),
-    startingBid: z.coerce.number().min(1, t('Starting bid is required', 'سعر البداية مطلوب')),
-    startTime: z.string().optional(),
+    saleType: z.enum(['fixed_price', 'auction']).default('fixed_price'),
+    price: z.coerce.number().min(1, t('Price is required', 'السعر مطلوب')),
+    // Auction-only fields (required when saleType === 'auction')
+    reservePrice: z.coerce.number().optional(),
+    startingBid: z.coerce.number().optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
     // AI Notes
     aiNotes: z.string().optional(),
-  });
+  }).refine(
+    (data) => {
+      if (data.saleType === 'auction') {
+        return (data.startingBid ?? 0) >= 1 && (data.reservePrice ?? 0) >= 1;
+      }
+      return true;
+    },
+    {
+      message: t('Starting bid and reserve price are required for auctions', 'سعر البداية وسعر الحجز مطلوبين للمزاد'),
+      path: ['startingBid'],
+    }
+  );
 
 type ListingFormInput = z.input<ReturnType<typeof createListingSchema>>;
 type ListingFormData = z.infer<ReturnType<typeof createListingSchema>>;
@@ -99,6 +116,7 @@ const CreateListingPage: React.FC = () => {
       seats: 5,
       features: [],
       images: [],
+      saleType: 'fixed_price',
       durationDays: '3',
       mileage: 0,
       year: new Date().getFullYear(),
@@ -179,7 +197,12 @@ const CreateListingPage: React.FC = () => {
     } else if (targetStep === 2) {
       fieldsToValidate = ['description', 'images'];
     } else if (targetStep === 3) {
-      fieldsToValidate = ['location', 'startingBid', 'reservePrice'];
+      const currentSaleType = getValues('saleType');
+      if (currentSaleType === 'auction') {
+        fieldsToValidate = ['location', 'price', 'startingBid', 'reservePrice'];
+      } else {
+        fieldsToValidate = ['location', 'price'];
+      }
     }
 
     const isStepValid = await trigger(fieldsToValidate);
@@ -193,14 +216,19 @@ const CreateListingPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const normalizedMileage = Number(data.mileage) || 0;
-      const normalizedReservePrice = Number(data.reservePrice) || 0;
-      const normalizedStartingBid = Number(data.startingBid) || 0;
-      const startDate = data.startTime ? new Date(data.startTime) : new Date();
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + parseInt(data.durationDays));
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setSubmitError(t('Please log in before creating a listing', 'يرجى تسجيل الدخول قبل انشاء اعلان'));
+        return;
+      }
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-      // 1. Create Vehicle
+      const normalizedMileage = Number(data.mileage) || 0;
+      const normalizedPrice = Number(data.price) || 0;
+      const isAuction = data.saleType === 'auction';
+
+      // 1. Create Vehicle (always)
       const vehiclePayload = {
         make: data.make,
         model: data.model,
@@ -215,8 +243,7 @@ const CreateListingPage: React.FC = () => {
         fuelType: data.fuelType,
         seats: data.seats,
         condition: data.condition,
-        price: normalizedReservePrice,
-        reservePrice: normalizedReservePrice,
+        price: isAuction ? Number(data.reservePrice) || normalizedPrice : normalizedPrice,
         description: data.description,
         location: data.location,
         features: data.features,
@@ -232,20 +259,16 @@ const CreateListingPage: React.FC = () => {
       
       const vehicleId = vehicleRes.data._id;
 
-      // 2. Create Auction
-      const auctionPayload = {
-        vehicleId: vehicleId,
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
-        startPrice: normalizedStartingBid,
-        reservePrice: normalizedReservePrice
-      };
+      // 2. Create Auction ONLY if sale type is 'auction'
+      if (isAuction) {
+        const auctionPayload = {
+          vehicleId: vehicleId,
+          durationDays: parseInt(data.durationDays),
+          startPrice: Number(data.startingBid) || 0,
+          reservePrice: Number(data.reservePrice) || normalizedPrice
+        };
 
-      // ✅ FIX 4: Use apiService for auction (Handles Token correctly)
-      const auctionRes = await apiService.createAuction(auctionPayload);
-
-      if (auctionRes.error) {
-         throw new Error(auctionRes.error || t('Failed to create auction', 'فشل انشاء المزاد'));
+        await axios.post(`${baseUrl}/auctions`, auctionPayload, config);
       }
 
       // Success
@@ -325,6 +348,7 @@ const CreateListingPage: React.FC = () => {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       onKeyDown={blockInvalidNumberInput}
+                      placeholder={t('2022', '2022')}
                       {...register('year')}
                       className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.year ? "border-rose-300" : "border-slate-200")}
                     />
@@ -333,13 +357,13 @@ const CreateListingPage: React.FC = () => {
                   
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Make', 'الماركة')}</label>
-                    <input type="text" {...register('make')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.make ? "border-rose-300" : "border-slate-200")} />
+                    <input type="text" placeholder={t('Toyota', 'تويوتا')} {...register('make')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.make ? "border-rose-300" : "border-slate-200")} />
                     {errors.make && <p className="text-xs text-rose-600">{errors.make.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Model', 'الموديل')}</label>
-                    <input type="text" {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
+                    <input type="text" placeholder={t('Camry', 'كامري')} {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
                     {errors.model && <p className="text-xs text-rose-600">{errors.model.message}</p>}
                   </div>
                   
@@ -352,6 +376,7 @@ const CreateListingPage: React.FC = () => {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       onKeyDown={blockInvalidNumberInput}
+                      placeholder={t('45000', '45000')}
                       {...register('mileage')}
                       className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.mileage ? "border-rose-300" : "border-slate-200")}
                     />
@@ -366,13 +391,38 @@ const CreateListingPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Plate Number', 'رقم اللوحة')}</label>
-                    <input type="text" {...register('plateNumber')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")} />
+                    <input
+                      type="text"
+                      maxLength={7}
+                      pattern="[A-Za-z]{1,3}[1-9]{1,4}"
+                      placeholder={t('AB123', 'AB123')}
+                      onKeyDown={(event) => {
+                        if (event.key === '0') event.preventDefault();
+                      }}
+                      {...register('plateNumber')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")}
+                    />
                     {errors.plateNumber && <p className="text-xs text-rose-600">{errors.plateNumber.message}</p>}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Color', 'اللون')}</label>
-                    <input type="text" {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")} />
+                    <select {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")}>
+                      <option value="">{t('Select color', 'اختر اللون')}</option>
+                      <option value="blue">{t('Blue', 'أزرق')}</option>
+                      <option value="red">{t('Red', 'أحمر')}</option>
+                      <option value="black">{t('Black', 'أسود')}</option>
+                      <option value="white">{t('White', 'أبيض')}</option>
+                      <option value="gray">{t('Gray', 'رمادي')}</option>
+                      <option value="silver">{t('Silver', 'فضي')}</option>
+                      <option value="green">{t('Green', 'أخضر')}</option>
+                      <option value="yellow">{t('Yellow', 'أصفر')}</option>
+                      <option value="orange">{t('Orange', 'برتقالي')}</option>
+                      <option value="brown">{t('Brown', 'بني')}</option>
+                      <option value="beige">{t('Beige', 'بيج')}</option>
+                      <option value="gold">{t('Gold', 'ذهبي')}</option>
+                      <option value="other">{t('Other', 'أخرى')}</option>
+                    </select>
                     {errors.color && <p className="text-xs text-rose-600">{errors.color.message}</p>}
                   </div>
 
@@ -395,6 +445,7 @@ const CreateListingPage: React.FC = () => {
                     <select {...register('transmission')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.transmission ? "border-rose-300" : "border-slate-200")}>
                       <option value="automatic">{t('Automatic', 'اوتوماتيك')}</option>
                       <option value="manual">{t('Manual', 'يدوي')}</option>
+                      <option value="other">{t('Other', 'أخرى')}</option>
                     </select>
                     {errors.transmission && <p className="text-xs text-rose-600">{errors.transmission.message}</p>}
                   </div>
@@ -412,17 +463,11 @@ const CreateListingPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Seats', 'عدد المقاعد')}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      step={1}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      onKeyDown={blockInvalidNumberInput}
-                      {...register('seats')}
-                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")}
-                    />
+                    <select {...register('seats')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")}>
+                      {[1, 2, 3, 4, 5, 6, 7].map(value => (
+                        <option key={value} value={value}>{formatNumber(value)}</option>
+                      ))}
+                    </select>
                     {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
                   </div>
                   
@@ -530,6 +575,7 @@ const CreateListingPage: React.FC = () => {
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Full Description', 'الوصف الكامل')}</label>
                   <textarea 
                     {...register('description')}
+                    placeholder={t('Example: single owner, full service history, new tires...', 'مثال: مالك واحد، صيانة كاملة، كاوتش جديد...')}
                     className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none min-h-[200px] text-sm", errors.description ? "border-rose-300" : "border-slate-200")}
                   />
                   {errors.description && <p className="text-xs text-rose-600">{errors.description.message}</p>}
@@ -537,51 +583,104 @@ const CreateListingPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 3: AUCTION CONFIG */}
+            {/* STEP 3: PRICING & SALE TYPE */}
             {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">{t('Auction Settings', 'اعدادات المزاد')}</h2>
-                  <p className="text-slate-500">{t('Set your price and duration', 'حدد السعر والمدة')}</p>
+                  <h2 className="text-2xl font-black text-slate-900">{t('Pricing & Sale Type', 'السعر ونوع البيع')}</h2>
+                  <p className="text-slate-500">{t('Choose how you want to sell your vehicle', 'اختر طريقة بيع سيارتك')}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Starting Bid', 'سعر البداية')}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
-                      <input 
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        onKeyDown={blockInvalidNumberInput}
-                        {...register('startingBid')}
-                        className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.startingBid ? "border-rose-300" : "border-slate-200")}
-                      />
-                    </div>
-                    {errors.startingBid && <p className="text-xs text-rose-600">{errors.startingBid.message}</p>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Reserve Price', 'سعر الحجز')}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
-                      <input 
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        onKeyDown={blockInvalidNumberInput}
-                        {...register('reservePrice')}
-                        className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.reservePrice ? "border-rose-300" : "border-slate-200")}
-                      />
-                    </div>
-                    {errors.reservePrice && <p className="text-xs text-rose-600">{errors.reservePrice.message}</p>}
+                {/* Sale Type Toggle */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Sale Type', 'نوع البيع')}</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className={cn(
+                      "flex flex-col items-center justify-center p-5 rounded-xl border-2 cursor-pointer transition-all",
+                      formData.saleType === 'fixed_price' ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-slate-200 hover:border-slate-300"
+                    )}>
+                      <input type="radio" value="fixed_price" {...register('saleType')} className="hidden" />
+                      <Tag size={24} className="mb-2" />
+                      <span className="text-sm font-bold">{t('Fixed Price', 'سعر ثابت')}</span>
+                      <span className="text-xs text-slate-500 mt-1 text-center">{t('Sell at a set price', 'بيع بسعر محدد')}</span>
+                    </label>
+                    <label className={cn(
+                      "flex flex-col items-center justify-center p-5 rounded-xl border-2 cursor-pointer transition-all",
+                      formData.saleType === 'auction' ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
+                    )}>
+                      <input type="radio" value="auction" {...register('saleType')} className="hidden" />
+                      <DollarSign size={24} className="mb-2" />
+                      <span className="text-sm font-bold">{t('Auction', 'مزاد')}</span>
+                      <span className="text-xs text-slate-500 mt-1 text-center">{t('Let buyers bid competitively', 'دع المشترين يتنافسون')}</span>
+                    </label>
                   </div>
                 </div>
+
+                {/* Price (always shown) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    {formData.saleType === 'auction' ? t('Reserve Price', 'سعر الحجز') : t('Asking Price', 'السعر المطلوب')}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                    <input 
+                      type="number"
+                      {...register('price')}
+                      className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.price ? "border-rose-300" : "border-slate-200")}
+                    />
+                  </div>
+                  {errors.price && <p className="text-xs text-rose-600">{errors.price.message}</p>}
+                  {formData.saleType === 'fixed_price' && (
+                    <p className="text-xs text-slate-400">{t('Buyers will purchase at this exact price', 'المشترون سيشترون بهذا السعر بالضبط')}</p>
+                  )}
+                </div>
+
+                {/* Auction-only fields */}
+                {formData.saleType === 'auction' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Starting Bid', 'سعر البداية')}</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                        <input 
+                          type="number"
+                          {...register('startingBid')}
+                          className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.startingBid ? "border-rose-300" : "border-slate-200")}
+                        />
+                      </div>
+                      {errors.startingBid && <p className="text-xs text-rose-600">{errors.startingBid.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Reserve Price', 'سعر الحجز')}</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                        <input 
+                          type="number"
+                          {...register('reservePrice')}
+                          className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.reservePrice ? "border-rose-300" : "border-slate-200")}
+                        />
+                      </div>
+                      {errors.reservePrice && <p className="text-xs text-rose-600">{errors.reservePrice.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Auction Duration', 'مدة المزاد')}</label>
+                      <div className="grid grid-cols-3 gap-4">
+                        {['1', '3', '7'].map((days) => (
+                          <label key={days} className={cn(
+                            "flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all",
+                            formData.durationDays === days ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
+                          )}>
+                            <input type="radio" value={days} {...register('durationDays')} className="hidden" />
+                            <span className="text-lg font-bold">{formatNumber(Number(days))} {t('Days', 'ايام')}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400">{t('Duration starts when admin approves your listing', 'المدة تبدأ عند موافقة المسؤول على اعلانك')}</p>
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Location (City)', 'الموقع المدينة')}</label>
@@ -596,21 +695,6 @@ const CreateListingPage: React.FC = () => {
                   </div>
                   {errors.location && <p className="text-xs text-rose-600">{errors.location.message}</p>}
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Auction Duration', 'مدة المزاد')}</label>
-                  <div className="grid grid-cols-3 gap-4">
-                    {['1', '3', '7'].map((days) => (
-                      <label key={days} className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all",
-                        formData.durationDays === days ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
-                      )}>
-                        <input type="radio" value={days} {...register('durationDays')} className="hidden" />
-                        <span className="text-lg font-bold">{formatNumber(Number(days))} {t('Days', 'ايام')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -622,16 +706,22 @@ const CreateListingPage: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900">{t('Ready to Submit?', 'جاهز للارسال')}</h2>
                 <p className="text-slate-500 max-w-md mx-auto">
-                  {t(
-                    'Your vehicle will be submitted for admin approval. Once approved, the auction will be scheduled.',
-                    'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيتم جدولة المزاد'
-                  )}
+                  {formData.saleType === 'auction'
+                    ? t('Your vehicle will be submitted for admin approval. Once approved, the auction will go live.', 'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيبدأ المزاد')
+                    : t('Your vehicle will be submitted for admin approval. Once approved, it will be listed for sale.', 'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيتم عرضها للبيع')
+                  }
                 </p>
                 <div className="bg-slate-50 rounded-2xl p-6 text-left max-w-sm mx-auto space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Vehicle', 'السيارة')}</span> <span className="font-bold">{formatNumber(formData.year)} {formData.make} {formData.model}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Reserve', 'الحجز')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.reservePrice))}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Duration', 'المدة')}</span> <span className="font-bold">{formatNumber(Number(formData.durationDays))} {t('Days', 'ايام')}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Status', 'الحالة')}</span> <span className="font-bold text-amber-600">{t('Pending Inspection', 'قيد الفحص')}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Vehicle', 'السيارة')}</span> <span className="font-bold">{formatNumber(Number(formData.year))} {formData.make} {formData.model}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Sale Type', 'نوع البيع')}</span> <span className="font-bold">{formData.saleType === 'auction' ? t('Auction', 'مزاد') : t('Fixed Price', 'سعر ثابت')}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Price', 'السعر')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.price))}</span></div>
+                  {formData.saleType === 'auction' && (
+                    <>
+                      <div className="flex justify-between"><span className="text-slate-400">{t('Starting Bid', 'سعر البداية')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.startingBid))}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">{t('Duration', 'المدة')}</span> <span className="font-bold">{formatNumber(Number(formData.durationDays))} {t('Days', 'ايام')}</span></div>
+                    </>
+                  )}
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Status', 'الحالة')}</span> <span className="font-bold text-amber-600">{t('Pending Approval', 'في انتظار الموافقة')}</span></div>
                 </div>
               </div>
             )}
