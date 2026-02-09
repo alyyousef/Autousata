@@ -1,15 +1,15 @@
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const { Server } = require('socket.io');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const morgan = require('morgan');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
+const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const morgan = require("morgan");
+require("dotenv").config();
 
 // Import Middleware & DB
-const { errorHandler, notFound } = require('./middleware/errorMiddleware'); // ✅ Correct Import
-const db = require('./config/db');
+const { errorHandler, notFound } = require("./middleware/errorMiddleware");
+const db = require("./config/db");
 
 const app = express();
 const server = http.createServer(app);
@@ -19,26 +19,32 @@ const PORT = process.env.PORT || 5005;
 // 1. SOCKET.IO SETUP
 // =====================================================
 const io = new Server(server, {
-    cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:3000',
-        methods: ['GET', 'POST'],
-        credentials: true
-    },
-    transports: ['websocket', 'polling']
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ["websocket", "polling"],
 });
 
+// Export io instance for use in routes
+function getIO() {
+  return io;
+}
+module.exports = { getIO };
+
 // Attach IO to every request so controllers can use it
-app.set('io', io);
+app.set("io", io);
 
 // =====================================================
 // 2. SECURITY MIDDLEWARE (Helmet & Rate Limit)
 // =====================================================
-app.use(helmet()); 
+app.use(helmet());
 
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 100, 
-    message: { error: 'Too many requests from this IP, please try again later.' }
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Too many requests from this IP, please try again later." },
 });
 
 const authLimiter = rateLimit({
@@ -48,82 +54,115 @@ const authLimiter = rateLimit({
 });
 
 // Apply Global Limiter
-app.use('/api', globalLimiter);
+app.use("/api", globalLimiter);
 
 // =====================================================
 // 3. STANDARD MIDDLEWARE
 // =====================================================
 // Webhook route MUST come before express.json()
-const webhookRoutes = require('./routes/webhooks');
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+// Stripe needs the raw body for signature verification
+const webhookRoutes = require("./routes/webhooks");
+app.use(
+  "/api/webhooks",
+  express.raw({ type: "application/json" }),
+  webhookRoutes,
+);
 
-app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // HTTP Logger
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 
 // =====================================================
 // 4. ROUTES
 // =====================================================
-const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profile');
-const vehicleRoutes = require('./routes/vehicles');
-const auctionRoutes = require('./routes/auctions');
-const paymentRoutes = require('./routes/payments');
+const authRoutes = require("./routes/auth");
+const profileRoutes = require("./routes/profile");
+const vehicleRoutes = require("./routes/vehicles");
+const auctionRoutes = require("./routes/auctions");
+const paymentRoutes = require("./routes/payments");
+const adminAuthRoutes = require("./routes/adminAuth");
+const adminUsersRoutes = require("./routes/adminUsers");
+const adminContentRoutes = require("./routes/adminContent");
+const adminRoutes = require("./routes/admin");
 
-// Apply Routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/vehicles', vehicleRoutes);
-app.use('/api/auctions', auctionRoutes);
-app.use('/api/payments', paymentRoutes); // ✅ Defined exactly once here
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/auctions", auctionRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/admin/auth", adminAuthRoutes);
+app.use("/api/admin/users", adminUsersRoutes);
+app.use("/api/admin/content", adminContentRoutes);
+const adminFinanceRoutes = require("./routes/adminFinance");
+app.use("/api/admin/finance", adminFinanceRoutes);
+app.use("/api/admin", adminRoutes);
+
+// Stripe redirect handler for 3D Secure / hash router compatibility
+// Stripe cannot redirect to hash URLs, so we redirect here first
+app.get("/payment-redirect", (req, res) => {
+  const { listingId, paymentId, payment_intent, payment_intent_client_secret } =
+    req.query;
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  const params = new URLSearchParams();
+  if (payment_intent) params.set("payment_intent", payment_intent);
+  if (payment_intent_client_secret)
+    params.set("payment_intent_client_secret", payment_intent_client_secret);
+  if (paymentId) params.set("paymentId", paymentId);
+  const hash = `/payment/${listingId || "unknown"}/confirmation`;
+  const queryString = params.toString() ? `?${params.toString()}` : "";
+  res.redirect(`${clientUrl}/#${hash}${queryString}`);
+});
 
 // Test Route
-app.get('/', (req, res) => {
-    res.json({ status: 'Online', message: 'Server running on Port ' + PORT });
+app.get("/", (req, res) => {
+  res.json({ status: "Online", message: "Server is running on Port " + PORT });
 });
 
 // =====================================================
 // 5. ERROR HANDLING (Must be after routes)
 // =====================================================
-app.use(notFound);      // ✅ Catches 404s
-app.use(errorHandler);  // ✅ Catches Errors & ORA messages
+app.use(notFound);
+app.use(errorHandler);
 
 // =====================================================
 // 6. SERVER STARTUP
 // =====================================================
-const initializeAuctionSocket = require('./sockets/auctionSocket');
-const auctionScheduler = require('./services/auctionScheduler');
+const initializeAuctionSocket = require("./sockets/auctionSocket");
+const auctionScheduler = require("./services/auctionScheduler");
 
 async function startServer() {
-    try {
-        // A. Initialize Oracle Pool
-        await db.initialize();
+  try {
+    // A. Initialize Oracle Pool
+    await db.initialize();
 
-        // B. Initialize Socket Logic
-        initializeAuctionSocket(io);
+    // B. Initialize Socket Logic
+    initializeAuctionSocket(io);
+    console.log("[Socket.IO] Initialized");
 
-        // C. Start Scheduler
-        if (auctionScheduler.startScheduler) {
-             auctionScheduler.startScheduler(io);
-        } else {
-             console.log('⚠️ Warning: auctionScheduler.startScheduler not found');
-        }
-
-        // D. Start HTTP Server
-        server.listen(PORT, '0.0.0.0', () => {
-            console.log(`✅ Server started on http://localhost:${PORT}`);
-        });
-
-    } catch (err) {
-        console.error('❌ Failed to start server:', err);
-        process.exit(1);
+    // C. Start Scheduler
+    if (auctionScheduler.startScheduler) {
+      auctionScheduler.startScheduler(io);
+    } else {
+      console.log("⚠️ Warning: auctionScheduler.startScheduler not found");
     }
+
+    // D. Start HTTP Server
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`✅ Server started on http://localhost:${PORT}`);
+      console.log(`Socket.IO listening on ws://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  }
 }
 
 process.on('SIGINT', async () => {

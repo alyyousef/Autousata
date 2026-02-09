@@ -6,13 +6,12 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Tag,
   Trophy,
   Gavel,
   Truck
 } from 'lucide-react';
-import { fetchLandingStats, fetchLandingTeasers } from '../mockApi';
 import { LandingStats, Vehicle } from '../types';
-import placeholderImage from '../../assests/frontendPictures/placeHolder.jpg';
 import rrTwoImage from '../../assests/carsPictures/RRTwo.jpg';
 import rrOneImage from '../../assests/carsPictures/RROne.jpg';
 import mcLarenImage from '../../assests/carsPictures/McLaren.avif';
@@ -21,7 +20,7 @@ import bugattiOneImage from '../../assests/carsPictures/bugattiOne.jpg';
 import bmwI8Image from '../../assests/carsPictures/BmwI8.jpg';
 import ferrariGif from '../../assests/carsPictures/ferrariGIF.gif';
 import porscheGif from '../../assests/carsPictures/porscheGif.gif';
-import { MOCK_AUCTIONS } from '../constants';
+import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const heroSlides = [
@@ -132,11 +131,15 @@ const LandingPage: React.FC = () => {
 
     try {
       const [statsResponse, vehicleResponse] = await Promise.all([
-        fetchLandingStats(),
-        fetchLandingTeasers()
+        apiService.getLandingStats(),
+        apiService.getFeaturedVehicles()
       ]);
-      setStats(statsResponse);
-      setVehicles(vehicleResponse);
+      if (statsResponse.data) {
+        setStats(statsResponse.data);
+      }
+      if (vehicleResponse.data) {
+        setVehicles(vehicleResponse.data.vehicles as Vehicle[]);
+      }
     } catch (err) {
       setError(t('We could not load the latest featured vehicles. Please try again.', 'تعذر تحميل السيارات المميزة حاليا. يرجى المحاولة مرة اخرى.'));
     } finally {
@@ -329,7 +332,7 @@ const LandingPage: React.FC = () => {
                       <StatCard label={t('Active listings', 'قوائم نشطة')} value={formatNumber(stats.activeListings)} />
                       <StatCard label={t('AVERAGE time to sell', 'متوسط وقت البيع')} value={formatAvgTimeToSell(stats.avgTimeToSell)} />
                       <StatCard label={t('Escrow protected', 'حماية الاسكرو')} value={stats.escrowProtected} />
-                      <StatCard label={t('Qualified buyers', 'مشترون مؤهلون')} value={formatNumber(86)} />
+                      <StatCard label={t('Sold vehicles', 'سيارات تم بيعها')} value={formatNumber(stats.soldVehicles ?? 0)} />
                     </>
                   ) : (
                     Array.from({ length: 4 }).map((_, index) => (
@@ -442,12 +445,11 @@ const LandingPage: React.FC = () => {
             ) : (
               <div className="grid gap-6 md:grid-cols-3">
                 {vehicles.map(vehicle => {
-                  const matchedAuction = MOCK_AUCTIONS.find(auction => auction.vehicle.id === vehicle.id);
                   return (
                     <VehicleCard
                       key={vehicle.id}
                       vehicle={vehicle}
-                      listingId={matchedAuction?.id ?? vehicle.id}
+                      listingId={vehicle.id}
                     />
                   );
                 })}
@@ -541,15 +543,21 @@ const VehicleCard: React.FC<{ vehicle: Vehicle; listingId: string }> = ({ vehicl
       aria-label={t(`View listing for ${vehicle.year} ${vehicle.make} ${vehicle.model}`, `عرض القائمة لسيارة ${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
     >
       <div className="relative">
-        <img
-          src={vehicle.images?.[0] || placeholderImage}
-          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-          className="h-52 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        />
+        {vehicle.images?.[0] ? (
+          <img
+            src={vehicle.images[0]}
+            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+            className="h-52 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="h-52 w-full bg-slate-100 flex items-center justify-center text-slate-300">
+            <Tag size={48} />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-950/10 to-transparent" />
         <div className="absolute left-4 bottom-4">
           <span className="inline-flex items-center rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.28em] text-slate-900 shadow-sm ring-1 ring-slate-200/80">
-            {t('Live auction', 'مزاد مباشر')}
+            {t('Featured', 'مميزة')}
           </span>
         </div>
       </div>

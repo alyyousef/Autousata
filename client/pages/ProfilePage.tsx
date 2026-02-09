@@ -5,10 +5,12 @@ import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
 import { AuctionStatus, VehicleStatus } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const [isEditing, setIsEditing] = useState(false);
   
@@ -80,7 +82,7 @@ const ProfilePage: React.FC = () => {
     }
   }, [user]);
 
-  // 3. Load Seller Listings
+// 3. Load Seller Listings
   useEffect(() => {
     let isMounted = true;
 
@@ -96,16 +98,16 @@ const ProfilePage: React.FC = () => {
 
       try {
         const [vehiclesResponse, auctionsResponse] = await Promise.all([
-            apiService.getSellerVehicles(),
-            apiService.getSellerAuctions()
+          apiService.getSellerVehicles(),
+          apiService.getSellerAuctions()
         ]);
 
         if (!isMounted) return;
 
         if (vehiclesResponse.error) {
-            setListingsError(vehiclesResponse.error);
-            setSellerListings([]);
-            return;
+          setListingsError(vehiclesResponse.error);
+          setSellerListings([]);
+          return;
         }
 
         const vehicles = vehiclesResponse.data || [];
@@ -117,51 +119,51 @@ const ProfilePage: React.FC = () => {
         // Fetch missing vehicles if needed
         const missingVehicleIds = Array.from(auctionMap.keys()).filter((vehicleId) => !vehicleMap.has(vehicleId));
         if (missingVehicleIds.length > 0) {
-            const fetchedVehicles = await Promise.all(
+          const fetchedVehicles = await Promise.all(
             missingVehicleIds.map((vehicleId) => apiService.getVehicleById(vehicleId))
-            );
+          );
 
-            fetchedVehicles.forEach((response) => {
+          fetchedVehicles.forEach((response) => {
             if (response.data) {
-                const vehicleId = response.data._id || response.data.id;
-                if (vehicleId) {
+              const vehicleId = response.data._id || response.data.id;
+              if (vehicleId) {
                 vehicleMap.set(vehicleId, response.data);
-                }
+              }
             }
-            });
+          });
         }
 
         const listings = Array.from(vehicleMap.values()).map((vehicle: any) => {
-            const vehicleId = vehicle._id || vehicle.id;
-            const auction = auctionMap.get(vehicleId);
-            return {
+          const vehicleId = vehicle._id || vehicle.id;
+          const auction = auctionMap.get(vehicleId);
+          return {
             id: vehicleId,
             vehicle: {
-                id: vehicleId,
-                make: vehicle?.make,
-                model: vehicle?.model,
-                year: vehicle?.year,
-                price: vehicle?.price,
-                status: vehicle?.status,
-                images: vehicle?.images || []
+              id: vehicleId,
+              make: vehicle?.make,
+              model: vehicle?.model,
+              year: vehicle?.year,
+              price: vehicle?.price,
+              status: vehicle?.status,
+              images: vehicle?.images || []
             },
             auctionStatus: auction?.status
-            };
+          };
         });
 
         setSellerListings(listings);
         if (auctionsResponse.error) {
-            setListingsError(auctionsResponse.error);
+          setListingsError(auctionsResponse.error);
         }
       } catch (err) {
-        if(isMounted) setListingsError("Failed to load listings");
+        if (isMounted) setListingsError('Failed to load listings');
       } finally {
-        if(isMounted) setListingsLoading(false);
+        if (isMounted) setListingsLoading(false);
       }
     };
 
     if (user) {
-        loadSellerListings();
+      loadSellerListings();
     }
 
     return () => {
@@ -169,7 +171,7 @@ const ProfilePage: React.FC = () => {
     };
   }, [user]);
 
-  // 4. Return early if loading or no user
+// 4. Return early if loading or no user
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -325,7 +327,7 @@ const ProfilePage: React.FC = () => {
     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
   };
 
-  const renderKycBadge = () => {
+const renderKycBadge = () => {
     const status = user.kycStatus || 'not_uploaded';
     switch (status) {
       case 'approved':
@@ -632,38 +634,28 @@ const ProfilePage: React.FC = () => {
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-black text-slate-900">My Listings</h3>
-                {(user.role === 'SELLER' || user.role === 'DEALER') && (
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                    {sellerListings.length} total
-                  </span>
-                )}
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                  {sellerListings.length} total
+                </span>
               </div>
 
-              {(user.role !== 'SELLER' && user.role !== 'DEALER') && (
-                <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
-                  Listings are available for sellers only.
+              {listingsLoading && (
+                <div className="text-sm text-slate-500">Loading your listings...</div>
+              )}
+
+              {!listingsLoading && listingsError && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
+                  {listingsError}
                 </div>
               )}
 
-              {(user.role === 'SELLER' || user.role === 'DEALER') && (
-                <>
-                  {listingsLoading && (
-                    <div className="text-sm text-slate-500">Loading your listings...</div>
-                  )}
+              {!listingsLoading && !listingsError && sellerListings.length === 0 && (
+                <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
+                  You have no listings yet.
+                </div>
+              )}
 
-                  {!listingsLoading && listingsError && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
-                      {listingsError}
-                    </div>
-                  )}
-
-                  {!listingsLoading && !listingsError && sellerListings.length === 0 && (
-                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
-                      You have no listings yet.
-                    </div>
-                  )}
-
-                  {!listingsLoading && sellerListings.length > 0 && (
+              {!listingsLoading && sellerListings.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {sellerListings.map((listing) => {
                         const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
@@ -705,36 +697,16 @@ const ProfilePage: React.FC = () => {
                         );
                       })}
                     </div>
-                  )}
-                </>
               )}
             </div>
 
             {/* Recent Activity Section */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
-              <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
-              <div className="space-y-4">
-                {[
-                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: 'EGP 95,000' },
-                  { action: 'Listing Created', target: '2022 Audi RS6', date: 'Yesterday', amount: 'N/A' },
-                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: 'EGP 68,500' }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                        <ExternalLink size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900">{item.action}: {item.target}</h4>
-                        <p className="text-xs text-slate-500">{item.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-900">{item.amount}</p>
-                      <ChevronRight size={16} className="text-slate-300 ml-auto mt-1" />
-                    </div>
-                  </div>
-                ))}
+              <h3 className="text-xl font-black text-slate-900 mb-8">{t('Recent Activity', 'النشاط الأخير')}</h3>
+              <div className="text-center py-8 text-slate-400">
+                <ExternalLink size={32} className="mx-auto mb-3 text-slate-300" />
+                <p className="font-semibold text-slate-500">{t('No recent activity', 'لا يوجد نشاط حديث')}</p>
+                <p className="text-sm mt-1">{t('Your bids, purchases, and listings will appear here.', 'ستظهر مزايداتك ومشترياتك وقوائمك هنا.')}</p>
               </div>
             </div>
 

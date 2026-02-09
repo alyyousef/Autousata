@@ -15,9 +15,10 @@ const oracledb = require('oracledb');
 /**
  * Authenticate socket connection
  * @param {Object} socket - Socket instance
- * @returns {Object|null} - Decoded user object or null
+ * @returns {Promise<Object|null>} - User object { id, role } or null
  */
-function authenticateSocket(socket) {
+async function authenticateSocket(socket) {
+  let connection;
   try {
     const token = socket.handshake.auth.token || socket.handshake.query.token;
 
@@ -26,10 +27,41 @@ function authenticateSocket(socket) {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded.user;
+    const userId = decoded.userId;
+
+    if (!userId) {
+      console.error('Socket auth: no userId in token payload');
+      return null;
+    }
+
+    // Fetch user from DB (same as HTTP auth middleware)
+    connection = await db.getConnection();
+    const result = await connection.execute(
+      `SELECT ID, ROLE, IS_ACTIVE, IS_BANNED FROM USERS WHERE ID = :userId`,
+      { userId },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      console.error('Socket auth: user not found for userId', userId);
+      return null;
+    }
+
+    const user = result.rows[0];
+
+    if (user.IS_BANNED === 'Y' || user.IS_ACTIVE === 'N') {
+      console.error('Socket auth: user is banned or inactive', userId);
+      return null;
+    }
+
+    return { id: user.ID, role: user.ROLE };
   } catch (err) {
     console.error('Socket authentication error:', err.message);
     return null;
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) { /* ignore */ }
+    }
   }
 }
 
@@ -103,7 +135,7 @@ function initializeAuctionSocket(io) {
     console.log(`[Socket.IO] New connection: ${socket.id}`);
 
     // Authenticate user
-    const user = authenticateSocket(socket);
+    const user = await authenticateSocket(socket);
     if (!user) {
       console.log(`[Socket.IO] Unauthenticated connection rejected: ${socket.id}`);
       socket.emit('error', { message: 'Authentication required' });

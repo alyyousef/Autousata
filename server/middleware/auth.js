@@ -1,25 +1,33 @@
-const jwt = require('jsonwebtoken');
-const oracledb = require('oracledb');
-require('dotenv').config();
+const jwt = require("jsonwebtoken");
+const oracledb = require("oracledb");
+require("dotenv").config();
 
-const ACCESS_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
-const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
-const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
+const ACCESS_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "default-refresh-secret";
+const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+const LEGACY_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "30d";
 
 // =========================================================
 // 1. GENERATE TOKEN (Legacy support)
 // =========================================================
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: LEGACY_TOKEN_EXPIRES_IN });
+  return jwt.sign({ userId }, ACCESS_SECRET, {
+    expiresIn: LEGACY_TOKEN_EXPIRES_IN,
+  });
 };
 
 // =========================================================
 // 2. GENERATE TOKENS (Access + Refresh)
 // =========================================================
 const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
-  const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '7d' });
+  const accessToken = jwt.sign({ userId }, ACCESS_SECRET, {
+    expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+  });
+  const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
   return { accessToken, refreshToken };
 };
 
@@ -40,71 +48,81 @@ const verifyRefreshToken = (token) => {
 const authenticate = async (req, res, next) => {
   let connection;
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ error: "No token provided" });
     }
 
     // Verify Access Token
     const decoded = jwt.verify(token, ACCESS_SECRET);
-    
+
     connection = await oracledb.getConnection();
 
-    // === UPDATED PROCEDURE CALL ===
-    // Added :ver to catch the verification status
+    // DIRECT SQL QUERY instead of stored procedure
     const result = await connection.execute(
-      `BEGIN 
-         sp_get_user_by_id(:id, :fn, :ln, :em, :ph, :role, :status, :pic, :city, :ver); 
-       END;`,
-      {
-        id: decoded.userId,
-        fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        em: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        ph: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        pic: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        city: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-        ver: { dir: oracledb.BIND_OUT, type: oracledb.STRING } // <--- CATCH VERIFICATION STATUS
-      }
+      `SELECT 
+        ID,
+        FIRST_NAME || ' ' || LAST_NAME AS NAME,
+        EMAIL,
+        ROLE,
+        IS_ACTIVE,
+        IS_BANNED
+      FROM USERS
+      WHERE ID = :userId`,
+      { userId: decoded.userId },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
 
-    const userData = result.outBinds;
+    console.log("📊 Query returned", result.rows?.length || 0, "rows");
 
-    if (userData.status === 'NOT_FOUND') {
-      return res.status(401).json({ error: 'User not found' });
+    // Check if user exists
+    if (!result.rows || result.rows.length === 0) {
+      console.error("❌ User not found. ID:", decoded.userId);
+      return res.status(401).json({ error: "User not found" });
     }
 
-    // === DATA MAPPING ===
+    const user = result.rows[0];
+    console.log("👤 User found:", user.EMAIL, "| Role:", user.ROLE);
+
+    // Check if user is banned or inactive
+    if (user.IS_BANNED === "1") {
+      console.error("🚫 User is banned");
+      return res.status(401).json({ error: "Account is banned" });
+    }
+
+    if (user.IS_ACTIVE === "0") {
+      console.error("⏸️ User is inactive");
+      return res.status(401).json({ error: "Account is inactive" });
+    }
+
+    // Attach user info to the request object
     req.user = {
-      id: decoded.userId,
-      firstName: userData.fn,
-      lastName: userData.ln,
-      email: userData.em,
-      phone: userData.ph,
-      role: userData.role,
-      profileImage: userData.pic,
-      location: {
-        city: userData.city
-      },
-      // Convert '1' to true, '0' to false
-      emailVerified: userData.ver === '1' 
+      _id: user.ID,
+      id: user.ID,
+      name: user.NAME,
+      email: user.EMAIL,
+      role: user.ROLE,
     };
-    
-    req.token = token;
-    next();
 
+    req.token = token;
+    console.log("✅ Auth success:", user.EMAIL);
+    next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ error: 'TokenExpired', message: 'Access token expired' });
+    if (error.name === "TokenExpiredError") {
+      return res
+        .status(401)
+        .json({ error: "TokenExpired", message: "Access token expired" });
     }
-    console.error('Auth Middleware Error:', error.message);
-    res.status(401).json({ error: 'Invalid token' });
+    console.error("Auth Middleware Error:", error.message);
+    res.status(401).json({ error: "Invalid token" });
   } finally {
     if (connection) {
-      try { await connection.close(); } catch (e) { console.error(e); }
+      try {
+        await connection.close();
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 };
@@ -114,9 +132,21 @@ const authenticate = async (req, res, next) => {
 // =========================================================
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
     }
+
+    const userRole = String(req.user.role || "").toLowerCase();
+    const allowedRoles = roles.map((r) => String(r).toLowerCase());
+
+    console.log("🔑 Auth check - User:", userRole, "| Required:", allowedRoles);
+
+    if (!allowedRoles.includes(userRole)) {
+      console.error("❌ Insufficient permissions");
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    console.log("✅ Authorization passed");
     next();
   };
 };
@@ -126,5 +156,5 @@ module.exports = {
   generateTokens,
   verifyRefreshToken,
   authenticate,
-  authorize
+  authorize,
 };

@@ -7,27 +7,71 @@ const { rateLimitBid } = require('../middleware/rateLimiter');
 const bidProcessingService = require('../services/bidProcessingService');
 const { getIO } = require('../server');
 
-// POST /api/auctions - Create a new auction
+/**
+ * Safely parse the IMAGES column from the database.
+ * Handles: JSON arrays, plain URL strings, comma-separated URLs,
+ * null/undefined, CLOB objects, and malformed data.
+ * Always returns a string[] of image URLs.
+ */
+function parseImagesColumn(raw) {
+  if (!raw) return [];
+  let str = raw;
+  if (typeof raw !== 'string') {
+    try { str = String(raw); } catch { return []; }
+  }
+  str = str.trim();
+  if (!str) return [];
+  if (str.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => typeof item === 'string' && item.length > 0);
+      }
+    } catch { /* fall through */ }
+  }
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    return str.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  }
+  try {
+    const parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(item => typeof item === 'string' && item.length > 0);
+    }
+    if (typeof parsed === 'string' && parsed.startsWith('http')) {
+      return [parsed];
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
+// POST /api/auctions - Create a new auction (draft)
+// Accepts durationDays instead of startTime/endTime.
+// Actual start/end times are calculated when admin approves the vehicle.
 router.post('/', auth, async (req, res) => {
   let connection;
   try {
     const {
       vehicleId,
-      startTime,
-      endTime,
+      durationDays,
       startPrice,
       reservePrice
     } = req.body;
 
-    if (!vehicleId || !startTime || !endTime || startPrice === undefined || reservePrice === undefined) {
+    if (!vehicleId || startPrice === undefined || reservePrice === undefined) {
       return res.status(400).json({ msg: 'Missing required auction fields' });
     }
 
-    const startDate = new Date(startTime);
-    const endDate = new Date(endTime);
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-      return res.status(400).json({ msg: 'Invalid start or end time' });
+    // Validate durationDays — must be 1, 3, or 7
+    const validDurations = [1, 3, 7];
+    const duration = Number(durationDays) || 3;
+    if (!validDurations.includes(duration)) {
+      return res.status(400).json({ msg: 'Invalid duration. Must be 1, 3, or 7 days.' });
     }
+
+    // Placeholder dates — will be overwritten on admin approval
+    // IMPORTANT: END_TIME must be > START_TIME to satisfy CHK_AUCT_DATES constraint
+    const placeholderStart = new Date();
+    const placeholderEnd = new Date(placeholderStart.getTime() + (duration * 24 * 60 * 60 * 1000)); // duration days later
 
     connection = await oracledb.getConnection();
 
@@ -70,6 +114,7 @@ router.post('/', auth, async (req, res) => {
         start_time,
         end_time,
         original_end_time,
+        duration_days,
         reserve_price_egp,
         starting_bid_egp,
         current_bid_egp,
@@ -87,6 +132,7 @@ router.post('/', auth, async (req, res) => {
         :startTime,
         :endTime,
         :originalEndTime,
+        :durationDays,
         :reservePriceEgp,
         :startingBidEgp,
         :currentBid,
@@ -102,9 +148,10 @@ router.post('/', auth, async (req, res) => {
         vehicleId,
         sellerId: req.user.id,
         status: 'draft',
-        startTime: startDate,
-        endTime: endDate,
-        originalEndTime: endDate,
+        startTime: placeholderStart,
+        endTime: placeholderEnd,
+        originalEndTime: placeholderEnd,
+        durationDays: duration,
         reservePriceEgp: Number(reservePrice) || 0,
         startingBidEgp: startBid,
         currentBid: startBid,
@@ -122,9 +169,7 @@ router.post('/', auth, async (req, res) => {
       _id: auctionId,
       vehicleId,
       sellerId: req.user.id,
-      startTime: startDate,
-      endTime: endDate,
-      originalEndTime: endDate,
+      durationDays: duration,
       startPrice: startBid,
       reservePrice: Number(reservePrice) || 0,
       currentBid: startBid,
@@ -208,6 +253,7 @@ router.get('/', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
+        v.images,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
@@ -244,6 +290,8 @@ router.get('/', async (req, res) => {
         poor: 'Poor'
       };
 
+      let images = parseImagesColumn(row.IMAGES);
+
       return {
         _id: row.AUCTION_ID,
         vehicleId: {
@@ -255,7 +303,7 @@ router.get('/', async (req, res) => {
           vin: row.VIN,
           condition: conditionMap[conditionValue] || 'Good',
           description: row.DESCRIPTION || '',
-          images: [],
+          images,
           location: row.LOCATION_CITY || '',
           features
         },
@@ -364,6 +412,7 @@ router.get('/:id', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
+        v.images,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
@@ -398,6 +447,8 @@ router.get('/:id', async (req, res) => {
       poor: 'Poor'
     };
 
+    let images = parseImagesColumn(row.IMAGES);
+
     res.json({
       _id: row.AUCTION_ID,
       vehicleId: {
@@ -409,7 +460,7 @@ router.get('/:id', async (req, res) => {
         vin: row.VIN,
         condition: conditionMap[conditionValue] || 'Good',
         description: row.DESCRIPTION || '',
-        images: [],
+        images,
         location: row.LOCATION_CITY || '',
         features
       },
