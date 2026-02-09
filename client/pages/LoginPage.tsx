@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import bugattiGif from '../../assests/carsPictures/buggatiG.gif';
@@ -34,7 +35,14 @@ const LoginPage: React.FC = () => {
     const result = await login(email, password);
 
     if (result.success) {
-      navigate('/browse');
+      const role = result.user?.role;
+      if (role === UserRole.ADMIN) {
+        navigate('/admin');
+      } else if (role === UserRole.SELLER || role === UserRole.DEALER) {
+        navigate('/dashboard');
+      } else {
+        navigate('/browse');
+      }
     } else {
       setError(result.error || t('Login failed', 'فشل تسجيل الدخول'));
     }

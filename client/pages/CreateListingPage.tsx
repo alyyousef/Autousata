@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Camera, Car, MapPin, DollarSign, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
-import { geminiService } from '../geminiService'; 
+import axios from 'axios';
+import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
+import { geminiService } from '../geminiService'; // Keeping AI service
 import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
@@ -51,11 +52,13 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     features: z.array(z.string()).default([]),
     images: z.array(z.string()).min(1, t('Add at least one photo', 'اضف صورة واحدة على الاقل')),
 
-    // Step 3: Pricing & Location (Auction Config)
+    // Step 3: Pricing & Sale Type
     location: z.string().min(1, t('Location is required', 'الموقع مطلوب')),
-    reservePrice: z.coerce.number().min(1, t('Reserve price is required', 'سعر الحجز مطلوب')),
-    startingBid: z.coerce.number().min(1, t('Starting bid is required', 'سعر البداية مطلوب')),
-    startTime: z.string().optional(),
+    saleType: z.enum(['fixed_price', 'auction']).default('fixed_price'),
+    price: z.coerce.number().min(1, t('Price is required', 'السعر مطلوب')),
+    // Auction-only fields (required when saleType === 'auction')
+    reservePrice: z.coerce.number().optional(),
+    startingBid: z.coerce.number().optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
     // AI Notes
@@ -86,7 +89,19 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
         message: t('Letters only (no numbers or symbols)', 'حروف فقط بدون أرقام أو رموز')
       });
     }
-  });
+  })
+  .refine(
+    (data) => {
+      if (data.saleType === 'auction') {
+        return (data.startingBid ?? 0) >= 1 && (data.reservePrice ?? 0) >= 1;
+      }
+      return true;
+    },
+    {
+      message: t('Starting bid and reserve price are required for auctions', 'سعر البداية وسعر الحجز مطلوبين للمزاد'),
+      path: ['startingBid'],
+    }
+  );
 
 type ListingFormInput = z.input<ReturnType<typeof createListingSchema>>;
 type ListingFormData = z.infer<ReturnType<typeof createListingSchema>>;
@@ -153,6 +168,7 @@ const CreateListingPage: React.FC = () => {
       seats: 5,
       features: [],
       images: [],
+      saleType: 'fixed_price',
       durationDays: '3',
       mileage: 0,
       year: new Date().getFullYear(),
@@ -242,7 +258,12 @@ const CreateListingPage: React.FC = () => {
     } else if (targetStep === 2) {
       fieldsToValidate = ['description', 'images'];
     } else if (targetStep === 3) {
-      fieldsToValidate = ['location', 'startingBid', 'reservePrice'];
+      const currentSaleType = getValues('saleType');
+      if (currentSaleType === 'auction') {
+        fieldsToValidate = ['location', 'price', 'startingBid', 'reservePrice'];
+      } else {
+        fieldsToValidate = ['location', 'price'];
+      }
     }
 
     const isStepValid = await trigger(fieldsToValidate);
@@ -256,14 +277,19 @@ const CreateListingPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const normalizedMileage = Number(data.mileage) || 0;
-      const normalizedReservePrice = Number(data.reservePrice) || 0;
-      const normalizedStartingBid = Number(data.startingBid) || 0;
-      const startDate = data.startTime ? new Date(data.startTime) : new Date();
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + parseInt(data.durationDays));
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setSubmitError(t('Please log in before creating a listing', 'يرجى تسجيل الدخول قبل انشاء اعلان'));
+        return;
+      }
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-      // 1. Create Vehicle
+      const normalizedMileage = Number(data.mileage) || 0;
+      const normalizedPrice = Number(data.price) || 0;
+      const isAuction = data.saleType === 'auction';
+
+      // 1. Create Vehicle (always)
       const vehiclePayload = {
         make: data.make === 'other' ? (data.customMake ?? '').trim() : data.make,
         model: data.model,
@@ -278,8 +304,7 @@ const CreateListingPage: React.FC = () => {
         fuelType: data.fuelType,
         seats: data.seats,
         condition: data.condition,
-        price: normalizedReservePrice,
-        reservePrice: normalizedReservePrice,
+        price: isAuction ? Number(data.reservePrice) || normalizedPrice : normalizedPrice,
         description: data.description,
         location: data.location,
         features: data.features,
@@ -295,20 +320,16 @@ const CreateListingPage: React.FC = () => {
       
       const vehicleId = vehicleRes.data._id;
 
-      // 2. Create Auction
-      const auctionPayload = {
-        vehicleId: vehicleId,
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
-        startPrice: normalizedStartingBid,
-        reservePrice: normalizedReservePrice
-      };
+      // 2. Create Auction ONLY if sale type is 'auction'
+      if (isAuction) {
+        const auctionPayload = {
+          vehicleId: vehicleId,
+          durationDays: parseInt(data.durationDays),
+          startPrice: Number(data.startingBid) || 0,
+          reservePrice: Number(data.reservePrice) || normalizedPrice
+        };
 
-      // ✅ FIX 4: Use apiService for auction (Handles Token correctly)
-      const auctionRes = await apiService.createAuction(auctionPayload);
-
-      if (auctionRes.error) {
-         throw new Error(auctionRes.error || t('Failed to create auction', 'فشل انشاء المزاد'));
+        await axios.post(`${baseUrl}/auctions`, auctionPayload, config);
       }
 
       // Success
@@ -712,53 +733,104 @@ const CreateListingPage: React.FC = () => {
               </div>
             )}
 
-            {/* STEP 3: AUCTION CONFIG */}
+            {/* STEP 3: PRICING & SALE TYPE */}
             {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">{t('Auction Settings', 'اعدادات المزاد')}</h2>
-                  <p className="text-slate-500">{t('Set your price and duration', 'حدد السعر والمدة')}</p>
+                  <h2 className="text-2xl font-black text-slate-900">{t('Pricing & Sale Type', 'السعر ونوع البيع')}</h2>
+                  <p className="text-slate-500">{t('Choose how you want to sell your vehicle', 'اختر طريقة بيع سيارتك')}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Starting Bid', 'سعر البداية')}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
-                      <input 
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        onKeyDown={blockInvalidNumberInput}
-                        placeholder={t('50000', '50000')}
-                        {...register('startingBid')}
-                        className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.startingBid ? "border-rose-300" : "border-slate-200")}
-                      />
-                    </div>
-                    {errors.startingBid && <p className="text-xs text-rose-600">{errors.startingBid.message}</p>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Reserve Price', 'سعر الحجز')}</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
-                      <input 
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        onKeyDown={blockInvalidNumberInput}
-                        placeholder={t('90000', '90000')}
-                        {...register('reservePrice')}
-                        className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.reservePrice ? "border-rose-300" : "border-slate-200")}
-                      />
-                    </div>
-                    {errors.reservePrice && <p className="text-xs text-rose-600">{errors.reservePrice.message}</p>}
+                {/* Sale Type Toggle */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Sale Type', 'نوع البيع')}</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className={cn(
+                      "flex flex-col items-center justify-center p-5 rounded-xl border-2 cursor-pointer transition-all",
+                      formData.saleType === 'fixed_price' ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-slate-200 hover:border-slate-300"
+                    )}>
+                      <input type="radio" value="fixed_price" {...register('saleType')} className="hidden" />
+                      <Tag size={24} className="mb-2" />
+                      <span className="text-sm font-bold">{t('Fixed Price', 'سعر ثابت')}</span>
+                      <span className="text-xs text-slate-500 mt-1 text-center">{t('Sell at a set price', 'بيع بسعر محدد')}</span>
+                    </label>
+                    <label className={cn(
+                      "flex flex-col items-center justify-center p-5 rounded-xl border-2 cursor-pointer transition-all",
+                      formData.saleType === 'auction' ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
+                    )}>
+                      <input type="radio" value="auction" {...register('saleType')} className="hidden" />
+                      <DollarSign size={24} className="mb-2" />
+                      <span className="text-sm font-bold">{t('Auction', 'مزاد')}</span>
+                      <span className="text-xs text-slate-500 mt-1 text-center">{t('Let buyers bid competitively', 'دع المشترين يتنافسون')}</span>
+                    </label>
                   </div>
                 </div>
+
+                {/* Price (always shown) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    {formData.saleType === 'auction' ? t('Reserve Price', 'سعر الحجز') : t('Asking Price', 'السعر المطلوب')}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                    <input 
+                      type="number"
+                      {...register('price')}
+                      className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.price ? "border-rose-300" : "border-slate-200")}
+                    />
+                  </div>
+                  {errors.price && <p className="text-xs text-rose-600">{errors.price.message}</p>}
+                  {formData.saleType === 'fixed_price' && (
+                    <p className="text-xs text-slate-400">{t('Buyers will purchase at this exact price', 'المشترون سيشترون بهذا السعر بالضبط')}</p>
+                  )}
+                </div>
+
+                {/* Auction-only fields */}
+                {formData.saleType === 'auction' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Starting Bid', 'سعر البداية')}</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                        <input 
+                          type="number"
+                          {...register('startingBid')}
+                          className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.startingBid ? "border-rose-300" : "border-slate-200")}
+                        />
+                      </div>
+                      {errors.startingBid && <p className="text-xs text-rose-600">{errors.startingBid.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Reserve Price', 'سعر الحجز')}</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{isArabic ? 'ج م' : 'EGP'}</span>
+                        <input 
+                          type="number"
+                          {...register('reservePrice')}
+                          className={cn("w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.reservePrice ? "border-rose-300" : "border-slate-200")}
+                        />
+                      </div>
+                      {errors.reservePrice && <p className="text-xs text-rose-600">{errors.reservePrice.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Auction Duration', 'مدة المزاد')}</label>
+                      <div className="grid grid-cols-3 gap-4">
+                        {['1', '3', '7'].map((days) => (
+                          <label key={days} className={cn(
+                            "flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all",
+                            formData.durationDays === days ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
+                          )}>
+                            <input type="radio" value={days} {...register('durationDays')} className="hidden" />
+                            <span className="text-lg font-bold">{formatNumber(Number(days))} {t('Days', 'ايام')}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400">{t('Duration starts when admin approves your listing', 'المدة تبدأ عند موافقة المسؤول على اعلانك')}</p>
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Location (City)', 'الموقع المدينة')}</label>
@@ -773,21 +845,6 @@ const CreateListingPage: React.FC = () => {
                   </div>
                   {errors.location && <p className="text-xs text-rose-600">{errors.location.message}</p>}
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Auction Duration', 'مدة المزاد')}</label>
-                  <div className="grid grid-cols-3 gap-4">
-                    {['1', '3', '7'].map((days) => (
-                      <label key={days} className={cn(
-                        "flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all",
-                        formData.durationDays === days ? "border-indigo-600 bg-indigo-50 text-indigo-700" : "border-slate-200 hover:border-slate-300"
-                      )}>
-                        <input type="radio" value={days} {...register('durationDays')} className="hidden" />
-                        <span className="text-lg font-bold">{formatNumber(Number(days))} {t('Days', 'ايام')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -799,16 +856,23 @@ const CreateListingPage: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900">{t('Ready to Submit?', 'جاهز للارسال')}</h2>
                 <p className="text-slate-500 max-w-md mx-auto">
-                  {t(
-                    'Your vehicle will be submitted for admin approval. Once approved, the auction will be scheduled.',
-                    'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيتم جدولة المزاد'
-                  )}
+                  {formData.saleType === 'auction'
+                    ? t('Your vehicle will be submitted for admin approval. Once approved, the auction will go live.', 'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيبدأ المزاد')
+                    : t('Your vehicle will be submitted for admin approval. Once approved, it will be listed for sale.', 'سيتم ارسال سيارتك للمراجعة وبعد الموافقة سيتم عرضها للبيع')
+                  }
                 </p>
                 <div className="bg-slate-50 rounded-2xl p-6 text-left max-w-sm mx-auto space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Vehicle', 'السيارة')}</span> <span className="font-bold">{formatNumber(formData.year)} {resolvedMake || formData.make} {formData.model}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Reserve', 'الحجز')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.reservePrice))}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Duration', 'المدة')}</span> <span className="font-bold">{formatNumber(Number(formData.durationDays))} {t('Days', 'ايام')}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{t('Status', 'الحالة')}</span> <span className="font-bold text-amber-600">{t('Pending Inspection', 'قيد الفحص')}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Vehicle', 'السيارة')}</span> <span className="font-bold">{formatNumber(Number(formData.year))} {resolvedMake || formData.make} {formData.model}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Sale Type', 'نوع البيع')}</span> <span className="font-bold">{formData.saleType === 'auction' ? t('Auction', 'مزاد') : t('Fixed Price', 'سعر ثابت')}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Price', 'السعر')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.price))}</span></div>
+                  {formData.saleType === 'auction' && (
+                    <>
+                      <div className="flex justify-between"><span className="text-slate-400">{t('Starting Bid', 'سعر البداية')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.startingBid))}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">{t('Reserve', 'الحجز')}</span> <span className="font-bold">{formatCurrencyEGP(Number(formData.reservePrice))}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">{t('Duration', 'المدة')}</span> <span className="font-bold">{formatNumber(Number(formData.durationDays))} {t('Days', 'ايام')}</span></div>
+                    </>
+                  )}
+                  <div className="flex justify-between"><span className="text-slate-400">{t('Status', 'الحالة')}</span> <span className="font-bold text-amber-600">{t('Pending Approval', 'في انتظار الموافقة')}</span></div>
                 </div>
               </div>
             )}

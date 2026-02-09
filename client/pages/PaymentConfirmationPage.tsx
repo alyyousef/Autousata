@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, MapPin, Loader2, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const PaymentConfirmationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const { addNotification } = useNotifications();
   const { t } = useLanguage();
   
@@ -21,21 +22,43 @@ const PaymentConfirmationPage: React.FC = () => {
   useEffect(() => {
     const fetchPaymentDetails = async () => {
       if (!id) {
-        setError(t('No auction ID provided', 'مفيش رقم مزاد'));
+        setError(t('No listing ID provided', 'مفيش رقم قائمة'));
         setIsLoading(false);
         return;
       }
 
       try {
-        const response = await apiService.getPaymentByAuction(id);
+        // Check if we have a stored paymentId (from PaymentPage)
+        const storedPaymentId = sessionStorage.getItem(`payment_${id}`);
 
-        if (response.error) {
+        // If Stripe redirected back with payment_intent, confirm first
+        const stripePaymentIntent = searchParams.get('payment_intent');
+        if (stripePaymentIntent && storedPaymentId) {
+          try {
+            await apiService.confirmPayment(storedPaymentId);
+          } catch (confirmErr) {
+            console.warn('Post-redirect confirm failed (webhook may handle):', confirmErr);
+          }
+        }
+
+        // Try fetching payment by stored paymentId first, then fall back to auction lookup
+        let response;
+        if (storedPaymentId) {
+          response = await apiService.getPaymentById(storedPaymentId);
+        }
+
+        if (!response?.data?.payment) {
+          // Fallback: try by auction ID (for auction purchases)
+          response = await apiService.getPaymentByAuction(id);
+        }
+
+        if (response?.error) {
           setError(response.error);
           setIsLoading(false);
           return;
         }
 
-        if (response.data) {
+        if (response?.data) {
           setPayment(response.data.payment);
           
           // Show success notification once
@@ -58,7 +81,7 @@ const PaymentConfirmationPage: React.FC = () => {
     };
 
     fetchPaymentDetails();
-  }, [id, addNotification, mockAuction, t]);
+  }, [id, searchParams, addNotification, mockAuction, t]);
 
   // Loading state
   if (isLoading) {
