@@ -530,17 +530,55 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/kyc/pending', {
+  const response = await fetch('http://localhost:5000/api/admin/content/kyc', {
     method: 'GET',
     headers,
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch pending KYC documents');
+    throw new Error('Failed to fetch KYC documents');
   }
 
   const data = await response.json();
-  return data.kycDocuments || data || [];
+  return data.data || [];
+};
+
+export const searchKYC = async (searchTerm: string, token?: string): Promise<KYCDocument[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/search?searchTerm=${encodeURIComponent(searchTerm)}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search KYC documents');
+  }
+
+  const data = await response.json();
+  return data.data || [];
+};
+
+export const filterKYC = async (status: string, token?: string): Promise<KYCDocument[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/filter?status=${encodeURIComponent(status)}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to filter KYC documents');
+  }
+
+  const data = await response.json();
+  return data.data || [];
 };
 
 export const approveKYC = async (kycId: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
@@ -595,6 +633,8 @@ export const rejectKYC = async (kycId: string, reason: string, token?: string): 
     return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
   }
 };
+
+
 
 export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
   const headers: HeadersInit = {};

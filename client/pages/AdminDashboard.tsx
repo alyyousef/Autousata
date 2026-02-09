@@ -6,7 +6,7 @@ import {
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3, Download, Eye
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, updateKYC, viewuser, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, searchKYC, filterKYC, updateKYC, viewuser, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -28,6 +28,8 @@ const AdminDashboard: React.FC = () => {
   const [kycDocuments, setKycDocuments] = useState<KYCDocument[]>([]);
   const [kycLoading, setKycLoading] = useState(false);
   const [kycError, setKycError] = useState<string | null>(null);
+  const [kycSearch, setKycSearch] = useState('');
+  const [kycStatusFilter, setKycStatusFilter] = useState<string>('');
   const [selectedKYC, setSelectedKYC] = useState<KYCDocument | null>(null);
   const [showKYCModal, setShowKYCModal] = useState(false);
   const [auctions, setAuctions] = useState<LiveAuction[]>([]);
@@ -91,7 +93,17 @@ const AdminDashboard: React.FC = () => {
       setKycLoading(true);
       setKycError(null);
       try {
-        const data = await getPendingKYC(effectiveToken);
+        let data: KYCDocument[];
+        
+        // Priority: search > filter > all
+        if (kycSearch.trim()) {
+          data = await searchKYC(kycSearch.trim(), effectiveToken);
+        } else if (kycStatusFilter) {
+          data = await filterKYC(kycStatusFilter, effectiveToken);
+        } else {
+          data = await getPendingKYC(effectiveToken);
+        }
+        
         setKycDocuments(data || []);
       } catch (e) {
         console.error('KYC fetch error:', e);
@@ -102,8 +114,13 @@ const AdminDashboard: React.FC = () => {
       }
     };
     
-    loadKYC();
-  }, [activeTab, effectiveToken]);
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      loadKYC();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, kycSearch, kycStatusFilter, effectiveToken]);
 
   // Load auctions when auctions tab is active
   useEffect(() => {
@@ -478,7 +495,37 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {activeTab === 'kyc' && (
-              <div className="overflow-x-auto">
+              <div>
+                {/* Search and Filter Bar */}
+                <div className="p-6 border-b border-slate-100">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input
+                        type="text"
+                        placeholder="Search KYC by name, email, phone..."
+                        value={kycSearch}
+                        onChange={(e) => setKycSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="relative min-w-[200px]">
+                      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <select
+                        value={kycStatusFilter}
+                        onChange={(e) => setKycStatusFilter(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
                 {kycLoading && (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -555,8 +602,8 @@ const AdminDashboard: React.FC = () => {
                                   disabled={!documentUrl}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
-                                    if (!doc.userId) return;
-                                    const result = await updateKYC(doc.userId, { kycStatus: newStatus }, effectiveToken);
+                                    if (!doc.id) return;
+                                    const result = await updateKYC(doc.id, { kycStatus: newStatus }, effectiveToken);
                                     if (result.ok) {
                                       const data = await getPendingKYC(effectiveToken);
                                       setKycDocuments(data || []);
@@ -578,15 +625,25 @@ const AdminDashboard: React.FC = () => {
                                   className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" 
                                   title="View details"
                                   onClick={async () => {
-                                    if (!doc.userId) return;
+                                    const userId = doc.id || doc.userId;
+                                    if (!userId) {
+                                      console.error('No user ID found for document:', doc);
+                                      alert('No user ID found');
+                                      return;
+                                    }
                                     try {
-                                      const userDetails = await viewuser(doc.userId, effectiveToken);
+                                      console.log('Fetching user details for:', userId);
+                                      const userDetails = await viewuser(userId, effectiveToken);
+                                      console.log('User details received:', userDetails);
                                       if (userDetails) {
                                         setSelectedKYC({ ...doc, ...userDetails });
                                         setShowKYCModal(true);
+                                      } else {
+                                        alert('No user details found');
                                       }
                                     } catch (error) {
-                                      alert('Error fetching user details');
+                                      console.error('Error fetching user details:', error);
+                                      alert('Error fetching user details: ' + (error instanceof Error ? error.message : 'Unknown error'));
                                     }
                                   }}
                                 >
@@ -606,6 +663,7 @@ const AdminDashboard: React.FC = () => {
                     </tbody>
                   </table>
                 )}
+                </div>
               </div>
             )}
 
