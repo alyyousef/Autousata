@@ -96,6 +96,7 @@ export interface KYCDocument {
   isBanned?: number;
   kycStatus?: string;
   status?: string;
+  locationCity?:string;
   role?: string;
   kycId: string;
   documentType?: string;
@@ -557,6 +558,7 @@ export const searchKYC = async (searchTerm: string, token?: string): Promise<KYC
   const response = await fetch(`http://localhost:5000/api/admin/content/kyc/search?searchTerm=${encodeURIComponent(searchTerm)}`, {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -576,6 +578,7 @@ export const filterKYC = async (status: string, token?: string): Promise<KYCDocu
   const response = await fetch(`http://localhost:5000/api/admin/content/kyc/filter?status=${encodeURIComponent(status)}`, {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
