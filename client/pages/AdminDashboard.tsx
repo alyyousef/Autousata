@@ -6,7 +6,7 @@ import {
   Users, ShieldCheck, AlertTriangle, FileCheck, Search, Filter, 
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3
 } from 'lucide-react';
-import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, LiveAuction, getLiveAuctions, PendingPayment, getPendingPayments } from '../services/adminApi';
+import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, approveKYC, rejectKYC, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -29,6 +29,11 @@ const AdminDashboard: React.FC = () => {
   const [auctions, setAuctions] = useState<LiveAuction[]>([]);
   const [auctionsLoading, setAuctionsLoading] = useState(false);
   const [auctionsError, setAuctionsError] = useState<string | null>(null);
+  const [auctionSearch, setAuctionSearch] = useState('');
+  const [auctionStatusFilter, setAuctionStatusFilter] = useState<string>('');
+  const [editingAuction, setEditingAuction] = useState<{ id: string; field: 'status' | 'startTime'; value: string } | null>(null);
+  const [selectedAuction, setSelectedAuction] = useState<LiveAuction | null>(null);
+  const [showAuctionModal, setShowAuctionModal] = useState(false);
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
@@ -104,7 +109,17 @@ const AdminDashboard: React.FC = () => {
       setAuctionsLoading(true);
       setAuctionsError(null);
       try {
-        const data = await getLiveAuctions(effectiveToken);
+        let data: LiveAuction[];
+        
+        // Priority: search > filter > all
+        if (auctionSearch.trim()) {
+          data = await searchAuctions(auctionSearch.trim(), effectiveToken);
+        } else if (auctionStatusFilter) {
+          data = await filterAuctions(auctionStatusFilter, effectiveToken);
+        } else {
+          data = await getAllAuctions(effectiveToken);
+        }
+        
         setAuctions(data || []);
       } catch (e) {
         console.error('Auctions fetch error:', e);
@@ -115,8 +130,13 @@ const AdminDashboard: React.FC = () => {
       }
     };
     
-    loadAuctions();
-  }, [activeTab, effectiveToken]);
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      loadAuctions();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, auctionSearch, auctionStatusFilter, effectiveToken]);
 
   // Load payments when payments tab is active
   useEffect(() => {
@@ -153,6 +173,13 @@ const AdminDashboard: React.FC = () => {
             <Link to="/admin/users" className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all">
               User Moderation
             </Link>
+<Link
+  to="/admin/finance/revenue"
+  className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
+>
+  Revenue Dashboard
+</Link>
+
             <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 flex items-center gap-2 hover:bg-slate-50 transition-all">
               <BarChart3 size={18} />
               Platform Metrics
@@ -239,13 +266,13 @@ const AdminDashboard: React.FC = () => {
 
         <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 overflow-hidden premium-card-hover" ref={tabsRef}>
           {/* Tabs */}
-          <div className="px-8 border-b border-slate-100">
+          <div className="px-8 pt-6 border-b border-slate-100">
             <div className="flex gap-8">
               {['vehicles', 'kyc', 'auctions', 'payments'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
-                  className={`py-6 text-sm font-bold uppercase tracking-widest border-b-2 transition-all ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-6 py-3 text-sm font-bold uppercase tracking-widest rounded-full transition-all ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
                 >
                   {tab}
                 </button>
@@ -286,7 +313,8 @@ const AdminDashboard: React.FC = () => {
                 <table className="w-full">
                   <thead className="bg-slate-50/50">
                     <tr>
-                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle</th>
+                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Photo</th>
+                     <th className="px-4 py-4 w-[220px] text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Info</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
@@ -309,6 +337,19 @@ const AdminDashboard: React.FC = () => {
                       const inspectionDone = Boolean(v.inspection_report);
                       return (
                         <tr key={v.id} className="hover:bg-slate-50/50 transition-all group">
+                          <td className="px-4 py-6">
+                            <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
+                              <img 
+                                src={`/assests/carsPictures/McLaren.avif`} 
+                                alt={`${v.make} ${v.model}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).parentElement!.innerHTML = '<span class="text-slate-400 text-xs">No Image</span>';
+                                }}
+                              />
+                            </div>
+                          </td>
                           <td className="px-4 py-6">
                             <p className="font-bold text-slate-900">{v.make} {v.model} {v.year}</p>
                             <p className="text-xs text-slate-400">VIN: {v.vin || '—'} · Plate: {v.plate_number || '—'}</p>
@@ -493,10 +534,51 @@ const AdminDashboard: React.FC = () => {
                               </td>
                               <td className="px-4 py-6 text-right">
                                 <div className="flex justify-end gap-2">
-                                  <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Approve">
+                                  <button 
+                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" 
+                                    title="Approve"
+                                    onClick={async () => {
+                                      if (!doc.kycId) {
+                                        alert('KYC ID is missing');
+                                        return;
+                                      }
+                                      if (!confirm(`Approve KYC document for ${firstName} ${lastName}?`)) return;
+                                      
+                                      const result = await approveKYC(doc.kycId, effectiveToken);
+                                      if (result.ok) {
+                                        alert('KYC document approved successfully');
+                                        // Reload KYC documents
+                                        const data = await getPendingKYC(effectiveToken);
+                                        setKycDocuments(data || []);
+                                      } else {
+                                        alert(result.message || 'Failed to approve KYC document');
+                                      }
+                                    }}
+                                  >
                                     <CheckCircle size={18} />
                                   </button>
-                                  <button className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Reject">
+                                  <button 
+                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" 
+                                    title="Reject"
+                                    onClick={async () => {
+                                      if (!doc.kycId) {
+                                        alert('KYC ID is missing');
+                                        return;
+                                      }
+                                      const reason = prompt(`Enter rejection reason for ${firstName} ${lastName}:`);
+                                      if (!reason) return;
+                                      
+                                      const result = await rejectKYC(doc.kycId, reason, effectiveToken);
+                                      if (result.ok) {
+                                        alert('KYC document rejected successfully');
+                                        // Reload KYC documents
+                                        const data = await getPendingKYC(effectiveToken);
+                                        setKycDocuments(data || []);
+                                      } else {
+                                        alert(result.message || 'Failed to reject KYC document');
+                                      }
+                                    }}
+                                  >
                                     <XCircle size={18} />
                                   </button>
                                   <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="More actions">
@@ -521,7 +603,39 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {activeTab === 'auctions' && (
-              <div className="overflow-x-auto">
+              <div>
+                {/* Search and Filter Bar */}
+                <div className="p-6 border-b border-slate-100">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <input
+                        type="text"
+                        placeholder="Search auctions by seller, vehicle, status..."
+                        value={auctionSearch}
+                        onChange={(e) => setAuctionSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="relative min-w-[200px]">
+                      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <select
+                        value={auctionStatusFilter}
+                        onChange={(e) => setAuctionStatusFilter(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="live">Live</option>
+                        <option value="ended">Ended</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
                 {auctionsLoading && (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -538,9 +652,11 @@ const AdminDashboard: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-slate-50/50">
                       <tr>
-                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Auction ID</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Photo</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle</th>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seller</th>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Start Time</th>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Bid</th>
                         <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">End Time</th>
                         <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
@@ -549,29 +665,170 @@ const AdminDashboard: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                       {auctions && auctions.length > 0 ? (
                         auctions.map((auction, index) => {
-                          const auctionId = auction.id || 'N/A';
                           const sellerName = auction.sellerName || 'N/A';
-                          const status = auction.status || 'N/A';
+                          const vehicleName = auction.vehicleMake && auction.vehicleModel && auction.vehicleYear 
+                            ? `${auction.vehicleMake} ${auction.vehicleModel} ${auction.vehicleYear}`
+                            : 'N/A';
+                          const status = auction.status || 'draft';
+                          const startTime = auction.startTime ? new Date(auction.startTime).toLocaleString() : 'N/A';
                           const currentBid = auction.currentBid ? `${auction.currentBid.toLocaleString()} EGP` : 'No bids';
                           const endTime = auction.endTime ? new Date(auction.endTime).toLocaleString() : 'N/A';
+                          const isEditingStartTime = editingAuction?.id === auction.id && editingAuction?.field === 'startTime';
                           
                           return (
                             <tr key={auction.id || `auction-${index}`} className="hover:bg-slate-50/50 transition-all group">
-                              <td className="px-4 py-6 text-sm font-mono text-slate-600">{auctionId}</td>
+                              <td className="px-4 py-6">
+                                <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden">
+                                  <img 
+                                    src={`/assests/carsPictures/McLaren.avif`} 
+                                    alt={vehicleName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                      (e.target as HTMLImageElement).parentElement!.innerHTML = '<span class="text-slate-400 text-xs">No Image</span>';
+                                    }}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-4 py-6">
+                                <p className="font-bold text-slate-900">{vehicleName}</p>
+                              </td>
                               <td className="px-4 py-6 text-sm text-slate-900">{sellerName}</td>
                               <td className="px-4 py-6">
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
-                                  status === 'live' ? 'bg-emerald-50 text-emerald-600' : 
-                                  status === 'scheduled' ? 'bg-indigo-50 text-indigo-600' : 
-                                  'bg-slate-50 text-slate-600'
-                                }`}>
-                                  {status}
-                                </span>
+                                <select
+                                  value={status}
+                                  className="px-2.5 py-2 rounded-lg text-[12px] font-bold uppercase tracking-wider border bg-white border-slate-200 text-slate-900"
+                                  onChange={async (e) => {
+                                    const newStatus = e.target.value;
+                                    try {
+                                      const res = await updateAuctionStatus(auction.id, newStatus, effectiveToken);
+                                      if (res.ok) {
+                                        // Reload auctions from backend
+                                        let data;
+                                        if (auctionSearch.trim()) {
+                                          data = await searchAuctions(auctionSearch.trim(), effectiveToken);
+                                        } else if (auctionStatusFilter) {
+                                          data = await filterAuctions(auctionStatusFilter, effectiveToken);
+                                        } else {
+                                          data = await getAllAuctions(effectiveToken);
+                                        }
+                                        setAuctions(data || []);
+                                      } else {
+                                        alert(res.message || 'Failed to update status');
+                                      }
+                                    } catch (e) {
+                                      alert('Failed to update status');
+                                    }
+                                  }}
+                                >
+                                  <option value="draft">Draft</option>
+                                  <option value="scheduled">Scheduled</option>
+                                  <option value="live">Live</option>
+                                  <option value="ended">Ended</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-6">
+                                {isEditingStartTime ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="datetime-local"
+                                      value={editingAuction.value}
+                                      onChange={(e) => setEditingAuction({ ...editingAuction, value: e.target.value })}
+                                      className="border border-indigo-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          // Format to Oracle format: YYYY-MM-DD HH24:MI:SS using local time
+                                          const localDate = new Date(editingAuction.value);
+                                          const year = localDate.getFullYear();
+                                          const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                                          const day = String(localDate.getDate()).padStart(2, '0');
+                                          const hours = String(localDate.getHours()).padStart(2, '0');
+                                          const minutes = String(localDate.getMinutes()).padStart(2, '0');
+                                          const seconds = String(localDate.getSeconds()).padStart(2, '0');
+                                          const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                                          
+                                          const res = await setAuctionStartTime(auction.id, formattedTime, effectiveToken);
+                                          if (res.ok) {
+                                            // Reload auctions from backend
+                                            let data;
+                                            if (auctionSearch.trim()) {
+                                              data = await searchAuctions(auctionSearch.trim(), effectiveToken);
+                                            } else if (auctionStatusFilter) {
+                                              data = await filterAuctions(auctionStatusFilter, effectiveToken);
+                                            } else {
+                                              data = await getAllAuctions(effectiveToken);
+                                            }
+                                            setAuctions(data || []);
+                                            setEditingAuction(null);
+                                          } else {
+                                            alert(res.message || 'Failed to update start time');
+                                          }
+                                        } catch (e) {
+                                          alert('Failed to update start time');
+                                        }
+                                      }}
+                                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                                    >
+                                      <CheckCircle size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingAuction(null)}
+                                      className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+                                    >
+                                      <XCircle size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      // Convert database timestamp to local datetime-local format (YYYY-MM-DDTHH:mm)
+                                      let localTimeStr;
+                                      if (auction.startTime) {
+                                        const date = new Date(auction.startTime);
+                                        const year = date.getFullYear();
+                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                        const day = String(date.getDate()).padStart(2, '0');
+                                        const hours = String(date.getHours()).padStart(2, '0');
+                                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                                        localTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+                                      } else {
+                                        const date = new Date();
+                                        const year = date.getFullYear();
+                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                        const day = String(date.getDate()).padStart(2, '0');
+                                        const hours = String(date.getHours()).padStart(2, '0');
+                                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                                        localTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+                                      }
+                                      setEditingAuction({ id: auction.id, field: 'startTime', value: localTimeStr });
+                                    }}
+                                    className="text-sm text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded transition-all"
+                                  >
+                                    {startTime}
+                                  </button>
+                                )}
                               </td>
                               <td className="px-4 py-6 text-sm font-bold text-slate-900">{currentBid}</td>
                               <td className="px-4 py-6 text-sm text-slate-500">{endTime}</td>
                               <td className="px-4 py-6 text-right">
-                                <button className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" title="View details">
+                                <button 
+                                  className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" 
+                                  title="View details"
+                                  onClick={async () => {
+                                    try {
+                                      const auctionDetails = await getAuctionById(auction.id, effectiveToken);
+                                      if (auctionDetails) {
+                                        setSelectedAuction(auctionDetails);
+                                        setShowAuctionModal(true);
+                                      }
+                                    } catch (e) {
+                                      alert('Failed to load auction details');
+                                    }
+                                  }}
+                                >
                                   <ArrowUpRight size={18} />
                                 </button>
                               </td>
@@ -581,13 +838,14 @@ const AdminDashboard: React.FC = () => {
                       ) : (
                         <tr>
                           <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                            No live auctions
+                            No auctions found
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 )}
+                </div>
               </div>
             )}
 
@@ -664,6 +922,248 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Auction Details Modal */}
+        {showAuctionModal && selectedAuction && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-8">
+              {/* Header */}
+              <div className="sticky top-0 px-8 py-6 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between rounded-t-3xl">
+                <div>
+                  <p className="text-xs text-indigo-100 font-bold uppercase tracking-widest mb-1">Auction Details</p>
+                  <h3 className="text-2xl font-black text-white">Auction #{selectedAuction.id}</h3>
+                </div>
+                <button 
+                  className="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-xl transition-all" 
+                  onClick={() => {
+                    setShowAuctionModal(false);
+                    setSelectedAuction(null);
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="overflow-y-auto max-h-[calc(100vh-200px)] p-8">
+                {/* Vehicle Photo */}
+                <div className="mb-8">
+                  <div className="w-full h-80 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner">
+                    <img 
+                      src={`/assests/carsPictures/McLaren.avif`} 
+                      alt={selectedAuction.vehicleMake && selectedAuction.vehicleModel ? `${selectedAuction.vehicleMake} ${selectedAuction.vehicleModel}` : 'Vehicle'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="flex flex-col items-center justify-center h-full"><svg class="w-16 h-16 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="text-slate-400 text-sm font-medium">No Image Available</span></div>';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Vehicle Info Card */}
+                <div className="mb-8 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Vehicle</p>
+                      <h4 className="text-3xl font-black text-slate-900">
+                        {selectedAuction.vehicleMake && selectedAuction.vehicleModel && selectedAuction.vehicleYear 
+                          ? `${selectedAuction.vehicleMake} ${selectedAuction.vehicleModel} ${selectedAuction.vehicleYear}`
+                          : 'N/A'}
+                      </h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 font-mono">Vehicle ID: {selectedAuction.vehicleId}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                  {/* Seller Info */}
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Seller</p>
+                    <p className="text-xl font-bold text-slate-900 mb-2">{selectedAuction.sellerName || 'N/A'}</p>
+                    <p className="text-xs text-slate-500 font-mono">ID: {selectedAuction.sellerId}</p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Status</p>
+                    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider shadow-sm ${
+                      selectedAuction.status === 'live' ? 'bg-emerald-500 text-white' : 
+                      selectedAuction.status === 'scheduled' ? 'bg-indigo-500 text-white' : 
+                      selectedAuction.status === 'ended' ? 'bg-slate-400 text-white' :
+                      selectedAuction.status === 'draft' ? 'bg-amber-500 text-white' :
+                      'bg-rose-500 text-white'
+                    }`}>
+                      <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                      {selectedAuction.status}
+                    </span>
+                  </div>
+
+                </div>
+
+                {/* Pricing Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 border border-indigo-200">
+                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Starting Bid</p>
+                    <p className="text-2xl font-black text-indigo-900">{selectedAuction.startingBid ? `${selectedAuction.startingBid.toLocaleString()} EGP` : 'N/A'}</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border border-emerald-200">
+                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-2">Current Bid</p>
+                    <p className="text-2xl font-black text-emerald-900">{selectedAuction.currentBid ? `${selectedAuction.currentBid.toLocaleString()} EGP` : 'No bids yet'}</p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200">
+                    <p className="text-xs font-bold text-purple-600 uppercase tracking-widest mb-2">Reserve Price</p>
+                    <p className="text-2xl font-black text-purple-900">{selectedAuction.reservePrice ? `${selectedAuction.reservePrice.toLocaleString()} EGP` : 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* Timing Section */}
+                <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm mb-6">
+                  <h5 className="text-sm font-bold text-slate-700 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Auction Timeline
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Start Time</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedAuction.startTime ? new Date(selectedAuction.startTime).toLocaleString() : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">End Time</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedAuction.endTime ? new Date(selectedAuction.endTime).toLocaleString() : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Original End Time</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedAuction.originalEndTime ? new Date(selectedAuction.originalEndTime).toLocaleString() : 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bidding Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bid Count</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                      </div>
+                      <p className="text-2xl font-black text-slate-900">{selectedAuction.bidCount || 0} <span className="text-base font-normal text-slate-500">bids</span></p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Min Bid Increment</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <p className="text-2xl font-black text-slate-900">{selectedAuction.minBidIncrement ? `${selectedAuction.minBidIncrement.toLocaleString()} EGP` : 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {/* Leading Bidder */}
+                  {selectedAuction.leadingBidderId && (
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200">
+                      <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Leading Bidder</p>
+                      <p className="text-lg font-bold text-blue-900 mb-1">{selectedAuction.leadingBidderName || 'N/A'}</p>
+                      <p className="text-xs text-blue-700 font-mono">ID: {selectedAuction.leadingBidderId}</p>
+                    </div>
+                  )}
+
+                  {/* Winner */}
+                  {selectedAuction.winnerId && (
+                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border border-emerald-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Winner</p>
+                      </div>
+                      <p className="text-lg font-bold text-emerald-900 mb-1">{selectedAuction.winnerName || 'N/A'}</p>
+                      <p className="text-xs text-emerald-700 font-mono">ID: {selectedAuction.winnerId}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto Extend Settings */}
+                <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-6 border border-slate-200 mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <h5 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Auto Extension Settings</h5>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs text-slate-500 mb-2">Enabled</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${selectedAuction.autoExtendEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                        <p className="text-base font-bold text-slate-900">{selectedAuction.autoExtendEnabled ? 'Yes' : 'No'}</p>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs text-slate-500 mb-2">Extension Time</p>
+                      <p className="text-lg font-bold text-slate-900">{selectedAuction.autoExtendMinutes || 0} <span className="text-sm font-normal text-slate-500">min</span></p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs text-slate-500 mb-2">Max Extensions</p>
+                      <p className="text-lg font-bold text-slate-900">{selectedAuction.maxAutoExtensions || 0}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                      <p className="text-xs text-slate-500 mb-2">Used</p>
+                      <p className="text-lg font-bold text-indigo-600">{selectedAuction.autoExtCount || 0}<span className="text-sm text-slate-500"> / {selectedAuction.maxAutoExtensions || 0}</span></p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                  <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">System Timestamps</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Created At</p>
+                      <p className="text-sm font-semibold text-slate-900">{selectedAuction.createdAt ? new Date(selectedAuction.createdAt).toLocaleString() : 'N/A'}</p>
+                    </div>
+                    {selectedAuction.startedAt && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Started At</p>
+                        <p className="text-sm font-semibold text-slate-900">{new Date(selectedAuction.startedAt).toLocaleString()}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-8 py-6 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100 rounded-b-3xl flex justify-end gap-3">
+                <button 
+                  className="px-8 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl text-sm font-bold hover:from-slate-800 hover:to-black transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  onClick={() => {
+                    setShowAuctionModal(false);
+                    setSelectedAuction(null);
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Inspection Modal - Rendered at root level */}
         {showInspectionModal.open && showInspectionModal.vehicle && inspectionForm && (

@@ -29,11 +29,7 @@ router.post("/verify-email-otp", authController.verifyEmailOtp);
 
 // 5. GET CURRENT USER (Protected)
 router.get("/me", authenticate, authController.getMe);
-
-// 6. FORGOT PASSWORD
 router.post("/forgot-password", authController.forgotPassword);
-
-// 7. RESET PASSWORD
 router.post("/reset-password", authController.resetPassword);
 
 module.exports = router;

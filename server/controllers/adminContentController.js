@@ -1,24 +1,77 @@
-const { getPendingKYCService,getLiveAuctionService,getPendingPaymentsService } = require('../services/adminContentService');
+const { getPendingKYCService,
+    getAllAuctionService,
+    getPendingPaymentsService,
+    updateAuctionStatus,
+    setstartTimeAuction,
+    filterauctionbyStatus,
+    searchAuctions,
+    getAuctionById,
+    updateStatusKYC,
+    searchKYC,
+    filterKYCByStatus,
+    viewKYCDetails
+} = require('../services/adminContentService');
 
+//kyc
 const getPendingKYC = async (req, res) => {
     try {
         const kycQueue = await getPendingKYCService(); 
-        res.status(200).json({ data: kycQueue });
+        res.status(200).json({ kycDocuments: kycQueue });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch KYC queue' });
     }
 
 };
 
-const getLiveAuction = async (req, res) => {
+const updateKYCcontroller = async (req, res) => {
+    const { kycId } = req.params;
+    const { status } = req.body;
     try {
-        const liveAuctions = await getLiveAuctionService();
-        res.status(200).json({ data: liveAuctions });
+        await updateStatusKYC(kycId, status);
+        res.status(200).json({ message: 'KYC status updated successfully' });
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to fetch live auctions' });
+        res.status(500).json({ error: 'Failed to update KYC status' });
     }
 };
+
+const searchKYCController = async (req, res) => {
+    const { searchTerm } = req.query;
+    try {
+        const searchResults = await searchKYC(searchTerm);
+        res.status(200).json({ data: searchResults });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to search KYC documents' });
+    }
+};
+
+const filterKYCByStatusController = async (req, res) => {
+    const { status } = req.query;
+    try {
+        const filteredKYC = await filterKYCByStatus(status);
+        res.status(200).json({ data: filteredKYC });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to filter KYC documents' });
+    }
+};
+
+const viewKYCDetailsController = async (req, res) => {
+    const { kycId } = req.params;   
+    try {
+        const kycDetails = await viewKYCDetails(kycId);
+        if (!kycDetails) {
+            return res.status(404).json({ error: 'KYC document not found' });
+        }
+        res.status(200).json({ data: kycDetails });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch KYC details' });
+    }
+};
+
+
 
 const getPendingPayments= async (req, res) => {
     try {
@@ -31,4 +84,76 @@ const getPendingPayments= async (req, res) => {
     }
 };
 
-module.exports = { getPendingKYC ,getLiveAuction, getPendingPayments};
+//auctions
+const getAllAuction = async (req, res) => {
+    try {
+        const allAuctions = await getAllAuctionService();
+        res.status(200).json({ data: allAuctions });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch all auctions' });
+    }
+};
+
+const updateAuction = async (req, res) => {
+    const { auctionId } = req.params;
+    const { status } = req.body;
+    try {
+        await updateAuctionStatus(auctionId, status);
+        res.status(200).json({ message: 'Auction status updated successfully' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update auction status' });
+    }
+};
+
+const setAuctionStartTime = async (req, res) => {
+    const { auctionId } = req.params;
+    const { startTime } = req.body;
+    try {
+        await setstartTimeAuction(auctionId, startTime);
+        res.status(200).json({ message: 'Auction start time updated successfully' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to update auction start time' });
+    }
+};
+
+const filterAuctions = async (req, res) => {
+    const { status } = req.query;
+    try {
+        const filteredAuctions = await filterauctionbyStatus(status);
+        res.status(200).json({ data: filteredAuctions });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to filter auctions' });
+    }
+};
+
+const searchAuctionsController = async (req, res) => {
+    const { searchTerm } = req.query;
+    try {
+        const searchResults = await searchAuctions(searchTerm);
+        res.status(200).json({ data: searchResults });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to search auctions' });
+    }
+};
+
+const getAuctionController = async (req, res) => {
+    const { auctionId } = req.params;
+    try {
+        const auction = await getAuctionById(auctionId);
+        if (!auction) {
+            return res.status(404).json({ error: 'Auction not found' });
+        }
+        res.status(200).json({ data: auction });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch auction details' });
+    }
+};
+
+
+module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController};

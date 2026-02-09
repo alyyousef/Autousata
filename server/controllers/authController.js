@@ -4,7 +4,10 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const { generateTokens, verifyRefreshToken } = require("../middleware/auth");
 const { uploadToS3 } = require("../middleware/uploadMiddleware");
-const { sendVerificationEmail, sendPasswordResetEmail } = require("../services/emailService");
+const {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} = require("../services/emailService");
 require("dotenv").config();
 
 // ==========================================
@@ -18,12 +21,18 @@ async function register(req, res) {
   // Phone validation
   const phoneRegex = /^[0-9]{10,15}$/;
   if (!phoneRegex.test(phone)) {
-    return res.status(400).json({ error: "Invalid phone format. Only numbers allowed (10-15 digits)." });
+    return res
+      .status(400)
+      .json({
+        error: "Invalid phone format. Only numbers allowed (10-15 digits).",
+      });
   }
 
   // Password strength (min 8 chars)
   if (password.length < 8) {
-    return res.status(400).json({ error: "Password too weak. Minimum 8 characters." });
+    return res
+      .status(400)
+      .json({ error: "Password too weak. Minimum 8 characters." });
   }
 
   try {
@@ -86,6 +95,9 @@ async function register(req, res) {
       console.log("✉️ [7] Sending OTP Email...");
       sendVerificationEmail(email, otpCode).catch((err) =>
         console.error("Email failed in background:", err),
+      );
+      sendVerificationEmail(email, otpCode).catch((err) =>
+        console.error("Email failed:", err),
       );
 
       // G. Generate Tokens (So user is logged in, but unverified)
@@ -323,7 +335,10 @@ async function forgotPassword(req, res) {
     // 3. Send Reset Email
     await sendPasswordResetEmail(email, resetToken);
 
-    res.json({ success: true, message: "Password reset link sent to your email." });
+    res.json({
+      success: true,
+      message: "Password reset link sent to your email.",
+    });
   } catch (err) {
     console.error("Forgot Password Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -388,4 +403,12 @@ async function resetPassword(req, res) {
   }
 }
 
-module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword };
+module.exports = {
+  register,
+  login,
+  verifyEmailOtp,
+  refreshToken,
+  getMe,
+  forgotPassword,
+  resetPassword,
+};
