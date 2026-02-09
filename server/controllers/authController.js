@@ -11,16 +11,13 @@ require('dotenv').config();
 // 1. REGISTER
 // ==========================================
 async function register(req, res) {
-  const { firstName, lastName, email, phone, password } = req.body;
-  const file = req.file;
-  let connection;
+    const { firstName, lastName, email, phone, password } = req.body;
+    const file = req.file;
+    let connection;
 
     const phoneRegex = /^[0-9]{10,15}$/;
     if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid phone format.' });
     if (password.length < 8) return res.status(400).json({ error: 'Password too weak.' });
-
-  try {
-    console.log(`👉 Registering: ${email}`);
 
     try {
         console.log(`👉 Registering: ${email}`);
@@ -43,8 +40,8 @@ async function register(req, res) {
             }
         );
 
-    const status = result.outBinds.out_status;
-    const newUserId = result.outBinds.out_id;
+        const status = result.outBinds.out_status;
+        const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
             // B. Generate OTP with Node.js Time (Fixes Timezone Issue)
@@ -79,30 +76,18 @@ async function register(req, res) {
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
-  } catch (err) {
-    console.error("❌ Registration Error:", err);
-    res.status(500).json({ error: "Registration failed" });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (e) {
-        console.error("Error closing connection:", e);
-      }
-    }
-  }
 }
 
 // ==========================================
 // 2. LOGIN
 // ==========================================
 async function login(req, res) {
-  const { email, password } = req.body;
-  let connection;
+    const { email, password } = req.body;
+    let connection;
 
-  try {
-    console.log(`👉 Logging in: ${email}`);
-    connection = await db.getConnection();
+    try {
+        console.log(`👉 Logging in: ${email}`);
+        connection = await db.getConnection();
 
         const result = await connection.execute(
             `BEGIN sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); END;`,
@@ -160,52 +145,14 @@ async function login(req, res) {
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
-
-    if (userData.status !== "FOUND") {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    const match = await bcrypt.compare(password, userData.hash);
-
-    if (match) {
-      const { accessToken, refreshToken } = generateTokens(userData.id);
-
-      res.json({
-        message: "Login successful",
-        accessToken,
-        refreshToken,
-        user: {
-          id: userData.id,
-          firstName: userData.fn,
-          lastName: userData.ln,
-          email: email,
-          role: userData.role,
-          profileImage: userData.img,
-        },
-      });
-    } else {
-      res.status(401).json({ error: "Invalid credentials" });
-    }
-  } catch (err) {
-    console.error("❌ Login Error:", err);
-    res.status(500).json({ error: "Login failed" });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
 }
 
 // ==========================================
-// 3. VERIFY EMAIL OTP (FIXED TIMEZONE & WHITESPACE)
+// 3. VERIFY EMAIL OTP
 // ==========================================
 async function verifyEmailOtp(req, res) {
-  const { email, otp } = req.body;
-  let connection;
+    const { email, otp } = req.body;
+    let connection;
 
     try {
         console.log(`🔍 Verifying OTP for: ${email}, Input: '${otp}'`);
@@ -225,7 +172,6 @@ async function verifyEmailOtp(req, res) {
         const user = result.rows[0];
         const dbToken = user.TOKEN; 
         
-        // Safety Check: Is token missing?
         if (!dbToken) return res.status(400).json({ error: 'No active code. Please click Resend.' });
 
         const expiry = new Date(user.EXPIRY); 
@@ -244,7 +190,6 @@ async function verifyEmailOtp(req, res) {
             return res.status(400).json({ error: 'Code expired. Resend a new one.' });
         }
 
-        // Success - Set '1' for CHAR(1) column
         await connection.execute(
             `UPDATE users SET email_verified = '1', email_verification_token = NULL, email_token_expiry = NULL WHERE LOWER(email) = :email`,
             { email: safeEmail }, { autoCommit: true }
@@ -259,18 +204,6 @@ async function verifyEmailOtp(req, res) {
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
-  } catch (err) {
-    console.error("❌ OTP Verify Error:", err);
-    res.status(500).json({ error: "Verification failed" });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
 }
 
 // ==========================================
@@ -356,39 +289,6 @@ async function forgotPassword(req, res) {
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
-
-    const userId = check.rows[0][0];
-    const resetToken = crypto.randomBytes(32).toString("hex");
-
-    // 2. Save token
-    await connection.execute(
-      `UPDATE users 
-       SET reset_password_token = :token,
-           reset_password_expiry = CURRENT_TIMESTAMP + INTERVAL '1' HOUR
-       WHERE id = :id`,
-      { token: resetToken, id: userId },
-      { autoCommit: true },
-    );
-
-    // 3. Send Reset Email
-    await sendPasswordResetEmail(email, resetToken);
-
-    res.json({
-      success: true,
-      message: "Password reset link sent to your email.",
-    });
-  } catch (err) {
-    console.error("Forgot Password Error:", err);
-    res.status(500).json({ error: "Server error" });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
 }
 
 // ==========================================
@@ -400,7 +300,6 @@ async function resetPassword(req, res) {
     try {
         connection = await db.getConnection();
         
-        // Need to check DB Time vs Node Time? Safest to just fetch and check in JS.
         const result = await connection.execute(
             `SELECT id, reset_password_expiry FROM users WHERE reset_password_token = :token`,
             [token], { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -426,38 +325,10 @@ async function resetPassword(req, res) {
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
-
-    const userId = result.rows[0][0];
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    await connection.execute(
-      `UPDATE users 
-       SET password_hash = :pw,
-           reset_password_token = NULL,
-           reset_password_expiry = NULL
-       WHERE id = :id`,
-      { pw: hashedPassword, id: userId },
-      { autoCommit: true },
-    );
-
-    res.json({ message: "Password has been reset successfully." });
-  } catch (err) {
-    console.error("Reset Password Error:", err);
-    res.status(500).json({ error: "Server error" });
-  } finally {
-    if (connection) {
-      try {
-        await connection.close();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
 }
 
 // ==========================================
-// 8. RESEND OTP (FIXED TIMEZONE)
+// 8. RESEND OTP
 // ==========================================
 async function resendOtp(req, res) {
     const { email } = req.body;
@@ -470,8 +341,8 @@ async function resendOtp(req, res) {
         connection = await db.getConnection();
 
         const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        // ✅ CRITICAL FIX: Calculate Time in Node (UTC)
-        const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // +10 Minutes
+        // ✅ Calculate Time in Node (UTC)
+        const expiryTime = new Date(Date.now() + 10 * 60 * 1000); 
 
         const result = await connection.execute(
             `UPDATE users 
