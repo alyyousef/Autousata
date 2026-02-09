@@ -225,7 +225,7 @@ const CreateListingPage: React.FC = () => {
         features: data.features,
       };
 
-      // ✅ FIX 3: Use apiService (which handles Auth & Port 5002)
+      // ✅ FIX 3: Use apiService (which handles Auth & Port 5005)
       // Send vehiclePayload + imageFiles
       const vehicleRes = await apiService.createVehicle(vehiclePayload, imageFiles);
 

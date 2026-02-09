@@ -10,6 +10,14 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         fs: {
           allow: ['..']
+        },
+        // ✅ NEW: Proxy setup connecting to your real backend port
+        proxy: {
+          '/api': {
+            target: 'http://localhost:5005', 
+            changeOrigin: true,
+            secure: false,
+          }
         }
       },
       plugins: [react()],

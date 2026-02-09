@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
 const oracledb = require('oracledb');
-const crypto = require('crypto'); // ✅ FIXED: Added missing import
+const crypto = require('crypto');
 const db = require('../config/db');
 const { generateTokens, verifyRefreshToken } = require('../middleware/auth');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
@@ -8,50 +8,34 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/e
 require('dotenv').config();
 
 // ==========================================
-// 1. REGISTER (With OTP)
+// 1. REGISTER
 // ==========================================
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
 
-    // 1. Phone Validation
     const phoneRegex = /^[0-9]{10,15}$/;
-    if (!phoneRegex.test(phone)) {
-        return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
-    }
-
-    // 2. Password Strength (Min 8 chars)
-    if (password.length < 8) {
-        return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
-    }
+    if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid phone format.' });
+    if (password.length < 8) return res.status(400).json({ error: 'Password too weak.' });
 
     const file = req.file; 
     let connection;
 
     try {
         console.log(`👉 Registering: ${email}`);
-
         let profilePicUrl = null;
-        if (file) {
-            console.log("📸 [1] Starting S3 Upload...");
-            profilePicUrl = await uploadToS3(file, 'profiles'); 
-        }
+        if (file) profilePicUrl = await uploadToS3(file, 'profiles'); 
 
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
+        const hashedPassword = await bcrypt.hash(password, 10);
         connection = await db.getConnection();
         
+        // A. Create User
         const result = await connection.execute(
             `BEGIN 
                 sp_register_user(:fn, :ln, :em, :ph, :pw, :img, :out_id, :out_status); 
              END;`,
             {
-                fn: firstName,
-                ln: lastName,
-                em: email,
-                ph: phone,
-                pw: hashedPassword,
-                img: profilePicUrl, 
+                fn: firstName, ln: lastName, em: email, ph: phone,
+                pw: hashedPassword, img: profilePicUrl, 
                 out_id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING }
             }
@@ -61,26 +45,24 @@ async function register(req, res) {
         const newUserId = result.outBinds.out_id;
 
         if (status === 'SUCCESS') {
+            // B. Generate OTP with Node.js Time (Fixes Timezone Issue)
             const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // Now + 10 mins
 
             await connection.execute(
-                `BEGIN sp_save_email_otp(:email, :otp, :status); END;`,
-                { 
-                    email: email, 
-                    otp: otpCode, 
-                    status: { dir: oracledb.BIND_OUT, type: oracledb.STRING } 
-                }
+                `UPDATE users 
+                 SET email_verification_token = :otp,
+                     email_token_expiry = :expiry
+                 WHERE email = :email`,
+                { otp: otpCode, expiry: expiryTime, email: email },
+                { autoCommit: true }
             );
 
-            sendVerificationEmail(email, otpCode)
-                .catch(err => console.error("Email failed:", err));
+            sendVerificationEmail(email, otpCode).catch(e => console.error("Email failed:", e));
 
             const { accessToken, refreshToken } = generateTokens(newUserId);
-
             res.status(201).json({ 
-                message: 'User registered successfully.',
-                accessToken,
-                refreshToken,
+                message: 'User registered.', accessToken, refreshToken,
                 user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
 
@@ -90,10 +72,7 @@ async function register(req, res) {
 
     } catch (err) {
         console.error('❌ Registration Error:', err);
-        // Clean error message for user
-        if (err.message.includes('ORA-00001')) {
-            return res.status(409).json({ error: 'Email already exists' });
-        }
+        if (err.message?.includes('ORA-00001')) return res.status(409).json({ error: 'Email already exists' });
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
@@ -110,11 +89,8 @@ async function login(req, res) {
     try {
         connection = await db.getConnection();
 
-        // 1. Authenticate via Stored Procedure
         const result = await connection.execute(
-            `BEGIN 
-                sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); 
-             END;`,
+            `BEGIN sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); END;`,
             {
                 em: email,
                 id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
@@ -129,79 +105,42 @@ async function login(req, res) {
 
         const authData = result.outBinds;
 
-        if (authData.status === 'UNVERIFIED') {
-            return res.status(403).json({ error: 'Please verify your email.', needsVerification: true });
-        }
-
-        if (authData.status !== 'FOUND') {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        if (authData.status === 'UNVERIFIED') return res.status(403).json({ error: 'Please verify your email.', needsVerification: true });
+        if (authData.status !== 'FOUND') return res.status(401).json({ error: 'Invalid credentials' });
 
         const match = await bcrypt.compare(password, authData.hash);
 
         if (match) {
             try {
-                // 2. Fetch Full Profile
                 const userResult = await connection.execute(
-                    `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, 
-                            PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, 
-                            KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY
-                     FROM USERS 
-                     WHERE ID = :id`,
-                    [authData.id],
-                    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+                    `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
+                    [authData.id], { outFormat: oracledb.OUT_FORMAT_OBJECT }
                 );
 
                 if (userResult.rows.length > 0) {
                     const dbUser = userResult.rows[0];
-                    
                     const fullUser = {
-                        id: dbUser.ID,
-                        firstName: dbUser.FIRST_NAME,
-                        lastName: dbUser.LAST_NAME,
-                        email: dbUser.EMAIL,
-                        phone: dbUser.PHONE,
-                        role: dbUser.ROLE,
+                        id: dbUser.ID, firstName: dbUser.FIRST_NAME, lastName: dbUser.LAST_NAME,
+                        email: dbUser.EMAIL, phone: dbUser.PHONE, role: dbUser.ROLE,
                         profileImage: dbUser.PROFILE_PIC_URL, 
-                        // ✅ FIX: Use '==' to handle '1' (string) or 1 (number)
                         emailVerified: dbUser.EMAIL_VERIFIED == 1,
                         phoneVerified: dbUser.PHONE_VERIFIED == 1,
                         kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
                         kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
                         location: { city: dbUser.LOCATION_CITY || '' } 
                     };
-
                     const { accessToken, refreshToken } = generateTokens(fullUser.id);
-                    return res.json({
-                        message: 'Login successful',
-                        accessToken,
-                        refreshToken,
-                        user: fullUser
-                    });
+                    return res.json({ message: 'Login successful', accessToken, refreshToken, user: fullUser });
                 }
-            } catch (sqlError) {
-                console.error("❌ SQL Error in Login:", sqlError);
-            }
+            } catch (sqlError) { console.error("❌ SQL Error in Login:", sqlError); }
 
-            // Fallback if SQL fails
             const { accessToken, refreshToken } = generateTokens(authData.id);
-            res.json({
-                message: 'Login successful (Basic)',
-                accessToken,
-                refreshToken,
-                user: { 
-                    id: authData.id, firstName: authData.fn, lastName: authData.ln, 
-                    email, role: authData.role, profileImage: authData.img, 
-                    emailVerified: false 
-                }
-            });
-
+            res.json({ message: 'Login successful', accessToken, refreshToken, user: { id: authData.id, firstName: authData.fn, lastName: authData.ln, email, role: authData.role, profileImage: authData.img, emailVerified: true } });
         } else {
             res.status(401).json({ error: 'Invalid credentials' });
         }
-
     } catch (err) {
-        console.error('❌ Login Main Error:', err);
+        console.error('❌ Login Error:', err);
         res.status(500).json({ error: 'Login failed' });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
@@ -209,27 +148,60 @@ async function login(req, res) {
 }
 
 // ==========================================
-// 3. VERIFY EMAIL OTP
+// 3. VERIFY EMAIL OTP (FIXED TIMEZONE & WHITESPACE)
 // ==========================================
 async function verifyEmailOtp(req, res) {
     const { email, otp } = req.body;
     let connection;
 
     try {
+        console.log(`🔍 Verifying OTP for: ${email}, Input: '${otp}'`);
+        const safeEmail = email.toLowerCase();
+        
         connection = await db.getConnection();
+
+        // Use TRIM to remove any accidental padding
         const result = await connection.execute(
-            `BEGIN sp_verify_email_otp(:email, :otp, :status); END;`,
-            { email, otp, status: { dir: oracledb.BIND_OUT, type: oracledb.STRING } }
+            `SELECT TRIM(email_verification_token) as TOKEN, email_token_expiry as EXPIRY
+             FROM users WHERE LOWER(email) = :email`,
+            [safeEmail], { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
-        const status = result.outBinds.status;
-        if (status === 'SUCCESS') {
-            res.json({ success: true, message: 'Email verified successfully!' });
-        } else {
-            res.status(400).json({ error: 'Invalid or expired code.', code: status });
+        if (result.rows.length === 0) return res.status(400).json({ error: 'User not found.' });
+
+        const user = result.rows[0];
+        const dbToken = user.TOKEN; 
+        
+        // Safety Check: Is token missing?
+        if (!dbToken) return res.status(400).json({ error: 'No active code. Please click Resend.' });
+
+        const expiry = new Date(user.EXPIRY); 
+        const now = new Date();
+
+        console.log(`   > DB Token: '${dbToken}' | Input: '${otp}'`);
+        console.log(`   > Expiry: ${expiry.toISOString()} | Now: ${now.toISOString()}`);
+
+        if (String(dbToken) !== String(otp)) {
+            console.log("❌ Mismatch.");
+            return res.status(400).json({ error: 'Invalid code.' });
         }
+
+        if (now > expiry) {
+            console.log("❌ Expired.");
+            return res.status(400).json({ error: 'Code expired. Resend a new one.' });
+        }
+
+        // Success - Set '1' for CHAR(1) column
+        await connection.execute(
+            `UPDATE users SET email_verified = '1', email_verification_token = NULL, email_token_expiry = NULL WHERE LOWER(email) = :email`,
+            { email: safeEmail }, { autoCommit: true }
+        );
+
+        console.log("✅ Verified!");
+        res.json({ success: true, message: 'Email verified successfully!' });
+
     } catch (err) {
-        console.error('❌ OTP Verify Error:', err);
+        console.error('❌ Verify Error:', err);
         res.status(500).json({ error: 'Verification failed' });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
@@ -242,10 +214,8 @@ async function verifyEmailOtp(req, res) {
 async function refreshToken(req, res) {
     const { refreshToken: token } = req.body;
     if (!token) return res.status(400).json({ error: 'Refresh token required' });
-
     const decoded = verifyRefreshToken(token);
     if (!decoded) return res.status(403).json({ error: 'Invalid refresh token' });
-
     const tokens = generateTokens(decoded.userId);
     res.json({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
 }
@@ -256,106 +226,64 @@ async function refreshToken(req, res) {
 async function getMe(req, res) {
     let connection;
     try {
-        // ✅ FIX: Check for 'userId' OR 'id' to prevent undefined errors
         const targetId = req.user?.userId || req.user?.id;
-        
-        if (!targetId) {
-            console.error("❌ GetMe Failed: No User ID in token:", req.user);
-            return res.status(401).json({ error: 'Not authenticated' });
-        }
+        if (!targetId) return res.status(401).json({ error: 'Not authenticated' });
 
         connection = await db.getConnection();
-        
         const result = await connection.execute(
-            `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, 
-                    PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED,
-                    KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY
-             FROM USERS 
-             WHERE ID = :id`,
-            [targetId],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
+            [targetId], { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
+        if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        
         const dbUser = result.rows[0];
-
-        const fullUser = {
-            id: dbUser.ID,
-            firstName: dbUser.FIRST_NAME,
-            lastName: dbUser.LAST_NAME,
-            email: dbUser.EMAIL,
-            phone: dbUser.PHONE,
-            role: dbUser.ROLE,
-            profileImage: dbUser.PROFILE_PIC_URL,
-            // ✅ FIX: Use '==' for loose comparison (handles '1' vs 1)
-            emailVerified: dbUser.EMAIL_VERIFIED == 1, 
-            phoneVerified: dbUser.PHONE_VERIFIED == 1,
-            kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
-            kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
-            location: { city: dbUser.LOCATION_CITY || '' }
-        };
-
-        res.json({ user: fullUser });
-
+        res.json({ 
+            user: {
+                id: dbUser.ID, firstName: dbUser.FIRST_NAME, lastName: dbUser.LAST_NAME,
+                email: dbUser.EMAIL, phone: dbUser.PHONE, role: dbUser.ROLE,
+                profileImage: dbUser.PROFILE_PIC_URL,
+                emailVerified: dbUser.EMAIL_VERIFIED == 1,
+                phoneVerified: dbUser.PHONE_VERIFIED == 1,
+                kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
+                kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
+                location: { city: dbUser.LOCATION_CITY || '' }
+            }
+        });
     } catch (err) {
-        console.error("❌ GetMe Crash Error:", err);
-        // Return 500, but try to avoid logging out frontend if possible
-        res.status(500).json({ error: "Server Error fetching profile" });
+        console.error("❌ GetMe Error:", err);
+        res.status(500).json({ error: "Server Error" });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
     }
 }
+
 // ==========================================
-// 6. FORGOT PASSWORD (Corrected)
+// 6. FORGOT PASSWORD
 // ==========================================
 async function forgotPassword(req, res) {
     const { email } = req.body;
     let connection;
-
     try {
-        // ✅ FIX: Validate Input First!
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!email || !emailRegex.test(email)) {
-            return res.status(400).json({ error: 'Invalid email format' });
-        }
+        if (!email) return res.status(400).json({ error: 'Email required' });
 
         connection = await db.getConnection();
-        
-        // 1. Check if user exists
-        const check = await connection.execute(
-            `SELECT id FROM users WHERE email = :email`,
-            [email]
-        );
+        const check = await connection.execute(`SELECT id FROM users WHERE email = :email`, [email]);
 
-        // ✅ LOGIC UPDATE: Explicitly tell frontend if user is missing
-        if (check.rows.length === 0) {
-            return res.status(404).json({ 
-                error: 'Email not found', 
-                code: 'USER_NOT_FOUND',
-                message: 'This email is not registered with us.' 
-            });
-        }
+        if (check.rows.length === 0) return res.status(404).json({ error: 'Email not found', message: 'This email is not registered.' });
 
         const userId = check.rows[0][0];
         const resetToken = crypto.randomBytes(32).toString('hex');
+        const expiry = new Date(Date.now() + 60 * 60 * 1000); // Node Time: 1 Hour
 
-        // 2. Save token
         await connection.execute(
-            `UPDATE users 
-             SET reset_password_token = :token,
-                 reset_password_expiry = CURRENT_TIMESTAMP + INTERVAL '1' HOUR
-             WHERE id = :id`,
-            { token: resetToken, id: userId },
+            `UPDATE users SET reset_password_token = :token, reset_password_expiry = :expiry WHERE id = :id`,
+            { token: resetToken, expiry: expiry, id: userId },
             { autoCommit: true }
         );
 
-        // 3. Send Premium Email
         await sendPasswordResetEmail(email, resetToken);
-
-        res.json({ success: true, message: 'Password reset link sent to your email.' });
+        res.json({ success: true, message: 'Password reset link sent.' });
 
     } catch (err) {
         console.error('Forgot Password Error:', err);
@@ -371,37 +299,29 @@ async function forgotPassword(req, res) {
 async function resetPassword(req, res) {
     const { token, newPassword } = req.body;
     let connection;
-
     try {
         connection = await db.getConnection();
-
+        
+        // Need to check DB Time vs Node Time? Safest to just fetch and check in JS.
         const result = await connection.execute(
-            `SELECT id FROM users 
-             WHERE reset_password_token = :token 
-             AND reset_password_expiry > CURRENT_TIMESTAMP`,
-            [token]
+            `SELECT id, reset_password_expiry FROM users WHERE reset_password_token = :token`,
+            [token], { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
-        if (result.rows.length === 0) {
-            return res.status(400).json({ error: 'Invalid or expired reset token.' });
+        if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid token.' });
+
+        const user = result.rows[0];
+        if (new Date() > new Date(user.RESET_PASSWORD_EXPIRY)) {
+            return res.status(400).json({ error: 'Token expired.' });
         }
 
-        const userId = result.rows[0][0];
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
         await connection.execute(
-            `UPDATE users 
-             SET password_hash = :pw,
-                 reset_password_token = NULL,
-                 reset_password_expiry = NULL
-             WHERE id = :id`,
-            { pw: hashedPassword, id: userId },
-            { autoCommit: true }
+            `UPDATE users SET password_hash = :pw, reset_password_token = NULL, reset_password_expiry = NULL WHERE id = :id`,
+            { pw: hashedPassword, id: user.ID }, { autoCommit: true }
         );
 
-        res.json({ message: 'Password has been reset successfully.' });
-
+        res.json({ message: 'Password reset successfully.' });
     } catch (err) {
         console.error('Reset Password Error:', err);
         res.status(500).json({ error: 'Server error' });
@@ -410,4 +330,44 @@ async function resetPassword(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword };
+// ==========================================
+// 8. RESEND OTP (FIXED TIMEZONE)
+// ==========================================
+async function resendOtp(req, res) {
+    const { email } = req.body;
+    let connection;
+
+    try {
+        console.log(`🔄 Resending OTP to: ${email}`);
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        connection = await db.getConnection();
+
+        const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        // ✅ CRITICAL FIX: Calculate Time in Node (UTC)
+        const expiryTime = new Date(Date.now() + 10 * 60 * 1000); // +10 Minutes
+
+        const result = await connection.execute(
+            `UPDATE users 
+             SET email_verification_token = :otp,
+                 email_token_expiry = :expiry
+             WHERE email = :email`,
+            { otp: newOtp, expiry: expiryTime, email: email },
+            { autoCommit: true }
+        );
+
+        if (result.rowsAffected === 0) return res.status(404).json({ error: 'User not found' });
+
+        try { await sendVerificationEmail(email, newOtp); } catch (e) { console.error("Email failed", e); }
+
+        res.json({ message: 'Verification code resent. Check your inbox.' });
+
+    } catch (err) {
+        console.error('❌ Resend OTP Error:', err);
+        res.status(500).json({ error: 'Failed to resend OTP' });
+    } finally {
+        if (connection) { try { await connection.close(); } catch (e) {} }
+    }
+}
+
+module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword, resendOtp };

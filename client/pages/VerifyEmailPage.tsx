@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, Mail, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Mail, CheckCircle, XCircle, Loader, RefreshCw } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -14,6 +14,7 @@ const VerifyEmailPage: React.FC = () => {
   
   const token = searchParams.get('token');
   
+  // Verification States
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +22,12 @@ const VerifyEmailPage: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'otp'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
 
-  // Handle token-based verification (email link)
+  // ✅ RESEND OTP STATES
+  const [resendTimer, setResendTimer] = useState(0); // 0 = ready to send
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+
+  // 1. Handle token-based verification (email link)
   useEffect(() => {
     if (token) {
       const verifyToken = async () => {
@@ -52,37 +58,68 @@ const VerifyEmailPage: React.FC = () => {
     }
   }, [token, state, navigate, t]);
 
+  // ✅ 2. Handle Resend Timer Countdown
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
   const email = state?.email || '';
 
-  // Handle OTP verification
+  // ✅ 3. Handle Resend OTP Action
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return; 
+
+    setResendLoading(true);
+    setResendMessage('');
+    setError('');
+
+    try {
+      // ✅ FIX: Use the centralized API service (which uses the proxy)
+      // instead of manually fetching from localhost:5000
+      const response = await apiService.resendOtp(email);
+
+      if (response.data) {
+        setResendTimer(60); 
+        setResendMessage('New code sent! Check your inbox.');
+      } else {
+        setError(response.error || 'Failed to resend code.');
+      }
+    } catch (err) {
+      setError('Network error. Could not resend code.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  // 4. Handle Verify OTP Logic
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setResendMessage('');
     setLoading(true);
 
     try {
-      // 1. Verify the Code
       const response = await apiService.verifyEmailOtp(email, otp);
 
       if (response.data && (response.data as any).success) {
         setSuccess(true);
-
-        // 2. Fetch the FRESH user profile (which now has is_verified = 1)
         try {
           const userResponse = await apiService.getCurrentUser();
           if (userResponse.data?.user) {
-             // 3. Force the app to update the user state immediately
              updateUser(userResponse.data.user);
           }
         } catch (fetchError) {
           console.error("Could not refresh user profile", fetchError);
         }
-
-        // 4. Redirect after a brief moment
         setTimeout(() => {
           navigate('/browse');
         }, 1500);
-
       } else {
         setError(response.error || 'Invalid code. Please try again.');
       }
@@ -162,9 +199,17 @@ const VerifyEmailPage: React.FC = () => {
             <div className="px-8 py-10">
               <form onSubmit={handleVerify} className="space-y-6">
                 
+                {/* General Error */}
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl text-center font-medium animate-pulse">
                     {error}
+                  </div>
+                )}
+
+                {/* Resend Success Message */}
+                {resendMessage && (
+                  <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 text-sm rounded-xl text-center font-bold flex items-center justify-center gap-2">
+                    <CheckCircle size={16} /> {resendMessage}
                   </div>
                 )}
 
@@ -210,10 +255,25 @@ const VerifyEmailPage: React.FC = () => {
 
               {!success && (
                 <div className="mt-8 text-center">
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500 flex flex-col sm:flex-row items-center justify-center gap-1">
                     Didn't receive the email?{' '}
-                    <button className="text-indigo-600 font-semibold hover:underline">
-                      Resend Code
+                    <button 
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={resendTimer > 0 || resendLoading}
+                      className={`font-semibold flex items-center gap-1 transition-colors ${
+                        resendTimer > 0 
+                          ? 'text-slate-400 cursor-not-allowed' 
+                          : 'text-indigo-600 hover:text-indigo-700 hover:underline'
+                      }`}
+                    >
+                      {resendLoading ? (
+                        <span className="flex items-center gap-1"><Loader size={14} className="animate-spin"/> Sending...</span>
+                      ) : resendTimer > 0 ? (
+                        <span className="flex items-center gap-1">Resend available in {resendTimer}s</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><RefreshCw size={14}/> Resend Code</span>
+                      )}
                     </button>
                   </p>
                 </div>

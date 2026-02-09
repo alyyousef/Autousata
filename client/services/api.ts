@@ -1,5 +1,4 @@
-const API_BASE_URL = 'http://localhost:5002/api';
-
+const API_BASE_URL = 'http://localhost:5005/api';
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -137,6 +136,14 @@ class ApiService {
     });
   }
 
+  // ✅ NEW METHOD: Resend OTP
+  async resendOtp(email: string) {
+    return this.request<{ message: string }>('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
   async uploadKYC(file: File) {
     const formData = new FormData();
     formData.append('kycDocument', file); 
@@ -165,7 +172,7 @@ class ApiService {
   }
 
   // =========================================================
-  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // PASSWORD RESET METHODS
   // =========================================================
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
