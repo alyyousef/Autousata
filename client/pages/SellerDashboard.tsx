@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line
@@ -9,6 +9,7 @@ import {
   ChevronRight, ArrowUpRight, MoreHorizontal
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 
 const data = [
   { name: 'Jan', sales: 4000, views: 2400 },
@@ -20,6 +21,11 @@ const data = [
 
 const SellerDashboard: React.FC = () => {
   const { user } = useAuth();
+  const [timeRange, setTimeRange] = useState('30');
+  const timeRangeOptions: CustomSelectOption[] = [
+    { value: '30', label: 'Last 30 Days' },
+    { value: '180', label: 'Last 6 Months' }
+  ];
   
   if (!user) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -68,10 +74,12 @@ const SellerDashboard: React.FC = () => {
           <div className="lg:col-span-2 bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
             <div className="flex items-center justify-between mb-8">
               <h3 className="font-bold text-lg text-slate-900">Performance Analytics</h3>
-              <select className="text-sm border-none bg-slate-50 rounded-lg px-3 py-1.5 focus:ring-0">
-                <option>Last 30 Days</option>
-                <option>Last 6 Months</option>
-              </select>
+              <CustomSelect
+                value={timeRange}
+                options={timeRangeOptions}
+                onChange={(value) => setTimeRange(String(value))}
+                className="w-44"
+              />
             </div>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">

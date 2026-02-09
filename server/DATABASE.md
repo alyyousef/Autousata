@@ -13,6 +13,8 @@ The database is designed for a used car auction platform. It handles users (buye
 
 - **Payment Integration** (Migration 001): Added Stripe payment tracking, webhook idempotency, payment deadlines
 - **Real-Time Auctions** (Migration 002): Added Socket.IO webhook subscriptions, delivery logging, optimized indexes
+- **Auction Duration & Sale Type** (Migration 003): Added DURATION_DAYS to auctions for deferred scheduling
+- **Direct Purchase Support** (Migration 004): Added VEHICLE_ID and PURCHASE_TYPE to payments/escrows for non-auction purchases
 
 ## Entity Relationship Diagram (Mermaid)
 
@@ -29,10 +31,12 @@ erDiagram
 
     VEHICLES ||--|| INSPECTION_REPORTS : "has"
     VEHICLES ||--|| AUCTIONS : "auctioned via"
+    VEHICLES ||--o{ PAYMENTS : "purchased via"
+    VEHICLES ||--o{ ESCROWS : "secured by"
 
     AUCTIONS ||--o{ BIDS : "has"
-    AUCTIONS ||--|| PAYMENTS : "paid via"
-    AUCTIONS ||--|| ESCROWS : "secured via"
+    AUCTIONS ||--o{ PAYMENTS : "paid via"
+    AUCTIONS ||--o{ ESCROWS : "secured via"
     AUCTIONS ||--o{ NOTIFICATIONS : "triggers"
 
     PAYMENTS ||--|| ESCROWS : "funds"
@@ -220,22 +224,24 @@ Individual bids placed on an auction.
 
 ### 7. PAYMENTS
 
-Transaction records.
+Transaction records for both auction and direct purchases.
 
 | Column              | Type          | Constraints               | Description                                                |
 | :------------------ | :------------ | :------------------------ | :--------------------------------------------------------- |
 | `ID`                | VARCHAR2(36)  | PK                        | UUID                                                       |
-| `AUCTION_ID`        | VARCHAR2(36)  | FK -> AUCTIONS            |                                                            |
+| `AUCTION_ID`        | VARCHAR2(36)  | FK -> AUCTIONS, Nullable  | Set for auction purchases, NULL for direct purchases       |
+| `VEHICLE_ID`        | VARCHAR2(36)  | FK -> VEHICLES, Nullable  | Set for direct purchases, NULL for auction purchases       |
 | `BUYER_ID`          | VARCHAR2(36)  | FK -> USERS               | Payer                                                      |
 | `SELLER_ID`         | VARCHAR2(36)  | FK -> USERS               | Payee (indirectly)                                         |
 | `AMOUNT_EGP`        | NUMBER(15,2)  | Not Null                  | Total amount paid                                          |
 | `CURRENCY`          | VARCHAR2(3)   | Default `EGP`             | Currency code                                              |
 | `PROCESSOR_FEE_EGP` | NUMBER(12,2)  | Not Null                  | Processor fee                                              |
 | `PAYMENT_METHOD`    | VARCHAR2(20)  | Not Null                  | Payment method                                             |
-| `GATEWAY`           | VARCHAR2(20)  | Not Null                  | e.g., `Paymob`                                             |
-| `GATEWAY_ORDER_ID`  | VARCHAR2(255) | Not Null                  | Gateway order id                                           |
-| `GATEWAY_TRANS_ID`  | VARCHAR2(255) |                           | Gateway transaction id                                     |
-| `STATUS`            | VARCHAR2(20)  | Check                     | `pending`, `processing`, `completed`, `failed`, `refunded` |
+| `GATEWAY`           | VARCHAR2(20)  | Not Null                  | e.g., `Stripe`                                             |
+| `GATEWAY_ORDER_ID`  | VARCHAR2(255) | Not Null                  | Gateway order id (Stripe PaymentIntent ID)                 |
+| `GATEWAY_TRANS_ID`  | VARCHAR2(255) |                           | Gateway transaction id (Stripe Charge ID)                  |
+| `PURCHASE_TYPE`     | VARCHAR2(20)  | Not Null, Default 'auction' | `auction` or `direct`                                    |
+| `STATUS`            | VARCHAR2(20)  | Check                     | `pending`, `completed`, `failed`, `refunded`, `cancelled`  |
 | `FAILURE_REASON`    | CLOB          |                           | Failure details                                            |
 | `INITIATED_AT`      | TIMESTAMP     | Default CURRENT_TIMESTAMP | Initiated timestamp                                        |
 | `COMPLETED_AT`      | TIMESTAMP     |                           | Completed timestamp                                        |
@@ -245,24 +251,30 @@ Transaction records.
 **Indexes:**
 
 - `IDX_PAYMENTS_AUCTION` - Index on AUCTION_ID
+- `IDX_PAYMENTS_VEHICLE` - Index on VEHICLE_ID
 - `IDX_PAYMENTS_BUYER` - Index on BUYER_ID
 - `IDX_PAYMENTS_SELLER` - Index on SELLER_ID
 - `IDX_PAYMENTS_STATUS` - Index on STATUS
 - `IDX_PAYMENTS_GATEWAY_ORDER` - Index on GATEWAY_ORDER_ID
+- `IDX_PAYMENTS_PURCHASE_TYPE` - Index on PURCHASE_TYPE
 
 **Constraints:**
 
 - `CHK_PAYMENTS_STATUS` - CHECK (STATUS IN ('pending', 'completed', 'failed', 'refunded', 'cancelled'))
+- `CHK_PAYMENTS_PURCHASE_TYPE` - CHECK (PURCHASE_TYPE IN ('auction', 'direct'))
+- `CHK_PAYMENTS_AUCTION_OR_VEHICLE` - CHECK ((AUCTION_ID IS NOT NULL AND VEHICLE_ID IS NULL) OR (AUCTION_ID IS NULL AND VEHICLE_ID IS NOT NULL))
+- `FK_PAYMENTS_VEHICLE` - Foreign key to VEHICLES(ID)
 
 ### 8. ESCROWS
 
-Funds held securely until transfer is confirmed.
+Funds held securely until transfer is confirmed (for both auction and direct purchases).
 
 | Column                | Type         | Constraints               | Description                                |
 | :-------------------- | :----------- | :------------------------ | :----------------------------------------- |
 | `ID`                  | VARCHAR2(36) | PK                        | UUID                                       |
 | `PAYMENT_ID`          | VARCHAR2(36) | Unique, FK -> PAYMENTS    | Source of funds                            |
-| `AUCTION_ID`          | VARCHAR2(36) | FK -> AUCTIONS            | Linked auction                             |
+| `AUCTION_ID`          | VARCHAR2(36) | FK -> AUCTIONS, Nullable  | Set for auction purchases, NULL for direct |
+| `VEHICLE_ID`          | VARCHAR2(36) | FK -> VEHICLES, Nullable  | Set for direct purchases, NULL for auction |
 | `SELLER_ID`           | VARCHAR2(36) | FK -> USERS               | Seller                                     |
 | `BUYER_ID`            | VARCHAR2(36) | FK -> USERS               | Buyer                                      |
 | `TOTAL_AMOUNT_EGP`    | NUMBER(15,2) | Not Null                  | Total held amount                          |
@@ -286,6 +298,7 @@ Funds held securely until transfer is confirmed.
 
 - `IDX_ESCROWS_PAYMENT` - Index on PAYMENT_ID
 - `IDX_ESCROWS_AUCTION` - Index on AUCTION_ID
+- `IDX_ESCROWS_VEHICLE` - Index on VEHICLE_ID
 - `IDX_ESCROWS_STATUS` - Index on STATUS
 - `IDX_ESCROWS_BUYER` - Index on BUYER_ID
 - `IDX_ESCROWS_SELLER` - Index on SELLER_ID
@@ -293,6 +306,8 @@ Funds held securely until transfer is confirmed.
 **Constraints:**
 
 - `CHK_ESCROWS_STATUS` - CHECK (STATUS IN ('held', 'released', 'refunded', 'disputed'))
+- `CHK_ESCROWS_AUCTION_OR_VEHICLE` - CHECK ((AUCTION_ID IS NOT NULL AND VEHICLE_ID IS NULL) OR (AUCTION_ID IS NULL AND VEHICLE_ID IS NOT NULL))
+- `FK_ESCROWS_VEHICLE` - Foreign key to VEHICLES(ID)
 
 ### 9. USER_RATINGS
 
@@ -433,13 +448,15 @@ Webhook delivery history and debugging information.
 
 ### V_PAYMENT_SUMMARY
 
-Comprehensive payment analytics view combining payments, escrows, auctions, and vehicles.
+Comprehensive payment analytics view combining payments, escrows, auctions (if applicable), and vehicles.
 
 **Columns:**
 
-- Payment details (ID, AUCTION_ID, BUYER_ID, SELLER_ID, AMOUNT_EGP, STATUS, timestamps)
+- Payment details (ID, AUCTION_ID (nullable), VEHICLE_ID (nullable), PURCHASE_TYPE, BUYER_ID, SELLER_ID, AMOUNT_EGP, STATUS, timestamps)
 - Escrow details (ID, STATUS, COMMISSION_EGP, SELLER_PAYOUT_EGP, BUYER_RECEIVED, SELLER_TRANSFER)
 - Vehicle details (VEHICLE_ID, YEAR, MAKE, MODEL)
+
+**Note:** For direct purchases, AUCTION_ID is NULL and VEHICLE_ID is set. For auction purchases, AUCTION_ID is set and VEHICLE_ID may be NULL (vehicle ID obtained through AUCTIONS table).
 
 **Usage:** Payment reporting, analytics, and financial dashboards
 
@@ -525,12 +542,8 @@ Fetches basic public user info.
 ## API Implementation Notes
 
 1.  **JSON Handling**:
-    <<<<<<< HEAD - Columns like `VEHICLES.FEATURES`, `INSPECTION_REPORTS.PHOTOS_URL`, `NOTIFICATIONS.CHANNELS_SENT`, `USER_RATINGS.CATEGORY_SCORES`, `USER_RATINGS.POSITIVE_ASPECTS`, `USER_RATINGS.NEGATIVE_ASPECTS` are stored as **CLOB** with `IS JSON` constraints. - Ensure your API backend parses these JSON strings when reading and stringifies them when writing.
-    =======
-    _ Columns like `VEHICLES.FEATURES`, `INSPECTION_REPORTS.PHOTOS_URL`, `NOTIFICATIONS.CHANNELS_SENT`, `USER_RATINGS.CATEGORY_SCORES`, `USER_RATINGS.POSITIVE_ASPECTS`, `USER_RATINGS.NEGATIVE_ASPECTS`, and `WEBHOOK_DELIVERY_LOG.PAYLOAD` are stored as **CLOB** with `IS JSON` constraints.
-    _ Ensure your API backend parses these JSON strings when reading and stringifies them when writing.
-
-    > > > > > > > main
+    - Columns like `VEHICLES.FEATURES`, `INSPECTION_REPORTS.PHOTOS_URL`, `NOTIFICATIONS.CHANNELS_SENT`, `USER_RATINGS.CATEGORY_SCORES`, `USER_RATINGS.POSITIVE_ASPECTS`, `USER_RATINGS.NEGATIVE_ASPECTS`, and `WEBHOOK_DELIVERY_LOG.PAYLOAD` are stored as **CLOB** with `IS JSON` constraints.
+    - Ensure your API backend parses these JSON strings when reading and stringifies them when writing.
 
 2.  **Date/Time**:
     - Timestamps use `TIMESTAMP(6)` (and some `TIMESTAMP WITH LOCAL TIME ZONE` in `USERS`).
@@ -540,18 +553,18 @@ Fetches basic public user info.
     - **Auction Lifecycle**: `draft` -> `scheduled` -> `live` -> `ended` -> `settled`.
     - **Escrow Lifecycle**: `held` -> (Buyer & Seller Confirm) -> `released`.
     - **KYC Status**: `pending` -> `approved` / `rejected`.
-    - **Payment Status**: `pending` -> `processing` -> `completed` (or `failed`/`refunded`).
+    - **Payment Status**: `pending` -> `completed` (or `failed`/`refunded`/`cancelled`).
+    - **Vehicle Status**: `draft` -> `active` -> `sold` (or `delisted`). Vehicles marked `sold` only after payment succeeds.
 
 4.  **Concurrency**:
     - The `AUCTIONS.CURRENT_BID_EGP` and `BID_COUNT` are denormalized fields. When placing a bid, ensure you use transactions to update the `BIDS` table and the `AUCTIONS` table atomically to prevent race conditions.
+    - For direct purchases, use availability checks with pending payment exclusions to prevent concurrent purchase attempts.
 
 5.  **Security**:
-    <<<<<<< HEAD - Always hash passwords before calling `sp_register_user` or comparing with `sp_login_user`. - Use `sp_login_user` to check for `BANNED` or `INACTIVE` status during authentication.
-    =======
-    _ Always hash passwords before calling `sp_register_user` or comparing with `sp_login_user`.
-    _ Use `sp_login_user` to check for `BANNED` or `INACTIVE` status during authentication.
-    _ **Webhook Security**: Validate webhook signatures using HMAC-SHA256 and the `SECRET_KEY` from `WEBHOOK_SUBSCRIPTIONS`.
-    _ **Stripe Webhooks**: Use `WEBHOOK_EVENTS.EVENT_ID` for idempotency - verify event hasn't been processed before executing business logic.
+    - Always hash passwords before calling `sp_register_user` or comparing with `sp_login_user`.
+    - Use `sp_login_user` to check for `BANNED` or `INACTIVE` status during authentication.
+    - **Webhook Security**: Validate webhook signatures using HMAC-SHA256 and the `SECRET_KEY` from `WEBHOOK_SUBSCRIPTIONS`.
+    - **Stripe Webhooks**: Use `WEBHOOK_EVENTS.EVENT_ID` for idempotency - verify event hasn't been processed before executing business logic.
 
 6.  **Real-Time Bidding**:
     - Use the `IDX_AUCTIONS_STATUS_ENDTIME` composite index for efficient scheduler queries.
@@ -564,6 +577,14 @@ Fetches basic public user info.
     - Include `X-Webhook-Signature` header with HMAC-SHA256(payload, SECRET_KEY).
 
 8.  **Payment Deadline Tracking**:
-    _ Set `AUCTIONS.PAYMENT_DEADLINE` to 24 hours after auction ends.
-    _ Use scheduled jobs to check `PAYMENT_DEADLINE` and trigger notifications for unpaid winners. \* Index on `PAYMENT_DEADLINE` enables efficient queries for overdue payments.
-    > > > > > > > main
+    - Set `AUCTIONS.PAYMENT_DEADLINE` to 24 hours after auction ends.
+    - Use scheduled jobs to check `PAYMENT_DEADLINE` and trigger notifications for unpaid winners.
+    - Index on `PAYMENT_DEADLINE` enables efficient queries for overdue payments.
+
+9.  **Direct Purchase vs Auction Payments**:
+    - **Auction Purchases**: `PAYMENTS.AUCTION_ID` is set, `VEHICLE_ID` is NULL, `PURCHASE_TYPE = 'auction'`
+    - **Direct Purchases**: `PAYMENTS.VEHICLE_ID` is set, `AUCTION_ID` is NULL, `PURCHASE_TYPE = 'direct'`
+    - Constraint enforces exactly one of `AUCTION_ID` or `VEHICLE_ID` must be set (not both, not neither).
+    - Same constraint applies to `ESCROWS` table.
+    - Vehicle status is changed to `sold` ONLY after payment succeeds (via Stripe webhook).
+    - Failed payments should rollback vehicle status to `active` to allow retry.

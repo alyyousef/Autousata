@@ -4,14 +4,15 @@ import { useParams, Link } from 'react-router-dom';
 import { 
   Gavel, Clock, MapPin, Share2, Heart, ShieldCheck, 
   ChevronLeft, ChevronRight, Calculator, AlertCircle, Info,
-  History, MessageCircle, FileText, Bell, XCircle, CreditCard, Wallet, Ban
+  History, MessageCircle, FileText, Bell, XCircle, Wallet, Ban
 } from 'lucide-react';
-import { MOCK_AUCTIONS } from '../constants';
 import { useNotifications } from '../contexts/NotificationContext';
 import { geminiService } from '../geminiService';
 import ImageLightbox from '../components/ImageLightbox';
+import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 import RealTimeBidHistory, { RealTimeBid } from '../components/RealTimeBidHistory';
 import * as socketService from '../services/socketService';
+import { apiService } from '../services/api';
 
 const MIN_BID = 10000;
 const MIN_INCREMENT = 500;
@@ -91,22 +92,15 @@ const readPaymentStatus = (auctionId: string) => {
 
 const AuctionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const auction = MOCK_AUCTIONS.find(a => a.id === id) || MOCK_AUCTIONS[0];
+  const [auction, setAuction] = useState<any>(null);
+  const [auctionLoading, setAuctionLoading] = useState(true);
+  const [auctionError, setAuctionError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [currentBid, setCurrentBid] = useState(() => {
-    const stored = readBidState(auction.id);
-    return stored?.currentBid ?? auction.currentBid;
-  });
-  const [bidCount, setBidCount] = useState(() => {
-    const stored = readBidState(auction.id);
-    return stored?.bidCount ?? auction.bidCount;
-  });
-  const [bidAmount, setBidAmount] = useState<number>(() => {
-    const stored = readBidState(auction.id);
-    const base = stored?.currentBid ?? auction.currentBid;
-    return Math.max(base + MIN_INCREMENT, MIN_BID);
-  });
+  const [currentBid, setCurrentBid] = useState(0);
+  const [bidCount, setBidCount] = useState(0);
+  const [bidAmount, setBidAmount] = useState<number>(MIN_BID);
+  const [minBidIncrement, setMinBidIncrement] = useState(MIN_INCREMENT);
   const [proxyMax, setProxyMax] = useState<number | ''>('');
   const [bidHistory, setBidHistory] = useState<RealTimeBid[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -117,8 +111,77 @@ const AuctionDetailPage: React.FC = () => {
   const [now, setNow] = useState(() => Date.now());
   const [isFinancingOpen, setIsFinancingOpen] = useState(false);
   const [financeAdvice, setFinanceAdvice] = useState<any>(null);
-  const auctionEndsAt = new Date(auction.endTime).getTime();
+  const paymentMethodOptions: CustomSelectOption[] = [
+    { value: 'card', label: 'Card (Stripe placeholder)' },
+    { value: 'bank', label: 'Bank transfer' },
+    { value: 'wallet', label: 'Wallet balance' }
+  ];
+  const auctionEndsAt = auction ? new Date(auction.endTime).getTime() : 0;
   const { addNotification: pushNotification } = useNotifications();
+
+  // Fetch auction data from API
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    const fetchAuction = async () => {
+      setAuctionLoading(true);
+      setAuctionError(null);
+      try {
+        const response = await apiService.getAuctionById(id);
+        if (cancelled) return;
+        if (response.error) {
+          setAuctionError(response.error);
+        } else if (response.data) {
+          const data = response.data;
+          // Transform API response to match expected shape
+          const transformedAuction = {
+            id: data._id,
+            vehicle: {
+              id: data.vehicleId?.id || '',
+              make: data.vehicleId?.make || '',
+              model: data.vehicleId?.model || '',
+              year: data.vehicleId?.year || 0,
+              mileage: data.vehicleId?.mileage || 0,
+              vin: data.vehicleId?.vin || '',
+              condition: data.vehicleId?.condition || 'Good',
+              description: data.vehicleId?.description || '',
+              images: data.vehicleId?.images || [],
+              location: data.vehicleId?.location || '',
+              features: data.vehicleId?.features || [],
+            },
+            sellerId: data.sellerId,
+            currentBid: data.currentBid || 0,
+            startingBid: data.startPrice || 0,
+            reservePrice: data.reservePrice || 0,
+            bidCount: data.bidCount || 0,
+            minBidIncrement: data.minBidIncrement || MIN_INCREMENT,
+            endTime: data.endTime,
+            status: data.status,
+            bids: [],
+          };
+          setAuction(transformedAuction);
+
+          // Initialize bid state from stored or API data
+          const stored = readBidState(transformedAuction.id);
+          const initialBid = stored?.currentBid ?? transformedAuction.currentBid;
+          const initialCount = stored?.bidCount ?? transformedAuction.bidCount;
+          setCurrentBid(initialBid);
+          setBidCount(initialCount);
+          setMinBidIncrement(transformedAuction.minBidIncrement);
+          setBidAmount(Math.max(initialBid + (transformedAuction.minBidIncrement || MIN_INCREMENT), MIN_BID));
+          setPaymentStatus(readPaymentStatus(transformedAuction.id));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setAuctionError('Failed to load auction details');
+        }
+      } finally {
+        if (!cancelled) setAuctionLoading(false);
+      }
+    };
+    fetchAuction();
+    return () => { cancelled = true; };
+  }, [id]);
 
   useEffect(() => {
     // Background fetch finance advice using Gemini
@@ -135,6 +198,7 @@ const AuctionDetailPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!auction) return;
     if (Date.now() < auctionEndsAt) return;
     if (readPaymentStatus(auction.id) === 'paid') return;
     if (readPaymentNotice(auction.id)) return;
@@ -147,35 +211,85 @@ const AuctionDetailPage: React.FC = () => {
 
   // Socket.IO Integration - Real-time auction updates
   useEffect(() => {
-    if (!id) return;
+    if (!id || !auction) return;
 
     // Initialize Socket.IO connection
-    socketService.initializeSocket();
+    const socket = socketService.initializeSocket();
 
     // Join the auction room
     socketService.joinAuction(id);
 
-    // Listen for bid placed events
-    const handleBidPlaced = (data: socketService.BidPlacedEvent) => {
-      setCurrentBid(data.auction.currentBid);
-      setBidCount(data.auction.bidCount);
-      
-      // Add bid to history
-      const newBid: RealTimeBid = {
-        id: data.bid.id,
-        bidderId: data.bid.bidderId,
-        amount: data.bid.amount,
-        timestamp: data.bid.timestamp,
-        isYou: false // Will be set by bidder ID comparison
-      };
-      setBidHistory(prev => [newBid, ...prev]);
+    // Listen for auction_joined — server sends current state & bid history
+    const handleAuctionJoined = (data: any) => {
+      setCurrentBid(data.currentBid);
+      setBidCount(data.bidCount);
+      setMinBidIncrement(data.minBidIncrement || MIN_INCREMENT);
+      setBidAmount(Math.max(data.currentBid + (data.minBidIncrement || MIN_INCREMENT), MIN_BID));
+    };
 
-      // Update suggested bid amount
-      setBidAmount(data.auction.currentBid + MIN_INCREMENT);
+    // Listen for bid_history — server sends recent bids on join
+    const handleBidHistory = (data: { bids: any[] }) => {
+      const formattedBids: RealTimeBid[] = (data.bids || []).map((b: any) => ({
+        id: b.id,
+        bidderId: b.displayName || 'Bidder',
+        amount: b.amount,
+        timestamp: b.timestamp,
+        isYou: b.isYou || false,
+      }));
+      setBidHistory(formattedBids);
+    };
 
-      // Show notification
+    // Listen for bid placed events (sent only to the bidder who placed it)
+    const handleBidPlaced = (data: any) => {
+      const bid = data.bid;
+      if (bid) {
+        const newBid: RealTimeBid = {
+          id: bid.id,
+          bidderId: 'You',
+          amount: bid.amount,
+          timestamp: bid.timestamp,
+          isYou: true,
+        };
+        setBidHistory(prev => [newBid, ...prev]);
+        addLocalNotification(
+          `Your bid of EGP ${bid.amount.toLocaleString()} was placed successfully!`,
+          'success'
+        );
+      }
+    };
+
+    // Listen for auction_updated — broadcast to all users in auction room
+    const handleAuctionUpdated = (data: any) => {
+      setCurrentBid(data.currentBid);
+      setBidCount(data.bidCount);
+      const increment = auction.minBidIncrement || MIN_INCREMENT;
+      setBidAmount(Math.max(data.currentBid + increment, MIN_BID));
+
+      // Add the new bid to history
+      if (data.newBid) {
+        const userId = localStorage.getItem('userId');
+        const isYou = data.leadingBidderId === userId;
+        const newBid: RealTimeBid = {
+          id: data.newBid.id,
+          bidderId: isYou ? 'You' : (data.newBid.displayName || 'Bidder'),
+          amount: data.newBid.amount,
+          timestamp: data.newBid.timestamp,
+          isYou,
+        };
+        setBidHistory(prev => [newBid, ...prev]);
+      }
+
+      // Update local storage
+      writeBidState(id, data.currentBid, data.bidCount);
+
+      // Handle auto-extension
+      if (data.autoExtended && data.newEndTime) {
+        setAuction((prev: any) => prev ? { ...prev, endTime: data.newEndTime } : prev);
+        addLocalNotification('Auction time extended due to late bid!', 'warn');
+      }
+
       addLocalNotification(
-        `New bid: EGP ${data.auction.currentBid.toLocaleString()}`,
+        `New bid: EGP ${data.currentBid.toLocaleString()}`,
         'info'
       );
     };
@@ -219,7 +333,10 @@ const AuctionDetailPage: React.FC = () => {
     };
 
     // Register event listeners
-    socketService.onBidPlaced(handleBidPlaced);
+    socket.on('auction_joined', handleAuctionJoined);
+    socket.on('bid_history', handleBidHistory);
+    socket.on('bid_placed', handleBidPlaced);
+    socket.on('auction_updated', handleAuctionUpdated);
     socketService.onUserOutbid(handleUserOutbid);
     socketService.onAuctionEnded(handleAuctionEnded);
     socketService.onAuctionEndingSoon(handleAuctionEndingSoon);
@@ -227,14 +344,17 @@ const AuctionDetailPage: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
-      socketService.offBidPlaced(handleBidPlaced);
+      socket.off('auction_joined', handleAuctionJoined);
+      socket.off('bid_history', handleBidHistory);
+      socket.off('bid_placed', handleBidPlaced);
+      socket.off('auction_updated', handleAuctionUpdated);
       socketService.offUserOutbid(handleUserOutbid);
       socketService.offAuctionEnded(handleAuctionEnded);
       socketService.offAuctionEndingSoon(handleAuctionEndingSoon);
       socketService.offBidError(handleBidError);
       socketService.leaveAuction(id);
     };
-  }, [id, pushNotification]);
+  }, [id, auction, pushNotification]);
 
   const addLocalNotification = (message: string, tone: Notification['tone']) => {
     setNotifications(prev => [
@@ -243,51 +363,7 @@ const AuctionDetailPage: React.FC = () => {
     ].slice(0, 5));
   };
 
-  const addBid = (amount: number, by: BidEntry['by'], note?: string) => {
-    setBidHistory(prev => [
-      ...prev,
-      { id: Math.random().toString(36).slice(2), amount, by, time: Date.now(), note }
-    ]);
-    setCurrentBid(amount);
-    setBidCount(prev => {
-      const next = prev + 1;
-      writeBidState(auction.id, amount, next);
-      return next;
-    });
-    if (by === 'you') {
-      pushNotification(
-        `Your bidding on the ${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model} is completed at EGP ${amount.toLocaleString()}.`,
-        'success'
-      );
-    } else {
-      pushNotification(`New bid placed at EGP ${amount.toLocaleString()}.`, 'info');
-    }
-  };
-
-  useEffect(() => {
-    if (isCancelled) return;
-    const timer = window.setInterval(() => {
-      if (Date.now() >= auctionEndsAt) return;
-      const base = Math.max(currentBid + MIN_INCREMENT, MIN_BID);
-      const jump = MIN_INCREMENT * (1 + Math.floor(Math.random() * 3));
-      const incoming = base + jump;
-
-      addBid(incoming, 'competitor', 'Live bid');
-      addLocalNotification(`New bid placed at EGP ${incoming.toLocaleString()}`, 'info');
-
-      if (proxyMax && incoming + MIN_INCREMENT <= proxyMax) {
-        const autoAmount = Math.min(proxyMax, incoming + MIN_INCREMENT);
-        window.setTimeout(() => {
-          addBid(autoAmount, 'you', 'Auto-bid');
-          addLocalNotification(`Auto-bid placed at EGP ${autoAmount.toLocaleString()}`, 'success');
-        }, 400);
-      } else if (proxyMax && incoming > proxyMax) {
-        addLocalNotification('You were outbid. Increase your maximum to regain the lead.', 'warn');
-      }
-    }, 12000);
-
-    return () => window.clearInterval(timer);
-  }, [auctionEndsAt, currentBid, isCancelled, proxyMax]);
+  // Fake competitor bid simulation removed — all bids come from Socket.IO now
 
   const formatTimeRemaining = (endTime: number, nowTime: number) => {
     const diff = endTime - nowTime;
@@ -300,7 +376,7 @@ const AuctionDetailPage: React.FC = () => {
     return `${days}d ${hours}h ${minutes}m ${seconds}s`;
   };
 
-  const minAllowedBid = Math.max(MIN_BID, currentBid + MIN_INCREMENT);
+  const minAllowedBid = Math.max(MIN_BID, currentBid + minBidIncrement);
 
   const handlePlaceBid = () => {
     if (isCancelled) {
@@ -342,19 +418,21 @@ const AuctionDetailPage: React.FC = () => {
   };
 
   const handleRetractBid = () => {
-    const lastBid = bidHistory[bidHistory.length - 1];
-    if (!lastBid || lastBid.by !== 'you') {
+    if (!auction) return;
+    const lastBid = bidHistory[0]; // bids are newest-first
+    if (!lastBid || !lastBid.isYou) {
       setBidError('Only your most recent bid can be retracted.');
       return;
     }
-    if (Date.now() - lastBid.time > RETRACTION_WINDOW_MINUTES * 60 * 1000) {
+    const bidTime = new Date(lastBid.timestamp).getTime();
+    if (Date.now() - bidTime > RETRACTION_WINDOW_MINUTES * 60 * 1000) {
       setBidError('Your retraction window has expired.');
       return;
     }
     setBidError(null);
     setBidHistory(prev => {
-      const next = prev.slice(0, -1);
-      const previousAmount = next[next.length - 1]?.amount ?? auction.currentBid;
+      const next = prev.slice(1);
+      const previousAmount = next[0]?.amount ?? auction.currentBid;
       setCurrentBid(previousAmount);
       setBidCount(count => {
         const nextCount = Math.max(0, count - 1);
@@ -379,6 +457,25 @@ const AuctionDetailPage: React.FC = () => {
       addLocalNotification('Payment confirmed. Thank you!', 'success');
     }, 1500);
   };
+
+  // Loading / Error states
+  if (auctionLoading) {
+    return (
+      <div className="bg-slate-50 min-h-screen flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+      </div>
+    );
+  }
+
+  if (auctionError || !auction) {
+    return (
+      <div className="bg-slate-50 min-h-screen flex flex-col justify-center items-center gap-4">
+        <AlertCircle size={48} className="text-rose-500" />
+        <p className="text-lg text-slate-700 font-semibold">{auctionError || 'Auction not found'}</p>
+        <Link to="/auctions" className="text-indigo-600 hover:underline text-sm font-medium">Back to Auctions</Link>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -699,17 +796,12 @@ const AuctionDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest text-slate-400">Payment method</label>
-                    <div className="relative mt-2">
-                      <select
+                    <div className="mt-2">
+                      <CustomSelect
                         value={paymentMethod}
-                        onChange={(event) => setPaymentMethod(event.target.value)}
-                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                      >
-                        <option value="card">Card (Stripe placeholder)</option>
-                        <option value="bank">Bank transfer</option>
-                        <option value="wallet">Wallet balance</option>
-                      </select>
-                      <CreditCard size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        options={paymentMethodOptions}
+                        onChange={(value) => setPaymentMethod(String(value))}
+                      />
                     </div>
                   </div>
                   <button

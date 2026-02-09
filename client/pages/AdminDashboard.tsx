@@ -13,7 +13,7 @@ const AdminDashboard: React.FC = () => {
   const location = useLocation();
   const adminToken = (location.state as any)?.token as string | undefined;
   // Optional: fallback to localStorage if state is missing
-  const effectiveToken = adminToken || localStorage.getItem('authToken') || undefined;
+  const effectiveToken = adminToken || localStorage.getItem('accessToken') || undefined;
   const [activeTab, setActiveTab] = useState<'vehicles' | 'kyc' | 'auctions' | 'payments'>('vehicles');
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [vehicleLoading, setVehicleLoading] = useState(false);
@@ -320,6 +320,7 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Photo</th>
                      <th className="px-4 py-4 w-[220px] text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vehicle</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Info</th>
+                      <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                       <th className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inspection</th>
                       <th className="px-4 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
@@ -363,6 +364,15 @@ const AdminDashboard: React.FC = () => {
                               <p>Mileage: {v.milage?.toLocaleString() ?? '—'} km · Location: {v.location || '—'}</p>
                               <p>Condition: {v.car_condition || '—'} · Price: {v.price ? `${v.price} ${v.currency || 'EGP'}` : '—'}</p>
                             </div>
+                          </td>
+                          <td className="px-4 py-6">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                              v.sale_type === 'auction'
+                                ? 'bg-violet-50 text-violet-600'
+                                : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {v.sale_type === 'auction' ? 'Auction' : 'Fixed Price'}
+                            </span>
                           </td>
                           <td className="px-4 py-6">
                             <select

@@ -166,6 +166,55 @@
   }
 
 
+// =========================================================
+  // BROWSE / BUY-NOW METHODS (Public)
+  // =========================================================
+
+  async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
+    const qp = new URLSearchParams();
+    if (params.page) qp.set('page', params.page.toString());
+    if (params.limit) qp.set('limit', params.limit.toString());
+    if (params.make) qp.set('make', params.make);
+    if (params.minPrice) qp.set('minPrice', params.minPrice.toString());
+    if (params.maxPrice) qp.set('maxPrice', params.maxPrice.toString());
+    if (params.bodyType) qp.set('bodyType', params.bodyType);
+    if (params.sort) qp.set('sort', params.sort);
+    return this.request<{ vehicles: any[]; page: number; limit: number; total: number; totalPages: number }>(`/vehicles/browse?${qp.toString()}`);
+  }
+
+  async getPublicVehicle(vehicleId: string) {
+    return this.request<any>(`/vehicles/browse/${vehicleId}`);
+  }
+
+  /**
+   * Create a Stripe Payment Intent for a direct (fixed-price) purchase
+   */
+  async createDirectPaymentIntent(vehicleId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        vehiclePrice: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      vehicle: {
+        id: string;
+        title: string;
+      };
+    }>('/payments/create-direct-intent', {
+      method: 'POST',
+      body: JSON.stringify({ vehicleId }),
+    });
+  }
+
+  // =========================================================
+  // VEHICLE & AUCTION CREATION METHODS
+  // =========================================================
+
   async createVehicle(data: any, files: File[]) {
     const formData = new FormData();
 
@@ -521,7 +570,35 @@
     }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
   }
 
+/**
+   * Get payment details by payment ID
+   */
+  async getPaymentById(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string | null;
+        vehicleId: string | null;
+        purchaseType: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/${paymentId}`);
+  }
 
+  /**
+   * Get escrow details
+   */
+ 
 
 
   adminGetUserTransactions(userId: string, queryString: string) {
