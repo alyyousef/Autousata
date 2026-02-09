@@ -12,5 +12,5 @@ router.put('/', authenticate, userController.updateProfile);
 // PUT /api/profile/avatar (Image Data)
 // We use 'upload.single("avatar")' because that's what the frontend sends
 router.put('/avatar', authenticate, upload.single('avatar'), userController.updateAvatar);
-
+router.put('/kyc', authenticate, upload.single('kycDocument'), userController.uploadKYC);
 module.exports = router;

@@ -7,6 +7,7 @@ import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { geminiService } from '../geminiService'; // Keeping AI service
 import { useLanguage } from '../contexts/LanguageContext';
+import { apiService } from '../services/api';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -32,11 +33,14 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     ),
     plateNumber: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().min(1, t('Plate number is required', 'رقم اللوحة مطلوب')).optional()
+      z
+        .string()
+        .regex(/^[A-Za-z]{1,3}[1-9]{1,4}$/, t('Plate number must be 1-3 letters then 1-4 numbers (no zeros)', 'رقم اللوحة يجب ان يكون 1-3 حروف وبعدها 1-4 أرقام (دون صفر)'))
+        .optional()
     ),
     color: z.string().min(1, t('Color is required', 'اللون مطلوب')),
     bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
-    transmission: z.enum(['manual', 'automatic']),
+    transmission: z.enum(['manual', 'automatic', 'other']),
     fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
     seats: z.coerce.number().min(1, t('Seats must be at least 1', 'عدد المقاعد يجب ان يكون واحد او اكثر')),
     condition: z.enum(['excellent', 'good', 'fair', 'poor']),
@@ -55,7 +59,7 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     startingBid: z.coerce.number().optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
-    // AI Notes (Optional, not sent to DB directly but used for generation)
+    // AI Notes
     aiNotes: z.string().optional(),
   }).refine(
     (data) => {
@@ -80,8 +84,12 @@ const CreateListingPage: React.FC = () => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
   const listingSchema = useMemo(() => createListingSchema(t), [t]);
+  
+  // ✅ FIX 1: Ensure this state is actually updated
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const currentYear = new Date().getFullYear();
   const blockInvalidNumberInput = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-', '.'].includes(event.key)) {
@@ -96,7 +104,7 @@ const CreateListingPage: React.FC = () => {
     setValue,
     trigger,
     getValues,
-    formState: { errors, isValid }
+    formState: { errors }
   } = useForm<ListingFormInput, unknown, ListingFormData>({
     resolver: zodResolver(listingSchema),
     mode: 'onChange',
@@ -116,8 +124,6 @@ const CreateListingPage: React.FC = () => {
   });
 
   const formData = watch();
-
-  // --- Handlers ---
 
   const handleAIHelp = async () => {
     setIsGeneratingAI(true);
@@ -139,11 +145,15 @@ const CreateListingPage: React.FC = () => {
       setIsGeneratingAI(false);
     }
   };
+
   const handleImagesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
-    // In a real app, upload to S3/Cloudinary here.
-    // For prototype, we convert to Base64.
+    // ✅ FIX 1: Add new files to the state so they can be uploaded
+    const newFiles = Array.from(files);
+    setImageFiles(prev => [...prev, ...newFiles]);
+
+    // Generate previews
     const readFile = (file: File) => new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -152,7 +162,8 @@ const CreateListingPage: React.FC = () => {
     });
 
     try {
-      const newImages = await Promise.all(Array.from(files).map(readFile));
+      const newImages = await Promise.all(newFiles.map(readFile));
+      // Update form data with previews for display
       setValue('images', [...(formData.images || []), ...newImages], { shouldValidate: true });
     } catch (err) {
       console.error(err);
@@ -172,8 +183,10 @@ const CreateListingPage: React.FC = () => {
   };
 
   const removeImage = (index: number) => {
+    // ✅ FIX 2: Remove from BOTH preview array and file array
     const current = getValues('images');
     setValue('images', current.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const validateStep = async (targetStep: number) => {
@@ -234,10 +247,16 @@ const CreateListingPage: React.FC = () => {
         description: data.description,
         location: data.location,
         features: data.features,
-        images: data.images // Warning: Large payloads if Base64!
       };
 
-      const vehicleRes = await axios.post(`${baseUrl}/vehicles`, vehiclePayload, config);
+      // ✅ FIX 3: Use apiService (which handles Auth & Port 5002)
+      // Send vehiclePayload + imageFiles
+      const vehicleRes = await apiService.createVehicle(vehiclePayload, imageFiles);
+
+      if (vehicleRes.error || !vehicleRes.data?._id) {
+        throw new Error(vehicleRes.error || t('Failed to create vehicle', 'فشل انشاء السيارة'));
+      }
+      
       const vehicleId = vehicleRes.data._id;
 
       // 2. Create Auction ONLY if sale type is 'auction'
@@ -253,20 +272,17 @@ const CreateListingPage: React.FC = () => {
       }
 
       // Success
-      navigate('/dashboard'); // Redirect to seller dashboard
+      navigate('/dashboard');
 
     } catch (err: any) {
       console.error(err);
-      const msg =
-        err.response?.data?.msg || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
+      const msg = err.message || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- UI Components ---
-  
   const steps = [
     { title: t('Vehicle Info', 'بيانات السيارة'), icon: Car },
     { title: t('Details & Photos', 'التفاصيل والصور'), icon: Camera },
@@ -332,6 +348,7 @@ const CreateListingPage: React.FC = () => {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       onKeyDown={blockInvalidNumberInput}
+                      placeholder={t('2022', '2022')}
                       {...register('year')}
                       className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.year ? "border-rose-300" : "border-slate-200")}
                     />
@@ -340,13 +357,13 @@ const CreateListingPage: React.FC = () => {
                   
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Make', 'الماركة')}</label>
-                    <input type="text" {...register('make')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.make ? "border-rose-300" : "border-slate-200")} />
+                    <input type="text" placeholder={t('Toyota', 'تويوتا')} {...register('make')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.make ? "border-rose-300" : "border-slate-200")} />
                     {errors.make && <p className="text-xs text-rose-600">{errors.make.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Model', 'الموديل')}</label>
-                    <input type="text" {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
+                    <input type="text" placeholder={t('Camry', 'كامري')} {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
                     {errors.model && <p className="text-xs text-rose-600">{errors.model.message}</p>}
                   </div>
                   
@@ -359,6 +376,7 @@ const CreateListingPage: React.FC = () => {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       onKeyDown={blockInvalidNumberInput}
+                      placeholder={t('45000', '45000')}
                       {...register('mileage')}
                       className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.mileage ? "border-rose-300" : "border-slate-200")}
                     />
@@ -373,13 +391,38 @@ const CreateListingPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Plate Number', 'رقم اللوحة')}</label>
-                    <input type="text" {...register('plateNumber')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")} />
+                    <input
+                      type="text"
+                      maxLength={7}
+                      pattern="[A-Za-z]{1,3}[1-9]{1,4}"
+                      placeholder={t('AB123', 'AB123')}
+                      onKeyDown={(event) => {
+                        if (event.key === '0') event.preventDefault();
+                      }}
+                      {...register('plateNumber')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")}
+                    />
                     {errors.plateNumber && <p className="text-xs text-rose-600">{errors.plateNumber.message}</p>}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Color', 'اللون')}</label>
-                    <input type="text" {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")} />
+                    <select {...register('color')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.color ? "border-rose-300" : "border-slate-200")}>
+                      <option value="">{t('Select color', 'اختر اللون')}</option>
+                      <option value="blue">{t('Blue', 'أزرق')}</option>
+                      <option value="red">{t('Red', 'أحمر')}</option>
+                      <option value="black">{t('Black', 'أسود')}</option>
+                      <option value="white">{t('White', 'أبيض')}</option>
+                      <option value="gray">{t('Gray', 'رمادي')}</option>
+                      <option value="silver">{t('Silver', 'فضي')}</option>
+                      <option value="green">{t('Green', 'أخضر')}</option>
+                      <option value="yellow">{t('Yellow', 'أصفر')}</option>
+                      <option value="orange">{t('Orange', 'برتقالي')}</option>
+                      <option value="brown">{t('Brown', 'بني')}</option>
+                      <option value="beige">{t('Beige', 'بيج')}</option>
+                      <option value="gold">{t('Gold', 'ذهبي')}</option>
+                      <option value="other">{t('Other', 'أخرى')}</option>
+                    </select>
                     {errors.color && <p className="text-xs text-rose-600">{errors.color.message}</p>}
                   </div>
 
@@ -402,6 +445,7 @@ const CreateListingPage: React.FC = () => {
                     <select {...register('transmission')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.transmission ? "border-rose-300" : "border-slate-200")}>
                       <option value="automatic">{t('Automatic', 'اوتوماتيك')}</option>
                       <option value="manual">{t('Manual', 'يدوي')}</option>
+                      <option value="other">{t('Other', 'أخرى')}</option>
                     </select>
                     {errors.transmission && <p className="text-xs text-rose-600">{errors.transmission.message}</p>}
                   </div>
@@ -419,17 +463,11 @@ const CreateListingPage: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Seats', 'عدد المقاعد')}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      step={1}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      onKeyDown={blockInvalidNumberInput}
-                      {...register('seats')}
-                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")}
-                    />
+                    <select {...register('seats')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.seats ? "border-rose-300" : "border-slate-200")}>
+                      {[1, 2, 3, 4, 5, 6, 7].map(value => (
+                        <option key={value} value={value}>{formatNumber(value)}</option>
+                      ))}
+                    </select>
                     {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
                   </div>
                   
@@ -537,6 +575,7 @@ const CreateListingPage: React.FC = () => {
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Full Description', 'الوصف الكامل')}</label>
                   <textarea 
                     {...register('description')}
+                    placeholder={t('Example: single owner, full service history, new tires...', 'مثال: مالك واحد، صيانة كاملة، كاوتش جديد...')}
                     className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none min-h-[200px] text-sm", errors.description ? "border-rose-300" : "border-slate-200")}
                   />
                   {errors.description && <p className="text-xs text-rose-600">{errors.description.message}</p>}

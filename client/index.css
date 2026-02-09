@@ -367,6 +367,12 @@ button.no-hover-rise:active {
   box-shadow: none;
 }
 
+.no-hover-rise:hover {
+  transform: none;
+  box-shadow: inherit;
+  border-color: inherit;
+}
+
 /* Utility: premium card hover used across the app */
 .premium-card-hover {
   transition:
@@ -383,6 +389,12 @@ button.no-hover-rise:active {
     0 22px 48px rgba(15, 23, 42, 0.28),
     6px 6px 0 -2px rgba(148, 163, 184, 0.45);
   border-color: rgba(148, 163, 184, 0.55);
+}
+
+.premium-card-hover.no-hover-rise:hover {
+  transform: none;
+  box-shadow: inherit;
+  border-color: inherit;
 }
 
 /* Disable hover lift on profile page cards only */
