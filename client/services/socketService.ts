@@ -5,7 +5,7 @@ let socket: Socket | null = null;
 
 // Get authentication token from localStorage
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('token');
+  return localStorage.getItem('accessToken');
 };
 
 // Initialize Socket.IO connection
