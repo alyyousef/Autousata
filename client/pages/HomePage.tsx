@@ -156,19 +156,6 @@ const HomePage: React.FC = () => {
     });
   }, [vehicles, searchTerm, searchFilter, conditionFilter]);
 
-  // Static buyer insight demo data
-  const buyerBidHistory = [
-    { id: 'bh-1', vehicle: '2021 Porsche 911 Carrera', amount: 95000, status: 'Leading' },
-    { id: 'bh-2', vehicle: '2022 Audi RS7', amount: 88000, status: 'Outbid' }
-  ];
-  const buyerNotifications = [
-    'Outbid on 2022 Audi RS7. Increase your max to regain the lead.',
-    'Proxy bid placed at EGP 95,000 on 2021 Porsche 911.'
-  ];
-  const buyerPayments = [
-    { id: 'pay-1', vehicle: '2019 BMW M4 Competition', status: 'Unpaid', amount: 120000 }
-  ];
-
   return (
     <>
       <div className="bg-slate-50 min-h-screen pb-20">
@@ -192,73 +179,6 @@ const HomePage: React.FC = () => {
               <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'بائعون موثقون')}</div>
               <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'اسعار واضحة')}</div>
               <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبق واضح')}</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Buyer Insights Panel */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 relative z-10">
-          <div className="buyer-insights-panel mx-auto max-w-6xl bg-white/95 border border-slate-200 rounded-3xl p-6 md:p-8 shadow-lg premium-card-hover no-hover-rise">
-            <div className="mb-6 text-center">
-              <h3 className="text-xl font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
-            </div>
-            <div className="grid gap-6 lg:grid-cols-3 text-left">
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Bid history', 'سجل المزايدات')}</h4>
-                <div className="space-y-4 text-sm">
-                  {buyerBidHistory.map(entry => (
-                    <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-                      <div className="space-y-2">
-                        <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
-                        <span className={`buyer-insights-status inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                          entry.status === 'Leading'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'تم تجاوزك')}
-                        </span>
-                      </div>
-                      <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
-                        {formatCurrencyEGP(entry.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Outbid notifications', 'اشعارات تجاوز المزايدة')}</h4>
-                <div className="space-y-4 text-sm text-slate-600">
-                  {buyerNotifications.map((note, index) => (
-                    <div key={index} className="buyer-insights-note w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-700">
-                      {t(note, 'اتسبقت في المزايدة. زود الحد الأقصى عشان ترجع الأول.')}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Payment status', 'حالة الدفع')}</h4>
-                <div className="space-y-4 text-sm">
-                  {buyerPayments.map(payment => (
-                    <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
-                      <div className="space-y-2">
-                        <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
-                        <span className="buyer-insights-status inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-                          {payment.status === 'Unpaid' ? t('Unpaid', 'غير مدفوع') : payment.status}
-                        </span>
-                      </div>
-                      <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
-                        {formatCurrencyEGP(payment.amount)}
-                      </span>
-                    </div>
-                  ))}
-                  <p className="buyer-insights-helper text-xs text-slate-400 mt-3">
-                    {t(
-                      'Payment methods and Stripe checkout are placeholders for API integration.',
-                      'طرق الدفع وStripe دلوقتي مجرد شكل تجريبي لحد ما API يتوصل.'
-                    )}
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </section>

@@ -5,10 +5,12 @@ import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
 import { AuctionStatus, VehicleStatus } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const [isEditing, setIsEditing] = useState(false);
   
@@ -676,29 +678,11 @@ const renderKycBadge = () => {
 
             {/* Recent Activity Section */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
-              <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
-              <div className="space-y-4">
-                {[
-                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: 'EGP 95,000' },
-                  { action: 'Listing Created', target: '2022 Audi RS6', date: 'Yesterday', amount: 'N/A' },
-                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: 'EGP 68,500' }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                        <ExternalLink size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900">{item.action}: {item.target}</h4>
-                        <p className="text-xs text-slate-500">{item.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-900">{item.amount}</p>
-                      <ChevronRight size={16} className="text-slate-300 ml-auto mt-1" />
-                    </div>
-                  </div>
-                ))}
+              <h3 className="text-xl font-black text-slate-900 mb-8">{t('Recent Activity', 'النشاط الأخير')}</h3>
+              <div className="text-center py-8 text-slate-400">
+                <ExternalLink size={32} className="mx-auto mb-3 text-slate-300" />
+                <p className="font-semibold text-slate-500">{t('No recent activity', 'لا يوجد نشاط حديث')}</p>
+                <p className="text-sm mt-1">{t('Your bids, purchases, and listings will appear here.', 'ستظهر مزايداتك ومشترياتك وقوائمك هنا.')}</p>
               </div>
             </div>
 

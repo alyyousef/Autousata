@@ -3,7 +3,6 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, MapPin, Loader2, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useNotifications } from '../contexts/NotificationContext';
-import { MOCK_AUCTIONS } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const PaymentConfirmationPage: React.FC = () => {
@@ -13,11 +12,9 @@ const PaymentConfirmationPage: React.FC = () => {
   const { t } = useLanguage();
   
   const [payment, setPayment] = useState<any>(null);
+  const [vehicle, setVehicle] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Fallback to mock auction for vehicle details
-  const mockAuction = MOCK_AUCTIONS.find(item => item.id === id);
 
   useEffect(() => {
     const fetchPaymentDetails = async () => {
@@ -60,14 +57,21 @@ const PaymentConfirmationPage: React.FC = () => {
 
         if (response?.data) {
           setPayment(response.data.payment);
+
+          // Fetch vehicle details from the payment's vehicleId or auctionId
+          const paymentData = response.data.payment;
+          if (paymentData.vehicleId) {
+            try {
+              const vehicleRes = await apiService.getPublicVehicle(paymentData.vehicleId);
+              if (vehicleRes.data) setVehicle(vehicleRes.data);
+            } catch {
+              // Vehicle details not available
+            }
+          }
           
-          // Show success notification once
-          if (response.data.payment.status === 'completed' && mockAuction) {
+          if (paymentData.status === 'completed') {
             addNotification(
-              t(
-                `Payment confirmed. You can pick up your ${mockAuction.vehicle.year} ${mockAuction.vehicle.make} ${mockAuction.vehicle.model} from ${mockAuction.vehicle.location}.`,
-                `تم تأكيد الدفع. تقدر تستلم ${mockAuction.vehicle.year} ${mockAuction.vehicle.make} ${mockAuction.vehicle.model} من ${mockAuction.vehicle.location}.`
-              ),
+              t('Payment confirmed successfully!', 'تم تأكيد الدفع بنجاح!'),
               'success'
             );
           }
@@ -81,7 +85,7 @@ const PaymentConfirmationPage: React.FC = () => {
     };
 
     fetchPaymentDetails();
-  }, [id, searchParams, addNotification, mockAuction, t]);
+  }, [id, searchParams, addNotification, t]);
 
   // Loading state
   if (isLoading) {
@@ -96,7 +100,7 @@ const PaymentConfirmationPage: React.FC = () => {
   }
 
   // Error state
-  if (error || !payment || !mockAuction) {
+  if (error || !payment) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-md">
@@ -119,7 +123,6 @@ const PaymentConfirmationPage: React.FC = () => {
   }
 
   const escrow = payment?.escrow;
-  const vehicle = mockAuction?.vehicle;
 
   return (
     <div className="min-h-screen bg-slate-50 py-12">

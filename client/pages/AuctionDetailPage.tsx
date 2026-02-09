@@ -25,8 +25,6 @@ type Notification = {
   tone: 'info' | 'warn' | 'success';
 };
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/800x500?text=No+Image+Available';
-
 const AuctionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -398,7 +396,7 @@ const AuctionDetailPage: React.FC = () => {
   const isAuctionEnded = now >= auctionEndsAt || auctionStatus === 'ended' || auctionStatus === 'cancelled';
   const minAllowedBid = Math.max(MIN_BID, currentBid + minBidIncrement);
   const reserveMet = currentBid >= reservePrice;
-  const images = auction?.vehicle?.images?.length > 0 ? auction.vehicle.images : [PLACEHOLDER_IMAGE];
+  const images: string[] = auction?.vehicle?.images?.length > 0 ? auction.vehicle.images : [];
 
   // ============================================================
   // BID ACTIONS
@@ -536,13 +534,13 @@ const AuctionDetailPage: React.FC = () => {
               {/* Gallery */}
               <div className="bg-white/95 rounded-2xl border border-slate-200 overflow-hidden shadow-sm premium-card-hover">
                 <div className="relative aspect-video group bg-slate-100">
-                  {images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? (
+                  {images.length > 0 ? (
                     <img
                       src={images[currentImageIndex]}
                       className="w-full h-full object-cover cursor-zoom-in"
                       alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
                       onClick={() => setLightboxSrc(images[currentImageIndex])}
-                      onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE; }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
@@ -550,7 +548,7 @@ const AuctionDetailPage: React.FC = () => {
                       <p className="mt-2 text-sm">No images available</p>
                     </div>
                   )}
-                  {images.length > 1 && images[0] !== PLACEHOLDER_IMAGE && (
+                  {images.length > 1 && (
                     <>
                       <button
                         title="Previous image"
@@ -572,7 +570,7 @@ const AuctionDetailPage: React.FC = () => {
                     {currentImageIndex + 1} / {images.length}
                   </div>
                 </div>
-                {images.length > 1 && images[0] !== PLACEHOLDER_IMAGE && (
+                {images.length > 1 && (
                   <div className="p-4 grid grid-cols-6 gap-3 overflow-x-auto">
                     {images.map((img: string, idx: number) => (
                       <button
@@ -586,7 +584,7 @@ const AuctionDetailPage: React.FC = () => {
                           className="w-full h-full object-cover cursor-zoom-in"
                           alt=""
                           onClick={(event) => { event.stopPropagation(); setLightboxSrc(img); }}
-                          onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE; }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       </button>
                     ))}

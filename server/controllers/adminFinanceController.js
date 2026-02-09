@@ -1,23 +1,3 @@
-if (process.env.MOCK_FINANCE === "true") {
-  return res.json({
-    range: { from, to, groupBy },
-    kpis: {
-      commissionEgp: 12500,
-      processorFeesEgp: 3200,
-      gmvEgp: 410000,
-      sellerPayoutEgp: 394300,
-      completedPaymentsCount: 3,
-      refundedAmountEgp: 0,
-    },
-    series: [
-      { bucket: "2026-02-01", commissionEgp: 3500, gmvEgp: 120000 },
-      { bucket: "2026-02-03", commissionEgp: 4000, gmvEgp: 150000 },
-      { bucket: "2026-02-05", commissionEgp: 5000, gmvEgp: 140000 },
-    ],
-    escrowsByStatus: [{ status: "released", count: 3, totalAmountEgp: 410000 }],
-  });
-}
-
 // server/controllers/adminFinanceController.js
 const oracledb = require("oracledb");
 const db = require("../config/db");

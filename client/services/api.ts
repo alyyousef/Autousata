@@ -182,6 +182,14 @@ const API_BASE_URL = 'http://localhost:5000/api';
     return this.request<{ vehicles: any[]; page: number; limit: number; total: number; totalPages: number }>(`/vehicles/browse?${qp.toString()}`);
   }
 
+  async getLandingStats() {
+    return this.request<{ activeListings: number; verifiedSellers: number; soldVehicles: number; avgTimeToSell: string; escrowProtected: string }>('/vehicles/stats');
+  }
+
+  async getFeaturedVehicles() {
+    return this.request<{ vehicles: any[] }>('/vehicles/featured');
+  }
+
   async getPublicVehicle(vehicleId: string) {
     return this.request<any>(`/vehicles/browse/${vehicleId}`);
   }
