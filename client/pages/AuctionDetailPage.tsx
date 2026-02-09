@@ -4,12 +4,13 @@ import { useParams, Link } from 'react-router-dom';
 import { 
   Gavel, Clock, MapPin, Share2, Heart, ShieldCheck, 
   ChevronLeft, ChevronRight, Calculator, AlertCircle, Info,
-  History, MessageCircle, FileText, Bell, XCircle, CreditCard, Wallet, Ban
+  History, MessageCircle, FileText, Bell, XCircle, Wallet, Ban
 } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useNotifications } from '../contexts/NotificationContext';
 import { geminiService } from '../geminiService';
 import ImageLightbox from '../components/ImageLightbox';
+import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 import RealTimeBidHistory, { RealTimeBid } from '../components/RealTimeBidHistory';
 import * as socketService from '../services/socketService';
 
@@ -117,6 +118,11 @@ const AuctionDetailPage: React.FC = () => {
   const [now, setNow] = useState(() => Date.now());
   const [isFinancingOpen, setIsFinancingOpen] = useState(false);
   const [financeAdvice, setFinanceAdvice] = useState<any>(null);
+  const paymentMethodOptions: CustomSelectOption[] = [
+    { value: 'card', label: 'Card (Stripe placeholder)' },
+    { value: 'bank', label: 'Bank transfer' },
+    { value: 'wallet', label: 'Wallet balance' }
+  ];
   const auctionEndsAt = new Date(auction.endTime).getTime();
   const { addNotification: pushNotification } = useNotifications();
 
@@ -699,17 +705,12 @@ const AuctionDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-xs uppercase tracking-widest text-slate-400">Payment method</label>
-                    <div className="relative mt-2">
-                      <select
+                    <div className="mt-2">
+                      <CustomSelect
                         value={paymentMethod}
-                        onChange={(event) => setPaymentMethod(event.target.value)}
-                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                      >
-                        <option value="card">Card (Stripe placeholder)</option>
-                        <option value="bank">Bank transfer</option>
-                        <option value="wallet">Wallet balance</option>
-                      </select>
-                      <CreditCard size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                        options={paymentMethodOptions}
+                        onChange={(value) => setPaymentMethod(String(value))}
+                      />
                     </div>
                   </div>
                   <button

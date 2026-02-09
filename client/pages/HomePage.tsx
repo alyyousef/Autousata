@@ -1,10 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'lucide-react';
+import { Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X } from 'lucide-react';
 import { MOCK_AUCTIONS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
+import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
@@ -200,6 +201,19 @@ const HomePage: React.FC = () => {
 
   const activeCount = listings.filter(listing => !delistedIds.has(listing.id)).length;
   const delistedCount = listings.length - activeCount;
+  const conditionOptions: CustomSelectOption[] = [
+    { value: 'All', label: t('All', 'الكل') },
+    { value: 'Mint', label: t('Mint', 'ممتاز جدا') },
+    { value: 'Excellent', label: t('Excellent', 'ممتازة') },
+    { value: 'Good', label: t('Good', 'جيدة') },
+    { value: 'Fair', label: t('Fair', 'مقبولة') }
+  ];
+  const sortOptions: CustomSelectOption[] = [
+    { value: 'relevance', label: t('Relevance', 'الاكثر صلة') },
+    { value: 'priceAsc', label: t('Price: low to high', 'السعر من الاقل للأعلى') },
+    { value: 'priceDesc', label: t('Price: high to low', 'السعر من الأعلى للأقل') },
+    { value: 'endingSoon', label: t('Ending soon', 'ينتهي قريبا') }
+  ];
   const buyerBidHistory = [
     { id: 'bh-1', vehicle: '2021 Porsche 911 Carrera', amount: 95000, status: 'Leading' },
     { id: 'bh-2', vehicle: '2022 Audi RS7', amount: 88000, status: 'Outbid' }
@@ -323,7 +337,7 @@ const HomePage: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-8 md:p-10 backdrop-blur-sm hero-panel">
+        <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-8 md:p-10 backdrop-blur-sm hero-panel relative z-30">
           <div className="space-y-6">
             <div>
               <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
@@ -358,7 +372,7 @@ const HomePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowFilters(prev => !prev)}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900 transition-colors"
+                  className="filter-toggle-btn inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-900 hover:text-slate-900 transition-colors"
                 >
                   <SlidersHorizontal size={16} />
                   {showFilters ? t('Hide filters', 'اخف الفلاتر') : t('Filters', 'فلاتر')}
@@ -416,22 +430,11 @@ const HomePage: React.FC = () => {
                     {t('Condition', 'الحالة')}
                   </label>
                   <div className="relative">
-                    <select
+                    <CustomSelect
                       value={conditionFilter}
-                      onChange={(event) => setConditionFilter(event.target.value)}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      {[
-                        { value: 'All', label: t('All', 'الكل') },
-                        { value: 'Mint', label: t('Mint', 'ممتاز جدا') },
-                        { value: 'Excellent', label: t('Excellent', 'ممتاز') },
-                        { value: 'Good', label: t('Good', 'جيد') },
-                        { value: 'Fair', label: t('Fair', 'مقبول') }
-                      ].map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      options={conditionOptions}
+                      onChange={(value) => setConditionFilter(String(value))}
+                    />
                   </div>
                 </div>
 
@@ -441,17 +444,11 @@ const HomePage: React.FC = () => {
                     {t('Sort by', 'ترتيب حسب')}
                   </label>
                   <div className="relative">
-                    <select
+                    <CustomSelect
                       value={sortBy}
-                      onChange={(event) => setSortBy(event.target.value as SortOption)}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      <option value="relevance">{t('Relevance', 'الاكثر صلة')}</option>
-                      <option value="priceAsc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
-                      <option value="priceDesc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
-                      <option value="endingSoon">{t('Ending soon', 'ينتهي قريبا')}</option>
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      options={sortOptions}
+                      onChange={(value) => setSortBy(value as SortOption)}
+                    />
                   </div>
                 </div>
 
