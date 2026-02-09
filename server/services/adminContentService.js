@@ -1,3 +1,4 @@
+const { get } = require("mongoose");
 const oracledb = require("oracledb");
 
 const getPendingPaymentsService = async () => {
@@ -579,6 +580,48 @@ const updateStatusKYC = async (userId, action = null) => {
     }
 };
 
+const getalluserskyc = async () => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT*
+            FROM DIP.USERS`,
+            [],
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        return result.rows.map((row) => ({
+            id: row.ID,
+            email: row.EMAIL,
+            phone: row.PHONE,
+            firstName: row.FIRST_NAME,
+            lastName: row.LAST_NAME,
+            isActive: row.IS_ACTIVE,
+            isBanned: row.IS_BANNED,
+            banreason: row.BAN_REASON,
+            bio: row.BIO,
+            locationCity: row.LOCATION_CITY,
+            profileurl: row.PROFILE_PIC_URL,
+            kycStatus: row.KYC_STATUS,
+            kycDocumentUrl: row.KYC_DOCUMENT_URL,
+            role: row.ROLE
+        }));
+    }
+    catch (error) {
+        console.error('Error fetching all users with KYC status:', error);
+        throw error;
+    }
+    finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing connection:', err);
+            }
+        }
+    }
+};
+
 const searchKYC = async (searchTerm) => {
     let connection;
     try {
@@ -596,7 +639,7 @@ const searchKYC = async (searchTerm) => {
                 U.BIO,
                 U.LOCATION_CITY,
                 U.ROLE,
-                U.KYC_DOCUMENT_URL,
+                U.KYC_DOCUMENT_URL
             FROM DIP.USERS U 
             WHERE LOWER(U.EMAIL) LIKE LOWER(:search)
                 OR LOWER(U.FIRST_NAME || ' ' || U.LAST_NAME) LIKE LOWER(:search)
@@ -839,5 +882,6 @@ module.exports = {
     searchKYC,
     filterKYCByStatus,
     viewKYCDetails,
-    viewuser
+    viewuser,
+    getalluserskyc
 };
