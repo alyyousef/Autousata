@@ -517,7 +517,8 @@ const getPendingKYCService = async () => {
                 IS_ACTIVE,
                 IS_BANNED,
                 KYC_STATUS,
-                KYC_DOCUMENT_URL
+                KYC_DOCUMENT_URL,
+                PROFILE_PIC_URL
             FROM DIP.USERS 
             WHERE KYC_STATUS = 'pending'`,
             [],
@@ -533,7 +534,8 @@ const getPendingKYCService = async () => {
             isActive: row.IS_ACTIVE,
             isBanned: row.IS_BANNED,
             kycStatus: row.KYC_STATUS,
-            kycDocumentUrl: row.KYC_DOCUMENT_URL
+            kycDocumentUrl: row.KYC_DOCUMENT_URL,
+            profileurl: row.PROFILE_PIC_URL   
         }));
     } catch (error) {
         console.error('Error fetching pending KYC documents:', error);

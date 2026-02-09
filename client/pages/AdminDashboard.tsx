@@ -48,7 +48,7 @@ const AdminDashboard: React.FC = () => {
   // Ensure the token passed via navigation is stored for API usage
   useEffect(() => {
     if (adminToken) {
-      localStorage.setItem('authToken', adminToken);
+      localStorage.setItem('accessToken', adminToken);
     }
   }, [adminToken]);
 
@@ -71,6 +71,8 @@ const AdminDashboard: React.FC = () => {
         
         setVehicles(data);
       } catch (e) {
+        console.error('Vehicles fetch error:', e);
+        console.error('Token being used:', effectiveToken ? 'Token exists' : 'No token');
         setVehicleError(e instanceof Error ? e.message : 'Failed to load vehicles');
       } finally {
         setVehicleLoading(false);
@@ -107,6 +109,7 @@ const AdminDashboard: React.FC = () => {
         setKycDocuments(data || []);
       } catch (e) {
         console.error('KYC fetch error:', e);
+        console.error('Token being used:', effectiveToken ? 'Token exists' : 'No token');
         setKycError(e instanceof Error ? e.message : 'Failed to load KYC documents');
         setKycDocuments([]);
       } finally {
@@ -144,6 +147,7 @@ const AdminDashboard: React.FC = () => {
         setAuctions(data || []);
       } catch (e) {
         console.error('Auctions fetch error:', e);
+        console.error('Token being used:', effectiveToken ? 'Token exists' : 'No token');
         setAuctionsError(e instanceof Error ? e.message : 'Failed to load auctions');
         setAuctions([]);
       } finally {
