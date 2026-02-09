@@ -4,10 +4,11 @@ const http = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const morgan = require('morgan'); // ✅ Added Morgan
+const morgan = require('morgan');
 require('dotenv').config();
 
-// Import DB
+// Import Middleware & DB
+const { errorHandler, notFound } = require('./middleware/errorMiddleware'); // ✅ Correct Import
 const db = require('./config/db');
 
 const app = express();
@@ -32,10 +33,10 @@ app.set('io', io);
 // =====================================================
 // 2. SECURITY MIDDLEWARE (Helmet & Rate Limit)
 // =====================================================
-app.use(helmet()); // Secure Headers
+app.use(helmet()); 
 
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000, 
     max: 100, 
     message: { error: 'Too many requests from this IP, please try again later.' }
 });
@@ -46,7 +47,7 @@ const authLimiter = rateLimit({
     message: { error: 'Too many login attempts, please try again later.' }
 });
 
-// Apply Global Limiter to API routes
+// Apply Global Limiter
 app.use('/api', globalLimiter);
 
 // =====================================================
@@ -63,7 +64,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ✅ HTTP Logger (Morgan) - Replaces manual console.log
+// HTTP Logger
 app.use(morgan('dev'));
 
 // =====================================================
@@ -75,12 +76,12 @@ const vehicleRoutes = require('./routes/vehicles');
 const auctionRoutes = require('./routes/auctions');
 const paymentRoutes = require('./routes/payments');
 
-// Apply Auth Limiter specifically to auth routes
+// Apply Routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/auctions', auctionRoutes);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/payments', paymentRoutes); // ✅ Defined exactly once here
 
 // Test Route
 app.get('/', (req, res) => {
@@ -88,7 +89,13 @@ app.get('/', (req, res) => {
 });
 
 // =====================================================
-// 5. SERVER STARTUP
+// 5. ERROR HANDLING (Must be after routes)
+// =====================================================
+app.use(notFound);      // ✅ Catches 404s
+app.use(errorHandler);  // ✅ Catches Errors & ORA messages
+
+// =====================================================
+// 6. SERVER STARTUP
 // =====================================================
 const initializeAuctionSocket = require('./sockets/auctionSocket');
 const auctionScheduler = require('./services/auctionScheduler');
