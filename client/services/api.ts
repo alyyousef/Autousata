@@ -28,105 +28,105 @@
   }
 
 
-  class ApiService {
-    // 1. Get tokens from storage
-    private getAccessToken(): string | null {
-      return localStorage.getItem('accessToken');
-    }
+    class ApiService {
+      // 1. Get tokens from storage
+      private getAccessToken(): string | null {
+        return localStorage.getItem('accessToken');
+      }
 
-    private getRefreshToken(): string | null {
-      return localStorage.getItem('refreshToken');
-    }
+      private getRefreshToken(): string | null {
+        return localStorage.getItem('refreshToken');
+      }
 
-    // 2. Helper to save both tokens
-    private setTokens(accessToken: string, refreshToken: string) {
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-    }
+      // 2. Helper to save both tokens
+      private setTokens(accessToken: string, refreshToken: string) {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
 
-    private clearTokens() {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-    }
+      private clearTokens() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
 
-    // =========================================================
-    // CORE REQUEST HANDLER (With Auto-Refresh Logic)
-    // =========================================================
-    private async request<T>(
-      endpoint: string,
-      options: RequestInit = {},
-      isRetry = false // Prevents infinite loops
-    ): Promise<ApiResponse<T>> {
-      
-      const token = this.getAccessToken();
-      const isFormData = options.body instanceof FormData;
+      // =========================================================
+      // CORE REQUEST HANDLER (With Auto-Refresh Logic)
+      // =========================================================
+      private async request<T>(
+        endpoint: string,
+        options: RequestInit = {},
+        isRetry = false // Prevents infinite loops
+      ): Promise<ApiResponse<T>> {
+        
+        const token = this.getAccessToken();
+        const isFormData = options.body instanceof FormData;
 
-      const headers: HeadersInit = {
-        ...(!isFormData && { 'Content-Type': 'application/json' }),
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      };
+        const headers: HeadersInit = {
+          ...(!isFormData && { 'Content-Type': 'application/json' }),
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...options.headers,
+        };
 
-      try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-          ...options,
-          headers,
-        });
+        try {
+          const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers,
+          });
 
-        // A. If Success, return data
-        if (response.ok) {
-          return { data: await response.json() };
-        }
-
-        const errorData = await response.json();
-
-        // B. If Token Expired (401), try to refresh!
-        if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
-          const success = await this.refreshAccessToken();
-          if (success) {
-            // Retry the ORIGINAL request with the NEW token
-            return this.request<T>(endpoint, options, true);
-          } else {
-            // Refresh failed -> Logout user
-            this.logout();
-            window.location.href = '/login'; 
-            return { error: 'Session expired. Please login again.' };
+          // A. If Success, return data
+          if (response.ok) {
+            return { data: await response.json() };
           }
+
+          const errorData = await response.json();
+
+          // B. If Token Expired (401), try to refresh!
+          if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
+            const success = await this.refreshAccessToken();
+            if (success) {
+              // Retry the ORIGINAL request with the NEW token
+              return this.request<T>(endpoint, options, true);
+            } else {
+              // Refresh failed -> Logout user
+              this.logout();
+              window.location.href = '/login'; 
+              return { error: 'Session expired. Please login again.' };
+            }
+          }
+
+          return { error: errorData.error || 'Request failed' };
+
+        } catch (error) {
+          return { error: error instanceof Error ? error.message : 'Network error' };
         }
-
-        return { error: errorData.error || 'Request failed' };
-
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Network error' };
       }
-    }
 
-    // =========================================================
-    // HELPER: Call the Backend to Swap Refresh Token
-    // =========================================================
-    private async refreshAccessToken(): Promise<boolean> {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) return false;
+      // =========================================================
+      // HELPER: Call the Backend to Swap Refresh Token
+      // =========================================================
+      private async refreshAccessToken(): Promise<boolean> {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) return false;
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
 
-        if (response.ok) {
-          const data = await response.json();
-          this.setTokens(data.accessToken, data.refreshToken);
-          return true;
+          if (response.ok) {
+            const data = await response.json();
+            this.setTokens(data.accessToken, data.refreshToken);
+            return true;
+          }
+        } catch (error) {
+          console.error('Refresh failed:', error);
         }
-      } catch (error) {
-        console.error('Refresh failed:', error);
+        
+        this.clearTokens();
+        return false;
       }
-      
-      this.clearTokens();
-      return false;
-    }
 
     // =========================================================
     // AUTH METHODS
@@ -207,51 +207,51 @@
       formData.append('password', password);
       if (profileImage) formData.append('profileImage', profileImage);
 
-      // Note: We expect accessToken/refreshToken now
-      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
-        method: 'POST',
-        body: formData,
-      });
+        // Note: We expect accessToken/refreshToken now
+        const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
+          method: 'POST',
+          body: formData,
+        });
 
-      if (response.data?.accessToken) {
-        this.setTokens(response.data.accessToken, response.data.refreshToken);
+        if (response.data?.accessToken) {
+          this.setTokens(response.data.accessToken, response.data.refreshToken);
+        }
+        return response;
       }
-      return response;
-    }
-  async verifyEmailOtp(email: string, otp: string) {
-      return this.request('/auth/verify-email-otp', {
-        method: 'POST',
-        body: JSON.stringify({ email, otp }),
-      });
-    }
-
-    async login(email: string, password: string) {
-      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (response.data?.accessToken) {
-        this.setTokens(response.data.accessToken, response.data.refreshToken);
+    async verifyEmailOtp(email: string, otp: string) {
+        return this.request('/auth/verify-email-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email, otp }),
+        });
       }
-      return response;
-    }
 
-    async logout() {
-      this.clearTokens();
-      return { data: { success: true } }; // Just clear local state
-    }
+      async login(email: string, password: string) {
+        const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
 
-    // =========================================================
-    // OTHER METHODS
-    // =========================================================
-    async getCurrentUser() {
-      return this.request<{ user: any }>('/auth/me');
-    }
+        if (response.data?.accessToken) {
+          this.setTokens(response.data.accessToken, response.data.refreshToken);
+        }
+        return response;
+      }
 
-    async getLoginHistory() {
-      return this.request<{ loginHistory: any[] }>('/auth/login-history');
-    }
+      async logout() {
+        this.clearTokens();
+        return { data: { success: true } }; // Just clear local state
+      }
+
+      // =========================================================
+      // OTHER METHODS
+      // =========================================================
+      async getCurrentUser() {
+        return this.request<{ user: any }>('/auth/me');
+      }
+
+      async getLoginHistory() {
+        return this.request<{ loginHistory: any[] }>('/auth/login-history');
+      }
 
     async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
       const queryParams = new URLSearchParams({
@@ -407,19 +407,19 @@
       }>(`/payments/escrows/${escrowId}`);
     }
 
-    /**
-     * Buyer confirms vehicle receipt (releases escrow)
-     */
-    async confirmVehicleReceipt(escrowId: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        escrowId: string;
-        sellerPayoutEGP: number;
-      }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
-        method: 'POST',
-      });
-    }
+      /**
+       * Buyer confirms vehicle receipt (releases escrow)
+       */
+      async confirmVehicleReceipt(escrowId: string) {
+        return this.request<{
+          success: boolean;
+          message: string;
+          escrowId: string;
+          sellerPayoutEGP: number;
+        }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+          method: 'POST',
+        });
+      }
 
 
     /**
