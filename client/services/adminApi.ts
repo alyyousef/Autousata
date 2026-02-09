@@ -114,6 +114,11 @@ export interface KYCDocument {
   submittedAt?: Date;
   reviewedAt?: Date;
   reviewedByAdminId?: string;
+  kycDocumentUrl?:string;
+  banreason?:string;
+  bio?:string;
+  profileurl?:string;
+  doc?:string;
 }
 
 export interface LiveAuction {
