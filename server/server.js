@@ -70,7 +70,7 @@ app.use(
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true,
   }),
 );
@@ -103,7 +103,6 @@ app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/admin/content", adminContentRoutes);
 const adminFinanceRoutes = require("./routes/adminFinance");
 app.use("/api/admin/finance", adminFinanceRoutes);
-
 app.use("/api/admin", adminRoutes);
 
 // Stripe redirect handler for 3D Secure / hash router compatibility
