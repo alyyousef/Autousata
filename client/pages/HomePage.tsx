@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X, Loader2 } from 'lucide-react';
+import { Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X, Loader2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiService } from '../services/api';
 import ImageLightbox from '../components/ImageLightbox';
+import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'year_desc';
 type SearchFilter = 'all' | 'make' | 'model' | 'year' | 'location';
@@ -47,6 +48,19 @@ const HomePage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const conditionOptions: CustomSelectOption[] = [
+    { value: 'All', label: t('All', 'الكل') },
+    { value: 'Excellent', label: t('Excellent', 'ممتازة') },
+    { value: 'Good', label: t('Good', 'جيدة') },
+    { value: 'Fair', label: t('Fair', 'مقبولة') },
+    { value: 'Poor', label: t('Poor', 'ضعيفة') }
+  ];
+  const sortOptions: CustomSelectOption[] = [
+    { value: 'newest', label: t('Newest', 'الأحدث') },
+    { value: 'price_asc', label: t('Price: low to high', 'السعر من الأقل للأعلى') },
+    { value: 'price_desc', label: t('Price: high to low', 'السعر من الأعلى للأقل') },
+    { value: 'year_desc', label: t('Newest model year', 'أحدث سنة') }
+  ];
 
   const conditionLabel = (condition: string) => {
     const key = condition.toLowerCase();
@@ -250,8 +264,8 @@ const HomePage: React.FC = () => {
         </section>
 
         {/* Search & Filters */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-          <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 relative z-30">
+          <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm relative z-30">
             <div className="space-y-6">
               <div>
                 <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
@@ -326,22 +340,11 @@ const HomePage: React.FC = () => {
                     {t('Condition', 'الحالة')}
                   </label>
                   <div className="relative">
-                    <select
+                    <CustomSelect
                       value={conditionFilter}
-                      onChange={(e) => setConditionFilter(e.target.value)}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      {[
-                        { value: 'All', label: t('All', 'الكل') },
-                        { value: 'Excellent', label: t('Excellent', 'ممتاز') },
-                        { value: 'Good', label: t('Good', 'جيد') },
-                        { value: 'Fair', label: t('Fair', 'مقبول') },
-                        { value: 'Poor', label: t('Poor', 'ضعيف') }
-                      ].map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      options={conditionOptions}
+                      onChange={(value) => setConditionFilter(String(value))}
+                    />
                   </div>
                 </div>
 
@@ -351,17 +354,11 @@ const HomePage: React.FC = () => {
                     {t('Sort by', 'ترتيب حسب')}
                   </label>
                   <div className="relative">
-                    <select
+                    <CustomSelect
                       value={sortBy}
-                      onChange={(e) => { setSortBy(e.target.value as SortOption); setPage(1); }}
-                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                    >
-                      <option value="newest">{t('Newest first', 'الاحدث اولا')}</option>
-                      <option value="price_asc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
-                      <option value="price_desc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
-                      <option value="year_desc">{t('Year: newest', 'السنة الاحدث')}</option>
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      options={sortOptions}
+                      onChange={(value) => { setSortBy(value as SortOption); setPage(1); }}
+                    />
                   </div>
                 </div>
               </div>

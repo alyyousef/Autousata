@@ -3,8 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Gavel, Clock, MapPin, Share2, Heart, ShieldCheck,
   ChevronLeft, ChevronRight, Calculator, AlertCircle, Info,
-  History, MessageCircle, FileText, Bell, XCircle, Wallet, Ban,
-  ImageOff
+  History, MessageCircle, FileText, Bell, XCircle, Wallet, Ban, ImageOff
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
