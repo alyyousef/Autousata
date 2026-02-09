@@ -355,6 +355,31 @@ async verifyEmailOtp(email: string, otp: string) {
   }
 
   /**
+   * Get payment details by payment ID
+   */
+  async getPaymentById(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string | null;
+        vehicleId: string | null;
+        purchaseType: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/${paymentId}`);
+  }
+
+  /**
    * Get escrow details
    */
   async getEscrowDetails(escrowId: string) {

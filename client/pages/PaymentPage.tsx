@@ -35,10 +35,13 @@ const PaymentForm: React.FC<{
     setErrorMessage(null);
 
     try {
+      // return_url must point to the server (not client) because hash routing
+      // doesn't survive Stripe redirects. Server redirects back to client hash URL.
+      const serverOrigin = 'http://localhost:5000';
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: window.location.origin + `/#/payment/${listingId}/confirmation`,
+          return_url: `${serverOrigin}/payment-redirect?listingId=${listingId}&paymentId=${paymentId}`,
         },
         redirect: 'if_required',
       });
@@ -49,18 +52,30 @@ const PaymentForm: React.FC<{
         return;
       }
 
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        const confirmResponse = await apiService.confirmPayment(paymentId);
-        
-        if (confirmResponse.error) {
-          setErrorMessage(confirmResponse.error);
-          setIsProcessing(false);
-          return;
+      if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+        // Small delay to let Stripe propagate the status
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        try {
+          const confirmResponse = await apiService.confirmPayment(paymentId);
+          if (confirmResponse.error) {
+            console.warn('Confirm response error (webhook may handle):', confirmResponse.error);
+          }
+        } catch (confirmErr) {
+          // Non-fatal — webhook will finalize the payment
+          console.warn('confirmPayment call failed, webhook will handle:', confirmErr);
         }
 
+        // Store paymentId so confirmation page can retrieve it
+        sessionStorage.setItem(`payment_${listingId}`, paymentId);
         navigate(`/payment/${listingId}/confirmation`);
+      } else if (paymentIntent && paymentIntent.status === 'requires_action') {
+        // 3D Secure or other authentication — Stripe will redirect
+        // After redirect, PaymentConfirmationPage handles confirmation
+        setErrorMessage(t('Additional authentication required. You will be redirected.', 'مطلوب مصادقة إضافية. ستتم إعادة توجيهك.'));
+        setIsProcessing(false);
       } else {
-        setErrorMessage(t('Payment processing incomplete', 'معالجة الدفع غير مكتملة'));
+        setErrorMessage(t('Payment processing incomplete. Please try again.', 'معالجة الدفع غير مكتملة. حاول مرة أخرى.'));
         setIsProcessing(false);
       }
     } catch (err) {
@@ -207,6 +222,8 @@ const PaymentPage: React.FC = () => {
           setClientSecret(response.data.clientSecret);
           setPaymentId(response.data.paymentId);
           setBreakdown(response.data.breakdown);
+          // Store paymentId so confirmation page can retrieve it (survives Stripe redirects)
+          sessionStorage.setItem(`payment_${id}`, response.data.paymentId);
         }
 
         setIsLoading(false);

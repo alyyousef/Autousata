@@ -11,11 +11,14 @@ export enum UserRole {
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   phone?: string;
   role: UserRole;
   isKycVerified: boolean;
   avatar?: string;
+  profileImage?: string;
   location?: {
     city?: string;
     country?: string;

@@ -72,16 +72,35 @@ export interface BidData {
   timestamp: string;
 }
 
-export interface AuctionUpdate {
+export interface AuctionJoinedEvent {
+  auctionId: string;
   currentBid: number;
   bidCount: number;
-  endTime?: string;
+  endTime: string;
+  status: string;
+  minBidIncrement: number;
+}
+
+export interface AuctionUpdate {
+  auctionId: string;
+  currentBid: number;
+  bidCount: number;
+  leadingBidderId?: string;
+  newBid?: {
+    id: string;
+    amount: number;
+    timestamp: string;
+    displayName: string;
+    isYou: boolean;
+  };
+  autoExtended?: boolean;
+  newEndTime?: string;
 }
 
 export interface BidPlacedEvent {
-  auctionId: string;
   bid: BidData;
-  auction: AuctionUpdate;
+  autoExtended?: boolean;
+  autoExtendInfo?: { newEndTime: string };
 }
 
 export interface UserOutbidEvent {

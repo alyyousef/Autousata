@@ -442,4 +442,11 @@ router.get('/escrows/disputed', authenticate, authorize('admin'), async (req, re
     }
 });
 
+/**
+ * @route   GET /api/payments/:id
+ * @desc    Get payment details by payment ID (must be last GET to avoid catching specific routes)
+ * @access  Private (Buyer, Seller, or Admin)
+ */
+router.get('/:id', authenticate, paymentController.getPaymentById);
+
 module.exports = router;

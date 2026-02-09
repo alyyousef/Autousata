@@ -32,7 +32,9 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Placeholder dates — will be overwritten on admin approval
-    const placeholderDate = new Date();
+    // IMPORTANT: END_TIME must be > START_TIME to satisfy CHK_AUCT_DATES constraint
+    const placeholderStart = new Date();
+    const placeholderEnd = new Date(placeholderStart.getTime() + (duration * 24 * 60 * 60 * 1000)); // duration days later
 
     connection = await oracledb.getConnection();
 
@@ -109,9 +111,9 @@ router.post('/', auth, async (req, res) => {
         vehicleId,
         sellerId: req.user.id,
         status: 'draft',
-        startTime: placeholderDate,
-        endTime: placeholderDate,
-        originalEndTime: placeholderDate,
+        startTime: placeholderStart,
+        endTime: placeholderEnd,
+        originalEndTime: placeholderEnd,
         durationDays: duration,
         reservePriceEgp: Number(reservePrice) || 0,
         startingBidEgp: startBid,

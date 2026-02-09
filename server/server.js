@@ -75,6 +75,20 @@ app.use("/api/admin/content", adminContentRoutes);
 const adminRoutes = require("./routes/admin");
 app.use("/api/admin", adminRoutes);
 
+// Stripe redirect handler for 3D Secure / hash router compatibility
+// Stripe cannot redirect to hash URLs, so we redirect here first
+app.get("/payment-redirect", (req, res) => {
+  const { listingId, paymentId, payment_intent, payment_intent_client_secret } = req.query;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const params = new URLSearchParams();
+  if (payment_intent) params.set('payment_intent', payment_intent);
+  if (payment_intent_client_secret) params.set('payment_intent_client_secret', payment_intent_client_secret);
+  if (paymentId) params.set('paymentId', paymentId);
+  const hash = `/payment/${listingId || 'unknown'}/confirmation`;
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  res.redirect(`${clientUrl}/#${hash}${queryString}`);
+});
+
 // Test Route
 app.get("/", (req, res) => {
   res.json({ status: "Online", message: "Server is running on Port " + PORT });
