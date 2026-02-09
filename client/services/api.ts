@@ -204,6 +204,48 @@
     });
   }
 
+
+  async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+
+    Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+             if(Array.isArray(data[key])) {
+                 formData.append(key, JSON.stringify(data[key]));
+             } else {
+                 formData.append(key, String(data[key]));
+             }
+        }
+    });
+
+    files.forEach((file) => {
+        formData.append('images', file);
+    });
+
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData, 
+    });
+  }
+
+  async createAuction(data: any) {
+    return this.request<any>('/auctions', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+  }
+
+    
+
+    // =========================================================
+    // PAYMENT METHODS
+    // =========================================================
+    
+
+      
+
+
+
     // =========================================================
     // OTHER METHODS
     // =========================================================
@@ -244,39 +286,9 @@
       return this.request<any[]>('/vehicles');
     }
 
-  async getVehicleById(vehicleId: string) {
-    return this.request<any>(`/vehicles/${vehicleId}`);
-  }
-
-  async createVehicle(data: any, files: File[]) {
-    const formData = new FormData();
-
-    Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
-             if(Array.isArray(data[key])) {
-                 formData.append(key, JSON.stringify(data[key]));
-             } else {
-                 formData.append(key, String(data[key]));
-             }
-        }
-    });
-
-    files.forEach((file) => {
-        formData.append('images', file);
-    });
-
-    return this.request<{ _id: string }>('/vehicles', {
-      method: 'POST',
-      body: formData, 
-    });
-  }
-
-  async createAuction(data: any) {
-    return this.request<any>('/auctions', {
-        method: 'POST',
-        body: JSON.stringify(data)
-    });
-  }
+    async getVehicleById(vehicleId: string) {
+      return this.request<any>(`/vehicles/${vehicleId}`);
+    }
 
     async getSellerAuctions() {
       return this.request<{ auctions: any[] }>('/auctions/seller');
@@ -317,8 +329,7 @@
           platformCommission: number;
           stripeFee: number;
           totalAmount: number;
-          sellerPayout: number;
-        };
+          sellerPayout: number;   };
         auction: {
           id: string;
           vehicle: string;
@@ -330,20 +341,8 @@
       });
     }
 
-    /**
-     * Confirm payment completion
-     */
-    async confirmPayment(paymentId: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        paymentId: string;
-        escrowId: string;
-      }>(`/payments/${paymentId}/confirm`, {
-        method: 'POST',
-      });
-    }
-
+     
+ 
     /**
      * Get payment details by auction ID
      */
@@ -367,85 +366,116 @@
       }>(`/payments/auction/${auctionId}`);
     }
 
-  async getEscrowDetails(escrowId: string) {
-    return this.request<{
-      success: boolean;
-      escrow: {
-        id: string;
-        auctionId: string;
-        totalAmountEGP: number;
-        commissionEGP: number;
+ 
+      
+
+    /**
+     * Confirm payment completion
+     */
+    async confirmPayment(paymentId: string) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        paymentId: string;
+        escrowId: string;
+      }>(`/payments/${paymentId}/confirm`, {
+        method: 'POST',
+      });
+    }
+
+   
+    async getEscrowDetails(escrowId: string) {
+      return this.request<{
+        success: boolean;
+        escrow: {
+          id: string;
+          auctionId: string;
+          totalAmountEGP: number;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+          status: string;
+          buyerReceived?: string;
+          vehicle: {
+            year: number;
+            make: string;
+            model: string;
+          };
+        };
+      }>(`/payments/escrows/${escrowId}`);
+    }
+
+    /**
+     * Buyer confirms vehicle receipt (releases escrow)
+     */
+    async confirmVehicleReceipt(escrowId: string) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        escrowId: string;
         sellerPayoutEGP: number;
-        status: string;
-        buyerReceived?: string;
-        vehicle: {
-          year: number;
-          make: string;
-          model: string;
-        };
-      };
-    }>(`/payments/escrows/${escrowId}`);
-  }
+      }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+        method: 'POST',
+      });
+    }
 
-  async confirmVehicleReceipt(escrowId: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      escrowId: string;
-      sellerPayoutEGP: number;
-    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
-      method: 'POST',
-    });
-  }
 
-  async initiateDispute(escrowId: string, reason: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      escrowId: string;
-    }>(`/payments/escrows/${escrowId}/dispute`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-  }
+    /**
+     * Initiate dispute on escrow
+     */
+    async initiateDispute(escrowId: string, reason: string) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        escrowId: string;
+      }>(`/payments/escrows/${escrowId}/dispute`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+    }
 
-  async getDisputedEscrows() {
-    return this.request<{
-      success: boolean;
-      disputes: Array<{
-        id: string;
-        auctionId: string;
-        totalAmountEGP: number;
-        disputeReason: string;
-        disputedAt: string;
-        vehicle: {
-          year: number;
-          make: string;
-          model: string;
-        };
-        buyer: {
-          name: string;
-          email: string;
-        };
-        seller: {
-          name: string;
-          email: string;
-        };
-      }>;
-    }>('/payments/escrows/disputed');
-  }
+    /**
+     * Admin: Get all disputed escrows
+     */
+    async getDisputedEscrows() {
+      return this.request<{
+        success: boolean;
+        disputes: Array<{
+          id: string;
+          auctionId: string;
+          totalAmountEGP: number;
+          disputeReason: string;
+          disputedAt: string;
+          vehicle: {
+            year: number;
+            make: string;
+            model: string;
+          };
+          buyer: {
+            name: string;
+            email: string;
+          };
+          seller: {
+            name: string;
+            email: string;
+          };
+        }>;
+      }>('/payments/escrows/disputed');
+    }
 
-  async processRefund(paymentId: string, reason: string, amount?: number) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      refundId: string;
-      amountRefundedEGP: number;
-    }>(`/payments/${paymentId}/refund`, {
-      method: 'POST',
-      body: JSON.stringify({ reason, amount }),
-    });
-  }
+    /**
+     * Admin: Process refund
+     */
+    async processRefund(paymentId: string, reason: string, amount?: number) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        refundId: string;
+        amountRefundedEGP: number;
+      }>(`/payments/${paymentId}/refund`, {
+        method: 'POST',
+        body: JSON.stringify({ reason, amount }),
+      });
+    }
 
     // ===================== Admin Content =====================
     async getPendingKYC() {
@@ -507,12 +537,21 @@
   }
 
 
+
+
+
+
+
+
+
   adminSuspendUser(userId: string, body: { reason: string }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
       method: "PATCH",
       body: JSON.stringify(body),
     });
   }
+
+
 
   adminReactivateUser(userId: string) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
