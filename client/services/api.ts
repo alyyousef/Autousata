@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5002/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -152,10 +152,21 @@ class ApiService {
     }
     return response;
   }
-async verifyEmailOtp(email: string, otp: string) {
+
+  async verifyEmailOtp(email: string, otp: string) {
     return this.request('/auth/verify-email-otp', {
       method: 'POST',
       body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file); 
+
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>('/profile/kyc', {
+      method: 'PUT',
+      body: formData,
     });
   }
 
@@ -174,6 +185,23 @@ async verifyEmailOtp(email: string, otp: string) {
   async logout() {
     this.clearTokens();
     return { data: { success: true } }; // Just clear local state
+  }
+
+  // =========================================================
+  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // =========================================================
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
   }
 
   // =========================================================
@@ -220,7 +248,7 @@ async verifyEmailOtp(email: string, otp: string) {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
-  // =========================================================
+// =========================================================
   // BROWSE / BUY-NOW METHODS (Public)
   // =========================================================
 
@@ -265,6 +293,40 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
+  // =========================================================
+  // VEHICLE & AUCTION CREATION METHODS
+  // =========================================================
+
+  async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+
+    Object.keys(data).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+             if(Array.isArray(data[key])) {
+                 formData.append(key, JSON.stringify(data[key]));
+             } else {
+                 formData.append(key, String(data[key]));
+             }
+        }
+    });
+
+    files.forEach((file) => {
+        formData.append('images', file);
+    });
+
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData, 
+    });
+  }
+
+  async createAuction(data: any) {
+    return this.request<any>('/auctions', {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+  }
+
   async getSellerAuctions() {
     return this.request<{ auctions: any[] }>('/auctions/seller');
   }
@@ -291,9 +353,6 @@ async verifyEmailOtp(email: string, otp: string) {
   // PAYMENT METHODS
   // =========================================================
   
-  /**
-   * Create a Stripe Payment Intent for an auction
-   */
   async createPaymentIntent(auctionId: string) {
     return this.request<{
       success: boolean;
@@ -317,9 +376,6 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
-  /**
-   * Confirm payment completion
-   */
   async confirmPayment(paymentId: string) {
     return this.request<{
       success: boolean;
@@ -331,9 +387,6 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
-  /**
-   * Get payment details by auction ID
-   */
   async getPaymentByAuction(auctionId: string) {
     return this.request<{
       success: boolean;
@@ -354,7 +407,7 @@ async verifyEmailOtp(email: string, otp: string) {
     }>(`/payments/auction/${auctionId}`);
   }
 
-  /**
+/**
    * Get payment details by payment ID
    */
   async getPaymentById(paymentId: string) {
@@ -402,9 +455,6 @@ async verifyEmailOtp(email: string, otp: string) {
     }>(`/payments/escrows/${escrowId}`);
   }
 
-  /**
-   * Buyer confirms vehicle receipt (releases escrow)
-   */
   async confirmVehicleReceipt(escrowId: string) {
     return this.request<{
       success: boolean;
@@ -416,9 +466,6 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
-  /**
-   * Initiate dispute on escrow
-   */
   async initiateDispute(escrowId: string, reason: string) {
     return this.request<{
       success: boolean;
@@ -430,9 +477,6 @@ async verifyEmailOtp(email: string, otp: string) {
     });
   }
 
-  /**
-   * Admin: Get all disputed escrows
-   */
   async getDisputedEscrows() {
     return this.request<{
       success: boolean;
@@ -459,9 +503,6 @@ async verifyEmailOtp(email: string, otp: string) {
     }>('/payments/escrows/disputed');
   }
 
-  /**
-   * Admin: Process refund
-   */
   async processRefund(paymentId: string, reason: string, amount?: number) {
     return this.request<{
       success: boolean;

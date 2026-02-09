@@ -10,7 +10,8 @@ const dbConfig = {
     connectString: process.env.ORACLE_CONN_STR,
     poolMin: 2,
     poolMax: 10,
-    poolIncrement: 2
+    poolIncrement: 1 ,
+    poolTimeout: 60,
 };
 
 let pool = null;

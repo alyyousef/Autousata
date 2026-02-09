@@ -5,6 +5,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { StripeProvider } from './contexts/StripeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { UserRole } from './types';
+import ResetPasswordPage from './pages/ResetPasswordPage'; // <--- Add this import
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import LandingPage from './pages/LandingPage';
@@ -74,6 +75,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
