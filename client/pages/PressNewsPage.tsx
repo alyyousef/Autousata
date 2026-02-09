@@ -64,7 +64,7 @@ const PressNewsPage: React.FC = () => {
         <div className="mt-12 text-center">
           <Link
             to="/browse"
-            className="primary-cta inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-colors"
+            className="market-cta-secondary inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-colors"
           >
             {t('Browse listings', 'تصفح القوائم')}
           </Link>
