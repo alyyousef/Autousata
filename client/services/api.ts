@@ -1,32 +1,8 @@
-const API_BASE_URL = 'http://localhost:5002/api';
-
+const API_BASE_URL = 'http://localhost:5005/api';
 interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
-type TransactionsResponse = {
-  page: number;
-  limit: number;
-  items: any[];
-};
-
-
-
-
-
-
-
-export interface KycItem {
-  id: string;
-  email?: string;
-  phone?: string;
-  firstName?: string;
-  lastName?: string;
-  documentType?: string;
-  status?: string;
-  submittedAt?: string;
-}
-
 
 class ApiService {
   // 1. Get tokens from storage
@@ -160,6 +136,14 @@ class ApiService {
     });
   }
 
+  // ✅ NEW METHOD: Resend OTP
+  async resendOtp(email: string) {
+    return this.request<{ message: string }>('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
   async uploadKYC(file: File) {
     const formData = new FormData();
     formData.append('kycDocument', file); 
@@ -188,7 +172,7 @@ class ApiService {
   }
 
   // =========================================================
-  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // PASSWORD RESET METHODS
   // =========================================================
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
@@ -247,55 +231,6 @@ class ApiService {
   async getVehicleById(vehicleId: string) {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
-
-// =========================================================
-  // BROWSE / BUY-NOW METHODS (Public)
-  // =========================================================
-
-  async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
-    const qp = new URLSearchParams();
-    if (params.page) qp.set('page', params.page.toString());
-    if (params.limit) qp.set('limit', params.limit.toString());
-    if (params.make) qp.set('make', params.make);
-    if (params.minPrice) qp.set('minPrice', params.minPrice.toString());
-    if (params.maxPrice) qp.set('maxPrice', params.maxPrice.toString());
-    if (params.bodyType) qp.set('bodyType', params.bodyType);
-    if (params.sort) qp.set('sort', params.sort);
-    return this.request<{ vehicles: any[]; page: number; limit: number; total: number; totalPages: number }>(`/vehicles/browse?${qp.toString()}`);
-  }
-
-  async getPublicVehicle(vehicleId: string) {
-    return this.request<any>(`/vehicles/browse/${vehicleId}`);
-  }
-
-  /**
-   * Create a Stripe Payment Intent for a direct (fixed-price) purchase
-   */
-  async createDirectPaymentIntent(vehicleId: string) {
-    return this.request<{
-      success: boolean;
-      clientSecret: string;
-      paymentId: string;
-      breakdown: {
-        vehiclePrice: number;
-        platformCommission: number;
-        stripeFee: number;
-        totalAmount: number;
-        sellerPayout: number;
-      };
-      vehicle: {
-        id: string;
-        title: string;
-      };
-    }>('/payments/create-direct-intent', {
-      method: 'POST',
-      body: JSON.stringify({ vehicleId }),
-    });
-  }
-
-  // =========================================================
-  // VEHICLE & AUCTION CREATION METHODS
-  // =========================================================
 
   async createVehicle(data: any, files: File[]) {
     const formData = new FormData();
@@ -407,34 +342,6 @@ class ApiService {
     }>(`/payments/auction/${auctionId}`);
   }
 
-/**
-   * Get payment details by payment ID
-   */
-  async getPaymentById(paymentId: string) {
-    return this.request<{
-      success: boolean;
-      payment: {
-        id: string;
-        auctionId: string | null;
-        vehicleId: string | null;
-        purchaseType: string;
-        amountEGP: number;
-        status: string;
-        initiatedAt: string;
-        completedAt?: string;
-        escrow?: {
-          id: string;
-          status: string;
-          commissionEGP: number;
-          sellerPayoutEGP: number;
-        };
-      };
-    }>(`/payments/${paymentId}`);
-  }
-
-  /**
-   * Get escrow details
-   */
   async getEscrowDetails(escrowId: string) {
     return this.request<{
       success: boolean;
@@ -514,95 +421,6 @@ class ApiService {
       body: JSON.stringify({ reason, amount }),
     });
   }
-
-  // ===================== Admin Content =====================
-  async getPendingKYC() {
-    return this.request<KycItem[]>('/admin/kyc/pending', {
-      method: 'GET',
-    });
-  }
-
-  async getLiveAuctions() {
-    return this.request<unknown[]>('/admin/auctions/live', {
-      method: 'GET',
-    });
-  }
-
-  async getPendingPayments() {
-    return this.request<unknown[]>('/admin/payments/pending', {
-      method: 'GET',
-    });
-  }
-
-
-
-
-
-  // Inside ApiService class
-
-public adminListUsers(page = 1, limit = 20) {
-  return this.request<{
-    items: any[];
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
 }
-
-public adminSearchUsers(q: string, page = 1, limit = 20) {
-  return this.request<{
-    items: any[];
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  }>(
-    `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
-    { method: "GET" }
-  );
-}
-
-
-
-adminGetUserTransactions(userId: string, queryString: string) {
-  const qs = queryString ? `?${queryString}` : "";
-  return this.request<TransactionsResponse>(
-    `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
-    { method: "GET" }
-  );
-
-}
-
-
-adminSuspendUser(userId: string, body: { reason: string }) {
-  return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-adminReactivateUser(userId: string) {
-  return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
-    method: "PATCH",
-  });
-}
-
-adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
-  return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-
-
-}
-
-
-
-
-
-
 
 export const apiService = new ApiService();

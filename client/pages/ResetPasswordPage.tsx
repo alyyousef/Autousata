@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, ArrowRight, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
+// Define Validation Schema
 const schema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string()
@@ -20,6 +22,9 @@ const ResetPasswordPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  
+  // ✅ 1. Get Logout Function
+  const { logout } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
@@ -36,7 +41,7 @@ const ResetPasswordPage: React.FC = () => {
     }
   }, [token, navigate]);
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
     if (!token) return;
     
     setStatus('loading');
@@ -49,7 +54,12 @@ const ResetPasswordPage: React.FC = () => {
         setServerError(res.error);
         setStatus('idle');
       } else {
+        // ✅ 2. FORCE LOGOUT ON SUCCESS
+        // This clears the old token so the user is not "half-logged-in"
+        await logout();
+        
         setStatus('success');
+        
         // Optional: Redirect after a delay
         setTimeout(() => navigate('/login'), 3000);
       }
