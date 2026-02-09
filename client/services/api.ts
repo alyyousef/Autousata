@@ -132,33 +132,7 @@
     // AUTH METHODS
     // =========================================================
     
-    async register(firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) {
-      const formData = new FormData();
-      formData.append('firstName', firstName);
-      formData.append('lastName', lastName);
-      formData.append('email', email);
-      formData.append('phone', phone);
-      formData.append('password', password);
-      if (profileImage) formData.append('profileImage', profileImage);
-
-      // Note: We expect accessToken/refreshToken now
-      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
-        method: 'POST',
-        body: formData,
-      });
-
-    if (response.data?.accessToken) {
-      this.setTokens(response.data.accessToken, response.data.refreshToken);
-    }
-    return response;
-  }
-
-  async verifyEmailOtp(email: string, otp: string) {
-    return this.request('/auth/verify-email-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp }),
-    });
-  }
+   
 
   async uploadKYC(file: File) {
     const formData = new FormData();
@@ -170,22 +144,8 @@
     });
   }
 
-    async login(email: string, password: string) {
-      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
+  
 
-      if (response.data?.accessToken) {
-        this.setTokens(response.data.accessToken, response.data.refreshToken);
-      }
-      return response;
-    }
-
-  async logout() {
-    this.clearTokens();
-    return { data: { success: true } }; // Just clear local state
-  }
 
   // =========================================================
   // PASSWORD RESET METHODS (Correctly placed inside class)
@@ -237,14 +197,50 @@
 
     
 
-    // =========================================================
-    // PAYMENT METHODS
-    // =========================================================
     
+    async register(firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) {
+      const formData = new FormData();
+      formData.append('firstName', firstName);
+      formData.append('lastName', lastName);
+      formData.append('email', email);
+      formData.append('phone', phone);
+      formData.append('password', password);
+      if (profileImage) formData.append('profileImage', profileImage);
 
-      
+      // Note: We expect accessToken/refreshToken now
+      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
+        method: 'POST',
+        body: formData,
+      });
 
+      if (response.data?.accessToken) {
+        this.setTokens(response.data.accessToken, response.data.refreshToken);
+      }
+      return response;
+    }
+  async verifyEmailOtp(email: string, otp: string) {
+      return this.request('/auth/verify-email-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp }),
+      });
+    }
 
+    async login(email: string, password: string) {
+      const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.data?.accessToken) {
+        this.setTokens(response.data.accessToken, response.data.refreshToken);
+      }
+      return response;
+    }
+
+    async logout() {
+      this.clearTokens();
+      return { data: { success: true } }; // Just clear local state
+    }
 
     // =========================================================
     // OTHER METHODS
@@ -344,6 +340,10 @@
      
  
     /**
+     * Confirm payment completion
+     */
+ 
+    /**
      * Get payment details by auction ID
      */
     async getPaymentByAuction(auctionId: string) {
@@ -384,6 +384,9 @@
     }
 
    
+    /**
+     * Get escrow details
+     */
     async getEscrowDetails(escrowId: string) {
       return this.request<{
         success: boolean;
