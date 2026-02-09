@@ -94,6 +94,7 @@ export interface KYCDocument {
   isActive?: number;
   isBanned?: number;
   kycStatus?: string;
+  role?: string;
   kycId: string;
   documentType?: string;
   documentNumber?: string;
@@ -117,6 +118,9 @@ export interface LiveAuction {
   vehicleId: number;
   sellerId: string;
   sellerName?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: number;
   status: string;
   startTime?: Date;
   endTime?: Date;
@@ -359,7 +363,7 @@ export const createInspectionReport = async (
     const data = await response.json();
 
     if (!response.ok) {
-      return { ok: false, message: data.error || 'Failed to create inspection report' };
+      return { ok: false, message: data.details || data.error || 'Failed to create inspection report' };
     }
 
     return { ok: true, reportId: data.reportId };
@@ -539,23 +543,57 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
   return data.kycDocuments || data || [];
 };
 
-export const getLiveAuctions = async (token?: string): Promise<LiveAuction[]> => {
-  const headers: HeadersInit = {};
+export const approveKYC = async (kycId: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/auctions/live', {
-    method: 'GET',
-    headers,
-  });
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/approve`, {
+      method: 'PATCH',
+      headers,
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch live auctions');
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to approve KYC document' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const rejectKYC = async (kycId: string, reason: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const data = await response.json();
-  return data.auctions || data || [];
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/reject`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ reason }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to reject KYC document' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
 };
 
 export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
@@ -621,4 +659,295 @@ export const editreport = async (reportId: string, payload: Partial<CreateInspec
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
   }
+};
+
+
+
+
+
+
+  
+
+export interface RevenueDashboardResponse {
+  range: { from: string; to: string; groupBy: RevenueGroupBy };
+  kpis: {
+    commissionEgp: number;
+    processorFeesEgp: number;
+    gmvEgp: number;
+    sellerPayoutEgp: number;
+    completedPaymentsCount: number;
+    refundedAmountEgp: number;
+  };
+  series: Array<{
+    bucket: string;
+    commissionEgp: number;
+    gmvEgp: number;
+    releasedEscrowsCount: number;
+  }>;
+  escrowsByStatus: Array<{
+    status: string;
+    count: number;
+    totalAmountEgp: number;
+  }>;
+}
+
+
+
+
+// =============================================
+// AUCTION ADMIN FUNCTIONS
+// =============================================
+
+/**
+ * Get all auctions
+ */
+export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin/content/auctions', {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch all auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Filter auctions by status
+ */
+export const filterAuctions = async (status: string, token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `http://localhost:5000/api/admin/content/auctions/filter?status=${encodeURIComponent(status)}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to filter auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Search auctions
+ */
+export const searchAuctions = async (searchTerm: string, token?: string): Promise<LiveAuction[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(
+    `http://localhost:5000/api/admin/content/auctions/search?searchTerm=${encodeURIComponent(searchTerm)}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to search auctions');
+  }
+
+  const data = await response.json();
+  return data.data || data.auctions || data || [];
+};
+
+/**
+ * Update auction status
+ */
+export const updateAuctionStatus = async (
+  auctionId: string,
+  status: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/content/auctions/${auctionId}/status`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update auction status' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+/**
+ * Set auction start time
+ */
+export const setAuctionStartTime = async (
+  auctionId: string,
+  startTime: string,
+  token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/content/auctions/${auctionId}/start-time`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ startTime }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update auction start time' };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const getAuctionById = async (auctionId: string, token?: string): Promise<LiveAuction | null> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(`http://localhost:5000/api/admin/content/auctions/${auctionId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch auction details');
+  }
+  
+  const data = await response.json();
+  return data.data || data.auction || null;
+};
+
+
+export type RevenueGroupBy = "day" | "week" | "month";
+
+
+
+
+  
+
+export interface RevenueDashboardResponse {
+  range: { from: string; to: string; groupBy: RevenueGroupBy };
+  kpis: {
+    commissionEgp: number;
+    processorFeesEgp: number;
+    gmvEgp: number;
+    sellerPayoutEgp: number;
+    completedPaymentsCount: number;
+    refundedAmountEgp: number;
+  };
+  series: Array<{
+    bucket: string;
+    commissionEgp: number;
+    gmvEgp: number;
+    releasedEscrowsCount: number;
+  }>;
+  escrowsByStatus: Array<{
+    status: string;
+    count: number;
+    totalAmountEgp: number;
+  }>;
+};
+
+export const getRevenueDashboard = async (
+  from: string,
+  to: string,
+  groupBy: RevenueGroupBy = "day"
+): Promise<RevenueDashboardResponse> => {
+  const response = await apiService.adminGetRevenueDashboard({ from, to, groupBy });
+
+  if (response.error) throw new Error(response.error);
+  if (!response.data) throw new Error("No data returned");
+
+  return response.data as RevenueDashboardResponse;
+};
+
+export const updateKYC = async (
+  kycId: string,
+  payload: Partial<KYCDocument>,
+    token?: string
+): Promise<{ ok: boolean; message?: string }> => {
+    const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    };
+    if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    }
+    try {
+    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { ok: false, message: data.error || 'Failed to update KYC document' };
+    }
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
+  }
+};
+
+export const viewuser = async (userId: string, token?: string): Promise<AdminUserSearchResult | null> => {
+  const headers: HeadersInit = {};
+    if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`http://localhost:5000/api/admin/content/users/${userId}`, {
+
+    method: 'GET',
+    headers,
+  });
+    if (!response.ok) {
+    throw new Error('Failed to fetch user details');
+    }
+    const result = await response.json();
+    return result.data || null;
 };

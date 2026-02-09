@@ -6,6 +6,53 @@ const { authenticate: auth } = require('../middleware/auth');
 // 1. Import the upload middleware
 const { upload, uploadToS3 } = require('../middleware/uploadMiddleware');
 
+/**
+ * Safely parse the IMAGES column from the database.
+ * Handles: JSON arrays, plain URL strings, comma-separated URLs,
+ * null/undefined, CLOB objects, and malformed data.
+ * Always returns a string[] of image URLs.
+ */
+function parseImagesColumn(raw) {
+  if (!raw) return [];
+
+  // If it's a Buffer or Lob object, convert to string
+  let str = raw;
+  if (typeof raw !== 'string') {
+    try { str = String(raw); } catch { return []; }
+  }
+
+  str = str.trim();
+  if (!str) return [];
+
+  // Try JSON parse first (expected format: '["url1","url2"]')
+  if (str.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => typeof item === 'string' && item.length > 0);
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Handle plain URL string or comma-separated URLs
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    return str.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  }
+
+  // Try JSON parse for other formats (e.g. double-encoded)
+  try {
+    const parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(item => typeof item === 'string' && item.length > 0);
+    }
+    if (typeof parsed === 'string' && parsed.startsWith('http')) {
+      return [parsed];
+    }
+  } catch { /* fall through */ }
+
+  return [];
+}
+
 // GET /api/vehicles - List user's vehicles
 router.get('/', auth, async (req, res) => {
   let connection;
@@ -60,15 +107,7 @@ router.get('/', auth, async (req, res) => {
       }
 
       // 3. Parse Images safely
-      const imagesRaw = row.IMAGES;
-      let images = [];
-      if (typeof imagesRaw === 'string') {
-        try {
-          images = JSON.parse(imagesRaw);
-        } catch (e) {
-          images = [];
-        }
-      }
+      const images = parseImagesColumn(row.IMAGES);
 
       const conditionValue = typeof row.CAR_CONDITION === 'string'
         ? row.CAR_CONDITION.toLowerCase()
@@ -93,7 +132,7 @@ router.get('/', auth, async (req, res) => {
         description: row.DESCRIPTION || '',
         location: row.LOCATION_CITY || '',
         features,
-        images: images, // Return the parsed images array
+        images,
         status: row.STATUS
       };
     });
@@ -207,8 +246,8 @@ router.post('/', auth, upload.array('images', 10), async (req, res) => {
         featuresJson = JSON.stringify(features);
     }
 
-    // 6. Prepare Images JSON
-    const imagesJson = JSON.stringify(imageUrls);
+    // 6. Prepare Images JSON (ensure it's never null)
+    const imagesJson = imageUrls.length > 0 ? JSON.stringify(imageUrls) : '[]';
 
     // 7. Insert with Images
     await connection.execute(
@@ -319,8 +358,102 @@ router.post('/', auth, upload.array('images', 10), async (req, res) => {
   }
 });
 
-// ──── PUBLIC BROWSE ENDPOINTS (no auth) ────
+// ──── PUBLIC ENDPOINTS (no auth) ────
 // IMPORTANT: These must be defined BEFORE /:id to avoid Express matching "browse" as a param
+
+// GET /api/vehicles/stats - Landing page stats (public)
+router.get('/stats', async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection();
+
+    const activeResult = await connection.execute(
+      `SELECT COUNT(*) AS total FROM vehicles WHERE status = 'active'`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const sellersResult = await connection.execute(
+      `SELECT COUNT(DISTINCT seller_id) AS total FROM vehicles WHERE status IN ('active', 'sold')`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const soldResult = await connection.execute(
+      `SELECT COUNT(*) AS total FROM vehicles WHERE status = 'sold'`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const activeListings = activeResult.rows?.[0]?.TOTAL || 0;
+    const verifiedSellers = sellersResult.rows?.[0]?.TOTAL || 0;
+    const soldVehicles = soldResult.rows?.[0]?.TOTAL || 0;
+
+    res.json({
+      activeListings,
+      verifiedSellers,
+      soldVehicles,
+      avgTimeToSell: '9 days',
+      escrowProtected: '100%'
+    });
+  } catch (err) {
+    console.error('Stats error:', err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) { console.error(e.message); }
+    }
+  }
+});
+
+// GET /api/vehicles/featured - Featured vehicles for landing page (public)
+router.get('/featured', async (req, res) => {
+  let connection;
+  try {
+    connection = await oracledb.getConnection();
+
+    const result = await connection.execute(
+      `SELECT v.id, v.make, v.model, v.year_mfg, v.mileage_km,
+              v.car_condition, v.price_egp, v.description, v.location_city,
+              v.images, v.status
+       FROM vehicles v
+       WHERE v.status = 'active'
+       ORDER BY v.published_at DESC NULLS LAST
+       FETCH FIRST 6 ROWS ONLY`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const conditionMap = { excellent: 'Excellent', good: 'Good', fair: 'Fair', poor: 'Poor' };
+
+    const vehicles = (result.rows || []).map((row) => {
+      const images = parseImagesColumn(row.IMAGES);
+      const conditionValue = typeof row.CAR_CONDITION === 'string' ? row.CAR_CONDITION.toLowerCase() : '';
+      return {
+        id: row.ID,
+        make: row.MAKE,
+        model: row.MODEL,
+        year: Number(row.YEAR_MFG) || 0,
+        mileage: Number(row.MILEAGE_KM) || 0,
+        condition: conditionMap[conditionValue] || 'Good',
+        price: Number(row.PRICE_EGP) || 0,
+        description: row.DESCRIPTION || '',
+        location: row.LOCATION_CITY || '',
+        images,
+        status: row.STATUS
+      };
+    });
+
+    res.json({ vehicles });
+  } catch (err) {
+    console.error('Featured vehicles error:', err.message);
+    res.status(500).send('Server Error');
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) { console.error(e.message); }
+    }
+  }
+});
 
 // GET /api/vehicles/browse - List active fixed-price vehicles (public)
 router.get('/browse', async (req, res) => {
@@ -371,7 +504,7 @@ router.get('/browse', async (req, res) => {
       `SELECT v.id, v.seller_id, v.make, v.model, v.year_mfg, v.mileage_km,
               v.color, v.body_type, v.transmission, v.fuel_type, v.seats,
               v.car_condition, v.price_egp, v.description, v.location_city,
-              v.features, v.status, v.published_at,
+              v.features, v.status, v.published_at, v.images,
               u.first_name AS seller_first_name
        FROM vehicles v
        LEFT JOIN users u ON v.seller_id = u.id
@@ -389,6 +522,7 @@ router.get('/browse', async (req, res) => {
       if (typeof row.FEATURES === 'string') {
         try { features = JSON.parse(row.FEATURES); } catch (e) { features = []; }
       }
+      const images = parseImagesColumn(row.IMAGES);
       const conditionValue = typeof row.CAR_CONDITION === 'string' ? row.CAR_CONDITION.toLowerCase() : '';
       return {
         _id: row.ID,
@@ -408,7 +542,7 @@ router.get('/browse', async (req, res) => {
         description: row.DESCRIPTION || '',
         location: row.LOCATION_CITY || '',
         features,
-        images: [],
+        images,
         status: row.STATUS,
         saleType: 'fixed_price'
       };
@@ -435,7 +569,7 @@ router.get('/browse/:id', async (req, res) => {
       `SELECT v.id, v.seller_id, v.make, v.model, v.year_mfg, v.mileage_km,
               v.vin, v.plate_number, v.color, v.body_type, v.transmission,
               v.fuel_type, v.seats, v.car_condition, v.price_egp, v.description,
-              v.location_city, v.features, v.status, v.published_at,
+              v.location_city, v.features, v.status, v.published_at, v.images,
               u.first_name AS seller_first_name
        FROM vehicles v
        LEFT JOIN users u ON v.seller_id = u.id
@@ -454,6 +588,7 @@ router.get('/browse/:id', async (req, res) => {
     if (typeof row.FEATURES === 'string') {
       try { features = JSON.parse(row.FEATURES); } catch (e) { features = []; }
     }
+    const images = parseImagesColumn(row.IMAGES);
     const conditionMap = { excellent: 'Excellent', good: 'Good', fair: 'Fair', poor: 'Poor' };
     const conditionValue = typeof row.CAR_CONDITION === 'string' ? row.CAR_CONDITION.toLowerCase() : '';
 
@@ -477,7 +612,7 @@ router.get('/browse/:id', async (req, res) => {
       description: row.DESCRIPTION || '',
       location: row.LOCATION_CITY || '',
       features,
-      images: [],
+      images,
       status: row.STATUS,
       saleType: 'fixed_price'
     });
@@ -542,15 +677,7 @@ router.get('/:id', auth, async (req, res) => {
     }
 
     // 9. Parse Images safely
-    const imagesRaw = row.IMAGES;
-    let images = [];
-    if (typeof imagesRaw === 'string') {
-      try {
-        images = JSON.parse(imagesRaw);
-      } catch (e) {
-        images = [];
-      }
-    }
+    const images = parseImagesColumn(row.IMAGES);
 
     const conditionValue = typeof row.CAR_CONDITION === 'string'
       ? row.CAR_CONDITION.toLowerCase()
@@ -582,7 +709,7 @@ router.get('/:id', auth, async (req, res) => {
       description: row.DESCRIPTION || '',
       location: row.LOCATION_CITY || '',
       features,
-      images: images,
+      images,
       status: row.STATUS
     });
   } catch (err) {
