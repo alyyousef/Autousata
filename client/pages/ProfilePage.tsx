@@ -47,12 +47,35 @@ const ProfilePage: React.FC = () => {
   }>>([]);
 
 
-  // 2. Load user data into state when component mounts
+  // =========================================================
+  // ✅ FIX: Force Fetch Latest User Data on Mount
+  // This ensures that even if local storage is stale, we get
+  // the fresh Phone, KYC, and Verification status from DB.
+  // =========================================================
+  useEffect(() => {
+    const fetchFreshProfile = async () => {
+      try {
+        const response = await apiService.getMe();
+        if (response.data && response.data.user) {
+          console.log("🔄 Profile Synced:", response.data.user);
+          updateUser(response.data.user); // Updates Context + Local State via dependency below
+        }
+      } catch (err) {
+        console.error("Background profile sync failed:", err);
+        // We don't block the UI here, we just rely on existing cached data if this fails
+      }
+    };
+
+    fetchFreshProfile();
+  }, []); // Runs once on mount
+
+
+  // 2. Load user data into local state whenever 'user' context updates
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || '');
       setLastName(user.lastName || '');
-      setPhone(user.phone || '');
+      setPhone(user.phone || ''); // ✅ This will now populate correctly after the fetch above
       setCity(user.location?.city || '');
     }
   }, [user]);
@@ -229,9 +252,10 @@ const ProfilePage: React.FC = () => {
       try {
         const res = await apiService.uploadKYC(file);
         if (res.data) {
+          // Manually construct the update to ensure UI reflects it immediately
           updateUser({ 
-            kycStatus: res.data.kycStatus,
-            kycDocumentUrl: res.data.kycDocumentUrl
+            kycStatus: res.data.kycStatus || 'pending',
+            kycDocumentUrl: res.data.kycDocumentUrl 
           });
           setSuccess('KYC Document uploaded successfully!');
         } else {

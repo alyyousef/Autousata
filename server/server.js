@@ -43,7 +43,7 @@ const globalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
-    max: 10, 
+    max: 200, 
     message: { error: 'Too many login attempts, please try again later.' }
 });
 
@@ -126,7 +126,6 @@ async function startServer() {
     }
 }
 
-// Graceful Shutdown
 process.on('SIGINT', async () => {
     console.log('\n🛑 Shutting down...');
     if (auctionScheduler.stopScheduler) auctionScheduler.stopScheduler();
@@ -141,4 +140,15 @@ process.on('SIGINT', async () => {
     });
 });
 
-startServer();
+// =====================================================
+// CRITICAL FIX: EXPORT APP & CONDITIONAL START
+// =====================================================
+
+// Only start the server if this file is run directly (node server.js)
+// This prevents the server from starting when we run 'npm test'
+if (require.main === module) {
+    startServer();
+}
+
+// Export the app so Jest can test it
+module.exports = app;

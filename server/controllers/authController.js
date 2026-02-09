@@ -13,15 +13,16 @@ require('dotenv').config();
 async function register(req, res) {
     const { firstName, lastName, email, phone, password } = req.body;
 
-const phoneRegex = /^[0-9]{10,15}$/;
-if (!phoneRegex.test(phone)) {
-    return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
-}
+    // 1. Phone Validation
+    const phoneRegex = /^[0-9]{10,15}$/;
+    if (!phoneRegex.test(phone)) {
+        return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
+    }
 
-// 2. Password Strength (Min 8 chars)
-if (password.length < 8) {
-    return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
-}
+    // 2. Password Strength (Min 8 chars)
+    if (password.length < 8) {
+        return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
+    }
 
     const file = req.file; 
     let connection;
@@ -89,6 +90,10 @@ if (password.length < 8) {
 
     } catch (err) {
         console.error('❌ Registration Error:', err);
+        // Clean error message for user
+        if (err.message.includes('ORA-00001')) {
+            return res.status(409).json({ error: 'Email already exists' });
+        }
         res.status(500).json({ error: 'Registration failed' });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
@@ -105,6 +110,7 @@ async function login(req, res) {
     try {
         connection = await db.getConnection();
 
+        // 1. Authenticate via Stored Procedure
         const result = await connection.execute(
             `BEGIN 
                 sp_login_user(:em, :id, :hash, :fn, :ln, :role, :img, :status); 
@@ -113,7 +119,7 @@ async function login(req, res) {
                 em: email,
                 id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 hash: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-                fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
+                fn: { dir: oracledb.BIND_OUT, type: oracledb.STRING }, 
                 ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
                 img: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
@@ -121,32 +127,81 @@ async function login(req, res) {
             }
         );
 
-        const userData = result.outBinds;
+        const authData = result.outBinds;
 
-        if (userData.status === 'UNVERIFIED') {
+        if (authData.status === 'UNVERIFIED') {
             return res.status(403).json({ error: 'Please verify your email.', needsVerification: true });
         }
 
-        if (userData.status !== 'FOUND') {
+        if (authData.status !== 'FOUND') {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const match = await bcrypt.compare(password, userData.hash);
+        const match = await bcrypt.compare(password, authData.hash);
 
         if (match) {
-            const { accessToken, refreshToken } = generateTokens(userData.id);
+            try {
+                // 2. Fetch Full Profile
+                const userResult = await connection.execute(
+                    `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, 
+                            PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, 
+                            KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY
+                     FROM USERS 
+                     WHERE ID = :id`,
+                    [authData.id],
+                    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+                );
+
+                if (userResult.rows.length > 0) {
+                    const dbUser = userResult.rows[0];
+                    
+                    const fullUser = {
+                        id: dbUser.ID,
+                        firstName: dbUser.FIRST_NAME,
+                        lastName: dbUser.LAST_NAME,
+                        email: dbUser.EMAIL,
+                        phone: dbUser.PHONE,
+                        role: dbUser.ROLE,
+                        profileImage: dbUser.PROFILE_PIC_URL, 
+                        // ✅ FIX: Use '==' to handle '1' (string) or 1 (number)
+                        emailVerified: dbUser.EMAIL_VERIFIED == 1,
+                        phoneVerified: dbUser.PHONE_VERIFIED == 1,
+                        kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
+                        kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
+                        location: { city: dbUser.LOCATION_CITY || '' } 
+                    };
+
+                    const { accessToken, refreshToken } = generateTokens(fullUser.id);
+                    return res.json({
+                        message: 'Login successful',
+                        accessToken,
+                        refreshToken,
+                        user: fullUser
+                    });
+                }
+            } catch (sqlError) {
+                console.error("❌ SQL Error in Login:", sqlError);
+            }
+
+            // Fallback if SQL fails
+            const { accessToken, refreshToken } = generateTokens(authData.id);
             res.json({
-                message: 'Login successful',
+                message: 'Login successful (Basic)',
                 accessToken,
                 refreshToken,
-                user: { id: userData.id, firstName: userData.fn, lastName: userData.ln, email, role: userData.role, profileImage: userData.img }
+                user: { 
+                    id: authData.id, firstName: authData.fn, lastName: authData.ln, 
+                    email, role: authData.role, profileImage: authData.img, 
+                    emailVerified: false 
+                }
             });
+
         } else {
             res.status(401).json({ error: 'Invalid credentials' });
         }
 
     } catch (err) {
-        console.error('❌ Login Error:', err);
+        console.error('❌ Login Main Error:', err);
         res.status(500).json({ error: 'Login failed' });
     } finally {
         if (connection) { try { await connection.close(); } catch (e) {} }
@@ -199,20 +254,74 @@ async function refreshToken(req, res) {
 // 5. GET CURRENT USER
 // ==========================================
 async function getMe(req, res) {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-    res.json({ user: req.user });
-}
+    let connection;
+    try {
+        // ✅ FIX: Check for 'userId' OR 'id' to prevent undefined errors
+        const targetId = req.user?.userId || req.user?.id;
+        
+        if (!targetId) {
+            console.error("❌ GetMe Failed: No User ID in token:", req.user);
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
 
+        connection = await db.getConnection();
+        
+        const result = await connection.execute(
+            `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, 
+                    PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED,
+                    KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY
+             FROM USERS 
+             WHERE ID = :id`,
+            [targetId],
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const dbUser = result.rows[0];
+
+        const fullUser = {
+            id: dbUser.ID,
+            firstName: dbUser.FIRST_NAME,
+            lastName: dbUser.LAST_NAME,
+            email: dbUser.EMAIL,
+            phone: dbUser.PHONE,
+            role: dbUser.ROLE,
+            profileImage: dbUser.PROFILE_PIC_URL,
+            // ✅ FIX: Use '==' for loose comparison (handles '1' vs 1)
+            emailVerified: dbUser.EMAIL_VERIFIED == 1, 
+            phoneVerified: dbUser.PHONE_VERIFIED == 1,
+            kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
+            kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
+            location: { city: dbUser.LOCATION_CITY || '' }
+        };
+
+        res.json({ user: fullUser });
+
+    } catch (err) {
+        console.error("❌ GetMe Crash Error:", err);
+        // Return 500, but try to avoid logging out frontend if possible
+        res.status(500).json({ error: "Server Error fetching profile" });
+    } finally {
+        if (connection) { try { await connection.close(); } catch (e) {} }
+    }
+}
 // ==========================================
-// 6. FORGOT PASSWORD (Updated Logic)
-// ==========================================
-// ==========================================
-// 6. FORGOT PASSWORD (Updated for Transparency)
+// 6. FORGOT PASSWORD (Corrected)
 // ==========================================
 async function forgotPassword(req, res) {
     const { email } = req.body;
     let connection;
+
     try {
+        // ✅ FIX: Validate Input First!
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
         connection = await db.getConnection();
         
         // 1. Check if user exists

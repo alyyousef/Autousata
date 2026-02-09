@@ -4,7 +4,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js --ignore 'uploads/' --ignore 'profiles/' --ignore '*.jpg' --ignore '*.png'"
+    "dev": "nodemon server.js --ignore 'uploads/' --ignore 'profiles/' --ignore '*.jpg' --ignore '*.png'",
+    "test": "jest --detectOpenHandles",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.985.0",
@@ -27,6 +30,12 @@
     "stripe": "^20.3.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.8.1",
+    "supertest": "^7.2.2"
   }
 }
