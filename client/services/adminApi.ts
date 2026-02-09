@@ -660,6 +660,39 @@ export const editreport = async (reportId: string, payload: Partial<CreateInspec
   }
 };
 
+
+
+
+
+
+  
+
+export interface RevenueDashboardResponse {
+  range: { from: string; to: string; groupBy: RevenueGroupBy };
+  kpis: {
+    commissionEgp: number;
+    processorFeesEgp: number;
+    gmvEgp: number;
+    sellerPayoutEgp: number;
+    completedPaymentsCount: number;
+    refundedAmountEgp: number;
+  };
+  series: Array<{
+    bucket: string;
+    commissionEgp: number;
+    gmvEgp: number;
+    releasedEscrowsCount: number;
+  }>;
+  escrowsByStatus: Array<{
+    status: string;
+    count: number;
+    totalAmountEgp: number;
+  }>;
+}
+
+
+
+
 // =============================================
 // AUCTION ADMIN FUNCTIONS
 // =============================================
@@ -832,28 +865,7 @@ export const getAuctionById = async (auctionId: string, token?: string): Promise
 
 export type RevenueGroupBy = "day" | "week" | "month";
 
-export interface RevenueDashboardResponse {
-  range: { from: string; to: string; groupBy: RevenueGroupBy };
-  kpis: {
-    commissionEgp: number;
-    processorFeesEgp: number;
-    gmvEgp: number;
-    sellerPayoutEgp: number;
-    completedPaymentsCount: number;
-    refundedAmountEgp: number;
-  };
-  series: Array<{
-    bucket: string;
-    commissionEgp: number;
-    gmvEgp: number;
-    releasedEscrowsCount: number;
-  }>;
-  escrowsByStatus: Array<{
-    status: string;
-    count: number;
-    totalAmountEgp: number;
-  }>;
-}
+
 
 
   
