@@ -13,7 +13,7 @@ const db = require("./config/db");
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5005;
 
 // =====================================================
 // 1. SOCKET.IO SETUP
@@ -60,25 +60,18 @@ app.use("/api", globalLimiter);
 // 3. STANDARD MIDDLEWARE
 // =====================================================
 // Webhook route MUST come before express.json()
-// Stripe needs the raw body for signature verification
-const webhookRoutes = require("./routes/webhooks");
-app.use(
-  "/api/webhooks",
-  express.raw({ type: "application/json" }),
-  webhookRoutes,
-);
+const webhookRoutes = require('./routes/webhooks');
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
-  }),
-);
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    credentials: true
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // HTTP Logger
-app.use(morgan("dev"));
+app.use(morgan('dev'));
 
 // =====================================================
 // 4. ROUTES
@@ -135,8 +128,8 @@ app.use(errorHandler);
 // =====================================================
 // 6. SERVER STARTUP
 // =====================================================
-const initializeAuctionSocket = require("./sockets/auctionSocket");
-const auctionScheduler = require("./services/auctionScheduler");
+const initializeAuctionSocket = require('./sockets/auctionSocket');
+const auctionScheduler = require('./services/auctionScheduler');
 
 async function startServer() {
   try {

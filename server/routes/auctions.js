@@ -7,6 +7,43 @@ const { rateLimitBid } = require('../middleware/rateLimiter');
 const bidProcessingService = require('../services/bidProcessingService');
 const { getIO } = require('../server');
 
+/**
+ * Safely parse the IMAGES column from the database.
+ * Handles: JSON arrays, plain URL strings, comma-separated URLs,
+ * null/undefined, CLOB objects, and malformed data.
+ * Always returns a string[] of image URLs.
+ */
+function parseImagesColumn(raw) {
+  if (!raw) return [];
+  let str = raw;
+  if (typeof raw !== 'string') {
+    try { str = String(raw); } catch { return []; }
+  }
+  str = str.trim();
+  if (!str) return [];
+  if (str.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => typeof item === 'string' && item.length > 0);
+      }
+    } catch { /* fall through */ }
+  }
+  if (str.startsWith('http://') || str.startsWith('https://')) {
+    return str.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  }
+  try {
+    const parsed = JSON.parse(str);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(item => typeof item === 'string' && item.length > 0);
+    }
+    if (typeof parsed === 'string' && parsed.startsWith('http')) {
+      return [parsed];
+    }
+  } catch { /* fall through */ }
+  return [];
+}
+
 // POST /api/auctions - Create a new auction (draft)
 // Accepts durationDays instead of startTime/endTime.
 // Actual start/end times are calculated when admin approves the vehicle.
@@ -216,6 +253,7 @@ router.get('/', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
+        v.images,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
@@ -252,6 +290,8 @@ router.get('/', async (req, res) => {
         poor: 'Poor'
       };
 
+      let images = parseImagesColumn(row.IMAGES);
+
       return {
         _id: row.AUCTION_ID,
         vehicleId: {
@@ -263,7 +303,7 @@ router.get('/', async (req, res) => {
           vin: row.VIN,
           condition: conditionMap[conditionValue] || 'Good',
           description: row.DESCRIPTION || '',
-          images: [],
+          images,
           location: row.LOCATION_CITY || '',
           features
         },
@@ -372,6 +412,7 @@ router.get('/:id', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
+        v.images,
         (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
@@ -406,6 +447,8 @@ router.get('/:id', async (req, res) => {
       poor: 'Poor'
     };
 
+    let images = parseImagesColumn(row.IMAGES);
+
     res.json({
       _id: row.AUCTION_ID,
       vehicleId: {
@@ -417,7 +460,7 @@ router.get('/:id', async (req, res) => {
         vin: row.VIN,
         condition: conditionMap[conditionValue] || 'Good',
         description: row.DESCRIPTION || '',
-        images: [],
+        images,
         location: row.LOCATION_CITY || '',
         features
       },

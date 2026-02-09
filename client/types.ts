@@ -115,6 +115,7 @@ export interface FinanceOption {
 export interface LandingStats {
   activeListings: number;
   verifiedSellers: number;
+  soldVehicles?: number;
   avgTimeToSell: string;
   escrowProtected: string;
 }

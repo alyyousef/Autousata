@@ -5,10 +5,12 @@ import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
 import { AuctionStatus, VehicleStatus } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const [isEditing, setIsEditing] = useState(false);
   
@@ -47,12 +49,35 @@ const ProfilePage: React.FC = () => {
   }>>([]);
 
 
-  // 2. Load user data into state when component mounts
+  // =========================================================
+  // ✅ FIX: Force Fetch Latest User Data on Mount
+  // This ensures that even if local storage is stale, we get
+  // the fresh Phone, KYC, and Verification status from DB.
+  // =========================================================
+  useEffect(() => {
+    const fetchFreshProfile = async () => {
+      try {
+        const response = await apiService.getMe();
+        if (response.data && response.data.user) {
+          console.log("🔄 Profile Synced:", response.data.user);
+          updateUser(response.data.user); // Updates Context + Local State via dependency below
+        }
+      } catch (err) {
+        console.error("Background profile sync failed:", err);
+        // We don't block the UI here, we just rely on existing cached data if this fails
+      }
+    };
+
+    fetchFreshProfile();
+  }, []); // Runs once on mount
+
+
+  // 2. Load user data into local state whenever 'user' context updates
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || '');
       setLastName(user.lastName || '');
-      setPhone(user.phone || '');
+      setPhone(user.phone || ''); // ✅ This will now populate correctly after the fetch above
       setCity(user.location?.city || '');
     }
   }, [user]);
@@ -229,9 +254,10 @@ const ProfilePage: React.FC = () => {
       try {
         const res = await apiService.uploadKYC(file);
         if (res.data) {
+          // Manually construct the update to ensure UI reflects it immediately
           updateUser({ 
-            kycStatus: res.data.kycStatus,
-            kycDocumentUrl: res.data.kycDocumentUrl
+            kycStatus: res.data.kycStatus || 'pending',
+            kycDocumentUrl: res.data.kycDocumentUrl 
           });
           setSuccess('KYC Document uploaded successfully!');
         } else {
@@ -608,28 +634,38 @@ const renderKycBadge = () => {
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-black text-slate-900">My Listings</h3>
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  {sellerListings.length} total
-                </span>
+                {(user.role === 'SELLER' || user.role === 'DEALER') && (
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                    {sellerListings.length} total
+                  </span>
+                )}
               </div>
 
-              {listingsLoading && (
-                <div className="text-sm text-slate-500">Loading your listings...</div>
-              )}
-
-              {!listingsLoading && listingsError && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
-                  {listingsError}
-                </div>
-              )}
-
-              {!listingsLoading && !listingsError && sellerListings.length === 0 && (
+              {(user.role !== 'SELLER' && user.role !== 'DEALER') && (
                 <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
-                  You have no listings yet.
+                  Listings are available for sellers only.
                 </div>
               )}
 
-              {!listingsLoading && sellerListings.length > 0 && (
+              {(user.role === 'SELLER' || user.role === 'DEALER') && (
+                <>
+                  {listingsLoading && (
+                    <div className="text-sm text-slate-500">Loading your listings...</div>
+                  )}
+
+                  {!listingsLoading && listingsError && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
+                      {listingsError}
+                    </div>
+                  )}
+
+                  {!listingsLoading && !listingsError && sellerListings.length === 0 && (
+                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
+                      You have no listings yet.
+                    </div>
+                  )}
+
+                  {!listingsLoading && sellerListings.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {sellerListings.map((listing) => {
                         const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
@@ -671,34 +707,18 @@ const renderKycBadge = () => {
                         );
                       })}
                     </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Recent Activity Section */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
-              <h3 className="text-xl font-black text-slate-900 mb-8">Recent Activity</h3>
-              <div className="space-y-4">
-                {[
-                  { action: 'Bid Placed', target: '2021 Porsche 911', date: '2 hours ago', amount: 'EGP 95,000' },
-                  { action: 'Listing Created', target: '2022 Audi RS6', date: 'Yesterday', amount: 'N/A' },
-                  { action: 'Won Auction', target: '2019 Ford Raptor', date: '3 days ago', amount: 'EGP 68,500' }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                        <ExternalLink size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900">{item.action}: {item.target}</h4>
-                        <p className="text-xs text-slate-500">{item.date}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-slate-900">{item.amount}</p>
-                      <ChevronRight size={16} className="text-slate-300 ml-auto mt-1" />
-                    </div>
-                  </div>
-                ))}
+              <h3 className="text-xl font-black text-slate-900 mb-8">{t('Recent Activity', 'النشاط الأخير')}</h3>
+              <div className="text-center py-8 text-slate-400">
+                <ExternalLink size={32} className="mx-auto mb-3 text-slate-300" />
+                <p className="font-semibold text-slate-500">{t('No recent activity', 'لا يوجد نشاط حديث')}</p>
+                <p className="text-sm mt-1">{t('Your bids, purchases, and listings will appear here.', 'ستظهر مزايداتك ومشترياتك وقوائمك هنا.')}</p>
               </div>
             </div>
 

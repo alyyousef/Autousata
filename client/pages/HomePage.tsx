@@ -168,7 +168,6 @@ const HomePage: React.FC = () => {
   const buyerPayments = [
     { id: 'pay-1', vehicle: '2019 BMW M4 Competition', status: 'Unpaid', amount: 120000 }
   ];
-
   return (
     <>
       <div className="bg-slate-50 min-h-screen pb-20">
