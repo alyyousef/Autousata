@@ -602,8 +602,8 @@ const AdminDashboard: React.FC = () => {
                                   disabled={!documentUrl}
                                   onChange={async (e) => {
                                     const newStatus = e.target.value;
-                                    if (!doc.userId) return;
-                                    const result = await updateKYC(doc.userId, { kycStatus: newStatus }, effectiveToken);
+                                    if (!doc.id) return;
+                                    const result = await updateKYC(doc.id, { kycStatus: newStatus }, effectiveToken);
                                     if (result.ok) {
                                       const data = await getPendingKYC(effectiveToken);
                                       setKycDocuments(data || []);
@@ -625,15 +625,25 @@ const AdminDashboard: React.FC = () => {
                                   className="p-2 text-slate-400 hover:text-slate-900 rounded-lg transition-all" 
                                   title="View details"
                                   onClick={async () => {
-                                    if (!doc.userId) return;
+                                    const userId = doc.id || doc.userId;
+                                    if (!userId) {
+                                      console.error('No user ID found for document:', doc);
+                                      alert('No user ID found');
+                                      return;
+                                    }
                                     try {
-                                      const userDetails = await viewuser(doc.userId, effectiveToken);
+                                      console.log('Fetching user details for:', userId);
+                                      const userDetails = await viewuser(userId, effectiveToken);
+                                      console.log('User details received:', userDetails);
                                       if (userDetails) {
                                         setSelectedKYC({ ...doc, ...userDetails });
                                         setShowKYCModal(true);
+                                      } else {
+                                        alert('No user details found');
                                       }
                                     } catch (error) {
-                                      alert('Error fetching user details');
+                                      console.error('Error fetching user details:', error);
+                                      alert('Error fetching user details: ' + (error instanceof Error ? error.message : 'Unknown error'));
                                     }
                                   }}
                                 >
