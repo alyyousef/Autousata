@@ -5,6 +5,7 @@ import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
 import { Auction } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { CardGridSkeleton } from '../components/LoadingSkeleton';
 
 type SortOption = 'endingSoon' | 'highestBid' | 'mostBids';
 
@@ -39,7 +40,7 @@ const AuctionsPage: React.FC = () => {
             reservePrice: item.reservePrice,
             bidCount: item.bidCount,
             endTime: item.endTime,
-            status: 'ACTIVE', // Map 'live' to 'ACTIVE'
+            status: item.status, // Trust backend normalization ('ACTIVE', 'ENDED', etc.)
             bids: [], // Not returned in list view
             buyItNowPrice: undefined 
           }));
@@ -150,9 +151,7 @@ const AuctionsPage: React.FC = () => {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
         {loading ? (
-           <div className="flex justify-center items-center h-64">
-             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
-           </div>
+           <CardGridSkeleton count={9} />
         ) : error ? (
            <div className="text-center text-red-500 py-10">{error}</div>
         ) : auctions.length === 0 ? (

@@ -580,11 +580,23 @@ async function handlePaymentIntentSucceeded(paymentIntent, connection) {
 
     // If this is a direct purchase, mark vehicle as sold
     if (purchaseType === 'direct' && vehicleId) {
-        await connection.execute(
+        const updateResult = await connection.execute(
             `UPDATE VEHICLES SET STATUS = 'sold' WHERE ID = :vehicleId`,
+            { vehicleId },
+            { autoCommit: false }
+        );
+        console.log(`✓ Vehicle ${vehicleId} marked as sold (${updateResult.rowsAffected} rows affected)`);
+        
+        // Verify update
+        const verifyResult = await connection.execute(
+            `SELECT STATUS FROM VEHICLES WHERE ID = :vehicleId`,
             { vehicleId }
         );
-        console.log(`Vehicle ${vehicleId} marked as sold`);
+        if (verifyResult.rows.length > 0) {
+            console.log(`✓ Verification: Vehicle ${vehicleId} status is now: ${verifyResult.rows[0][0]}`);
+        } else {
+            console.error(`✗ WARNING: Could not verify vehicle ${vehicleId} after status update`);
+        }
 
         // Create escrow record for direct purchase
         const metadata = paymentIntent.metadata;

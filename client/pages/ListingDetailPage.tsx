@@ -20,6 +20,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
+import { CardSkeleton, Skeleton } from '../components/LoadingSkeleton';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
@@ -328,8 +329,28 @@ const ListingDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
-        <div className="text-slate-600 text-sm">Loading auction...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-6">
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <CardSkeleton className="h-96" />
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <CardSkeleton className="h-64" />
+              <CardSkeleton className="h-48" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -489,7 +510,11 @@ const ListingDetailPage: React.FC = () => {
                   <ShieldCheck size={16} className="text-emerald-500" />
                   {t('Verified seller', 'بائع موثق')}
                 </div>
-                {user ? (
+                {v.status === 'sold' ? (
+                  <div className="w-full text-center px-6 py-3 rounded-2xl bg-slate-100 text-slate-500 font-bold border border-slate-200">
+                    {t('Sold', 'مباع')}
+                  </div>
+                ) : user ? (
                   <Link
                     to={`/payment/${v._id}?type=direct`}
                     className="block w-full text-center px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-lg shadow-emerald-500/20"
