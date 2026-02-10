@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Shield, Mail, Phone, ExternalLink, Camera, ChevronRight, LogOut, MapPin, User, FileText, CheckCircle, AlertTriangle, XCircle, UploadCloud, Lock, X } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { 
+  Shield, Mail, Phone, ExternalLink, Camera, LogOut, MapPin, 
+  User, FileText, CheckCircle, AlertTriangle, XCircle, Lock, X, ShieldCheck 
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -13,6 +16,7 @@ const ProfilePage: React.FC = () => {
   const { t } = useLanguage();
   
   const [isEditing, setIsEditing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // 1. Separate State for each editable field
   const [firstName, setFirstName] = useState('');
@@ -23,9 +27,6 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  // KYC Specific Loading State
-  const [kycLoading, setKycLoading] = useState(false);
   
   // Password Reset States
   const [resetLoading, setResetLoading] = useState(false);
@@ -48,11 +49,8 @@ const ProfilePage: React.FC = () => {
     auctionStatus?: AuctionStatus | string;
   }>>([]);
 
-
   // =========================================================
-  // ✅ FIX: Force Fetch Latest User Data on Mount
-  // This ensures that even if local storage is stale, we get
-  // the fresh Phone, KYC, and Verification status from DB.
+  // Sync User Data
   // =========================================================
   useEffect(() => {
     const fetchFreshProfile = async () => {
@@ -60,29 +58,27 @@ const ProfilePage: React.FC = () => {
         const response = await apiService.getMe();
         if (response.data && response.data.user) {
           console.log("🔄 Profile Synced:", response.data.user);
-          updateUser(response.data.user); // Updates Context + Local State via dependency below
+          updateUser(response.data.user);
         }
       } catch (err) {
         console.error("Background profile sync failed:", err);
-        // We don't block the UI here, we just rely on existing cached data if this fails
       }
     };
-
     fetchFreshProfile();
-  }, []); // Runs once on mount
+  }, []);
 
-
-  // 2. Load user data into local state whenever 'user' context updates
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || '');
       setLastName(user.lastName || '');
-      setPhone(user.phone || ''); // ✅ This will now populate correctly after the fetch above
+      setPhone(user.phone || '');
       setCity(user.location?.city || '');
     }
   }, [user]);
 
-// 3. Load Seller Listings
+  // =========================================================
+  // Load Seller Listings
+  // =========================================================
   useEffect(() => {
     let isMounted = true;
 
@@ -113,7 +109,6 @@ const ProfilePage: React.FC = () => {
         const vehicles = vehiclesResponse.data || [];
         const auctions = auctionsResponse.data?.auctions || [];
         const auctionMap = new Map(auctions.map((auction: any) => [auction.vehicleId, auction]));
-
         const vehicleMap = new Map(vehicles.map((vehicle: any) => [vehicle._id || vehicle.id, vehicle]));
 
         // Fetch missing vehicles if needed
@@ -122,13 +117,10 @@ const ProfilePage: React.FC = () => {
           const fetchedVehicles = await Promise.all(
             missingVehicleIds.map((vehicleId) => apiService.getVehicleById(vehicleId))
           );
-
           fetchedVehicles.forEach((response) => {
             if (response.data) {
               const vehicleId = response.data._id || response.data.id;
-              if (vehicleId) {
-                vehicleMap.set(vehicleId, response.data);
-              }
+              if (vehicleId) vehicleMap.set(vehicleId, response.data);
             }
           });
         }
@@ -152,9 +144,7 @@ const ProfilePage: React.FC = () => {
         });
 
         setSellerListings(listings);
-        if (auctionsResponse.error) {
-          setListingsError(auctionsResponse.error);
-        }
+        if (auctionsResponse.error) setListingsError(auctionsResponse.error);
       } catch (err) {
         if (isMounted) setListingsError('Failed to load listings');
       } finally {
@@ -162,23 +152,13 @@ const ProfilePage: React.FC = () => {
       }
     };
 
-    if (user) {
-      loadSellerListings();
-    }
+    if (user) loadSellerListings();
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [user]);
 
-// 4. Return early if loading or no user
-  if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
 
   const handleLogout = async () => {
     await logout();
@@ -232,49 +212,9 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // --- KYC Upload Handler ---
-  const handleKycUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      // Basic client-side validation
-      if (file.type !== 'application/pdf') {
-        setError('Only PDF documents are allowed for KYC.');
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) { // 10MB
-        setError('File size must be less than 10MB.');
-        return;
-      }
-
-      setKycLoading(true);
-      setError('');
-      setSuccess('');
-
-      try {
-        const res = await apiService.uploadKYC(file);
-        if (res.data) {
-          // Manually construct the update to ensure UI reflects it immediately
-          updateUser({ 
-            kycStatus: res.data.kycStatus || 'pending',
-            kycDocumentUrl: res.data.kycDocumentUrl 
-          });
-          setSuccess('KYC Document uploaded successfully!');
-        } else {
-          setError(res.error || 'KYC Upload failed');
-        }
-      } catch (err) {
-        setError('Network error during KYC upload');
-      } finally {
-        setKycLoading(false);
-      }
-    }
-  };
-
-  // --- Password Reset Execution (Triggered by Modal) ---
   const executePasswordReset = async () => {
     setResetLoading(true);
-    setShowResetModal(false); // Close modal immediately
+    setShowResetModal(false);
     setError('');
     setSuccess('');
 
@@ -312,9 +252,7 @@ const ProfilePage: React.FC = () => {
   };
 
   const getAuctionStatusBadge = (status?: AuctionStatus | string) => {
-    if (!status) {
-      return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
-    }
+    if (!status) return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
     const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
     const map: Record<string, { label: string; className: string }> = {
       draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
@@ -327,19 +265,25 @@ const ProfilePage: React.FC = () => {
     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
   };
 
-const renderKycBadge = () => {
+  // Helper for Small Badges
+  const renderKycBadge = () => {
     const status = user.kycStatus || 'not_uploaded';
     switch (status) {
-      case 'approved':
+      case 'verified': // New Backend Status
+      case 'approved': // Legacy Status
         return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded"><CheckCircle size={10} /> Verified</span>;
       case 'pending':
         return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded"><AlertTriangle size={10} /> Pending</span>;
       case 'denied':
-        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Denied</span>;
+      case 'failed':
+        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Failed</span>;
       default:
-        return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Not Uploaded</span>;
+        return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Unverified</span>;
     }
   };
+
+  // Helper to determine if we should show the "Verify Now" button
+  const isVerified = user.kycStatus === 'verified' || user.kycStatus === 'approved';
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page relative">
@@ -351,7 +295,7 @@ const renderKycBadge = () => {
         />
       )}
 
-      {/* ✅ CUSTOM PASSWORD RESET MODAL */}
+      {/* PASSWORD RESET MODAL */}
       {showResetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowResetModal(false)} />
@@ -368,7 +312,7 @@ const renderKycBadge = () => {
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-2">Reset Password?</h3>
               <p className="text-sm text-slate-500 mb-6">
-                We will send a secure reset link to <strong>{user.email}</strong>. This will allow you to create a new password.
+                We will send a secure reset link to <strong>{user.email}</strong>.
               </p>
               <div className="flex gap-3 w-full">
                 <button 
@@ -392,7 +336,7 @@ const renderKycBadge = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* LEFT COLUMN: Avatar, Contact Verification, KYC, Security */}
+          {/* LEFT COLUMN */}
           <div className="lg:col-span-1 space-y-6">
             
             {/* 1. Avatar Card */}
@@ -412,7 +356,6 @@ const renderKycBadge = () => {
                 <h2 className="text-xl font-black text-slate-900">{displayName}</h2>
                 <p className="text-sm text-slate-500 mb-6">{user.email}</p>
                 
-                {/* Role & Email Verification Badges */}
                 <div className="flex justify-center gap-2 mb-6">
                   <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-wider">{user.role}</span>
                   {user.emailVerified && (
@@ -422,7 +365,6 @@ const renderKycBadge = () => {
                   )}
                 </div>
 
-                {/* Edit Button */}
                 <button 
                   onClick={() => isEditing ? handleUpdateProfile() : setIsEditing(true)}
                   disabled={loading}
@@ -468,60 +410,56 @@ const renderKycBadge = () => {
               </div>
             </div>
 
-            {/* 3. KYC Verification Card */}
+            {/* 3. ✅ KYC Verification Card (UPDATED) */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText size={16} /> Identity Verification (KYC)
               </h3>
               
               <div className="space-y-4">
+                {/* Header Row */}
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">Document Status</span>
                   {renderKycBadge()}
                 </div>
 
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  {(!user.kycStatus || user.kycStatus === 'not_uploaded') && "To sell or bid, please upload a government-issued ID (PDF only)."}
-                  {user.kycStatus === 'pending' && "Your document is under review by our team. This usually takes 24 hours."}
-                  {user.kycStatus === 'approved' && "You are fully verified to buy and sell vehicles."}
-                  {user.kycStatus === 'denied' && "Your document was rejected. Please upload a clear, valid PDF."}
-                </p>
-
-                {user.kycStatus !== 'approved' && (user.kycStatus !== 'pending') && (
-                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 hover:border-indigo-400 transition-all group">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      {kycLoading ? (
-                        <span className="text-xs text-slate-500 flex items-center gap-2">
-                          <span className="animate-spin h-3 w-3 border-2 border-indigo-500 border-t-transparent rounded-full"/> 
-                          Uploading...
-                        </span>
-                      ) : (
-                        <>
-                          <div className="mb-1 text-slate-400 group-hover:text-indigo-600 transition-colors">
-                            <UploadCloud size={20} />
-                          </div>
-                          <p className="mb-1 text-xs text-slate-500 group-hover:text-indigo-600 font-bold">Click to upload PDF</p>
-                        </>
-                      )}
+                {/* Status-Based Content */}
+                {isVerified ? (
+                  // ✅ VERIFIED STATE (Green Badge)
+                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800">
+                    <div className="bg-white p-2 rounded-full shadow-sm text-emerald-600">
+                      <ShieldCheck size={20} />
                     </div>
-                    <input 
-                      type="file" 
-                      className="hidden" 
-                      accept="application/pdf"
-                      onChange={handleKycUpload}
-                      disabled={kycLoading}
-                    />
-                  </label>
+                    <div>
+                      <p className="text-sm font-bold">Identity Verified</p>
+                      <p className="text-xs opacity-80">You can now sell & bid freely.</p>
+                    </div>
+                  </div>
+                ) : (
+                  // ❌ UNVERIFIED STATE (Verify Now Button)
+                  <>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      To sell or bid on vehicles, you must complete the identity verification process.
+                    </p>
+                    
+                    <button 
+                      onClick={() => navigate('/kyc-process')}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
+                    >
+                      <ShieldCheck size={18} /> Verify Identity Now
+                    </button>
+                  </>
                 )}
                 
+                {/* View Document Link (If exists) */}
                 {user.kycDocumentUrl && (
                   <a 
                     href={user.kycDocumentUrl} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="flex items-center justify-center gap-1 w-full py-2 text-xs text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                    className="flex items-center justify-center gap-1 w-full py-2 text-xs text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors mt-2"
                   >
-                    <ExternalLink size={12} /> View Uploaded Document
+                    <ExternalLink size={12} /> View Previous Upload
                   </a>
                 )}
               </div>
@@ -533,20 +471,12 @@ const renderKycBadge = () => {
                 <Lock size={16} /> Security
               </h3>
               
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Need to update your password? We will send a secure reset link to <strong>{user.email}</strong>.
-              </p>
-
               <button 
                 onClick={() => setShowResetModal(true)}
                 disabled={resetLoading}
                 className="w-full py-2.5 flex items-center justify-center gap-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50"
               >
-                {resetLoading ? (
-                   <><div className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full"/> Sending...</>
-                ) : (
-                   'Change Password via Email'
-                )}
+                Change Password via Email
               </button>
             </div>
 
@@ -555,7 +485,7 @@ const renderKycBadge = () => {
             </button>
           </div>
 
-          {/* RIGHT COLUMN: Editable Form */}
+          {/* RIGHT COLUMN */}
           <div className="lg:col-span-2 space-y-8">
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl animate-pulse flex items-center gap-2"><AlertTriangle size={18}/> {error}</div>}
             {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2"><CheckCircle size={18}/> {success}</div>}
@@ -566,8 +496,6 @@ const renderKycBadge = () => {
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* First Name (Editable) */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">First Name</label>
                   {isEditing ? (
@@ -578,7 +506,6 @@ const renderKycBadge = () => {
                   )}
                 </div>
 
-                {/* Last Name (Editable) */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Last Name</label>
                   {isEditing ? (
@@ -589,19 +516,14 @@ const renderKycBadge = () => {
                   )}
                 </div>
 
-                {/* EMAIL (READ ONLY / LOCKED) */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</label>
                   <p className="p-2 font-bold text-slate-500 flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200/50">
                     <Mail size={14} /> {user.email}
-                    {/* Lock Icon */}
-                    <span className="ml-auto text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                       Locked
-                    </span>
+                    <span className="ml-auto text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">Locked</span>
                   </p>
                 </div>
 
-                {/* Phone (Editable) */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</label>
                   {isEditing ? (
@@ -614,7 +536,6 @@ const renderKycBadge = () => {
                   )}
                 </div>
 
-                {/* Location (Editable) */}
                 <div className="space-y-2">
                   <label htmlFor="profile-location" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
                   {isEditing ? (
@@ -639,64 +560,45 @@ const renderKycBadge = () => {
                 </span>
               </div>
 
-              {listingsLoading && (
-                <div className="text-sm text-slate-500">Loading your listings...</div>
-              )}
-
-              {!listingsLoading && listingsError && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
-                  {listingsError}
-                </div>
-              )}
-
-              {!listingsLoading && !listingsError && sellerListings.length === 0 && (
-                <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
-                  You have no listings yet.
-                </div>
-              )}
+              {listingsLoading && <div className="text-sm text-slate-500">Loading your listings...</div>}
+              {!listingsLoading && listingsError && <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">{listingsError}</div>}
+              {!listingsLoading && !listingsError && sellerListings.length === 0 && <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">You have no listings yet.</div>}
 
               {!listingsLoading && sellerListings.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {sellerListings.map((listing) => {
-                        const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
-                        const auctionBadge = getAuctionStatusBadge(listing.auctionStatus);
-                        const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
-                        const image = listing.vehicle.images?.[0];
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {sellerListings.map((listing) => {
+                    const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
+                    const auctionBadge = getAuctionStatusBadge(listing.auctionStatus);
+                    const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
+                    const image = listing.vehicle.images?.[0];
 
-                        return (
-                          <div
-                            key={listing.id}
-                            className="p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-all"
-                          >
-                            <div className="flex items-start gap-4">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
-                                {image ? (
-                                  <img src={image} alt={title} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span>{listing.vehicle.make?.slice(0, 2)?.toUpperCase() || 'CV'}</span>
-                                )}
+                    return (
+                      <div key={listing.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-all">
+                        <div className="flex items-start gap-4">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+                            {image ? (
+                              <img src={image} alt={title} className="w-full h-full object-cover" />
+                            ) : (
+                              <span>{listing.vehicle.make?.slice(0, 2)?.toUpperCase() || 'CV'}</span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h4 className="font-bold text-slate-900">{title || 'Vehicle Listing'}</h4>
+                                <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <h4 className="font-bold text-slate-900">{title || 'Vehicle Listing'}</h4>
-                                    <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
-                                  </div>
-                                  <div className="flex flex-col items-end gap-1">
-                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${vehicleBadge.className}`}>
-                                      Vehicle: {vehicleBadge.label}
-                                    </span>
-                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${auctionBadge.className}`}>
-                                      Auction: {auctionBadge.label}
-                                    </span>
-                                  </div>
-                                </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${vehicleBadge.className}`}>Vehicle: {vehicleBadge.label}</span>
+                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${auctionBadge.className}`}>Auction: {auctionBadge.label}</span>
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -709,7 +611,6 @@ const renderKycBadge = () => {
                 <p className="text-sm mt-1">{t('Your bids, purchases, and listings will appear here.', 'ستظهر مزايداتك ومشترياتك وقوائمك هنا.')}</p>
               </div>
             </div>
-
           </div>
         </div>
       </div>

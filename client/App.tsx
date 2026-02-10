@@ -1,4 +1,5 @@
 // App.tsx (full file)
+import KYCProcessPage from './pages/KYCProcessPage';
 import React, { useEffect, useLayoutEffect } from "react";
 import {
   HashRouter,
@@ -91,6 +92,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/auctions" element={<AuctionsPage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
+          <Route path="/kyc-process" element={<KYCProcessPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />

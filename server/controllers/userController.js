@@ -1,6 +1,7 @@
 const oracledb = require('oracledb');
 const db = require('../config/db');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
+const { verifyFaceMatch, validateDocument } = require('../services/rekognitionService'); // ✅ Imported validateDocument
 
 // ==========================================
 // 1. UPDATE TEXT PROFILE
@@ -110,7 +111,7 @@ async function updateAvatar(req, res) {
 }
 
 // ==========================================
-// 3. UPLOAD KYC DOCUMENT
+// 3. UPLOAD KYC DOCUMENT (Old method, kept for safety)
 // ==========================================
 async function uploadKYC(req, res) {
   let connection;
@@ -155,9 +156,91 @@ async function uploadKYC(req, res) {
   }
 }
 
-// ✅ EXPORT ALL FUNCTIONS CORRECTLY
+// ==========================================
+// 4. VALIDATE ID STEP (NEW)
+// ==========================================
+async function validateIDStep(req, res) {
+    const { idImage } = req.body;
+    if (!idImage) return res.status(400).json({ error: "No image provided" });
+
+    try {
+        const buffer = Buffer.from(idImage.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+        
+        // This throws an error if validation fails
+        await validateDocument(buffer);
+
+        res.json({ success: true, message: "ID accepted." });
+    } catch (error) {
+        console.error("❌ ID Validation Failed:", error.message);
+        res.status(400).json({ success: false, error: error.message });
+    }
+}
+
+// ==========================================
+// 5. VERIFY IDENTITY (FINAL STEP)
+// ==========================================
+async function verifyIdentity(req, res) {
+    const { idImage, selfieImage } = req.body;
+    const userId = req.user.id || req.user.userId; 
+
+    if (!idImage || !selfieImage) {
+        return res.status(400).json({ error: "Both ID image and Selfie are required." });
+    }
+
+    let connection;
+
+    try {
+        console.log(`🔍 Starting AI Verification for User ID: ${userId}...`);
+
+        // 1. Call AWS Rekognition Service
+        const result = await verifyFaceMatch(idImage, selfieImage);
+
+        console.log("🤖 AI Result:", result);
+
+        if (result.isMatch && result.similarity > 85) {
+            // 2. SUCCESS: Update Database instantly
+            connection = await db.getConnection();
+            
+            await connection.execute(
+                `UPDATE users 
+                 SET kyc_status = 'verified', 
+                     kyc_verified_at = CURRENT_TIMESTAMP
+                 WHERE id = :id`,
+                { id: userId },
+                { autoCommit: true }
+            );
+
+            return res.json({ 
+                success: true, 
+                status: 'verified', 
+                similarity: result.similarity,
+                message: "Identity verified successfully!" 
+            });
+        } else {
+            // 3. FAIL: Mismatch
+            return res.status(400).json({ 
+                success: false, 
+                status: 'failed', 
+                similarity: result.similarity,
+                error: result.message || "Face mismatch. Please retake the photos." 
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Verification Error:", error);
+        res.status(500).json({ error: "Verification service unavailable." });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { console.error(e); }
+        }
+    }
+}
+
+// ✅ EXPORT ALL FUNCTIONS
 module.exports = { 
     updateProfile, 
     updateAvatar, 
-    uploadKYC 
+    uploadKYC,
+    validateIDStep,
+    verifyIdentity
 };
