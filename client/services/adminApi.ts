@@ -40,7 +40,33 @@ export interface VehicleItem {
   inspection_req?: number;
   inspection_report?: string | null;
   sale_type?: 'auction' | 'fixed_price';
+  images?: string[] | string | null;
+  sellerId?: number;
+  fuel_type?: string;
+  seats?: number;
+  features?: string[] | string | null;
+  description?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  publishedAt?: string | Date | null;
+  deletedAt?: string | Date | null;
+  viewCount?: number;
+  seller_name?: string;
+  seller_email?: string;
+  seller_phone?: string;
+  seller_location?: string;
+  seller_bio?: string;
+  attributes?: {
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
+  result?: {
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
 }
+
+export interface VehicleDetails extends VehicleItem {}
 
 export interface CreateInspectionPayload {
   vehicleId: number;
@@ -129,6 +155,7 @@ export interface LiveAuction {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleYear?: number;
+  vehicleImages?: string[] | string | null;
   status: string;
   startTime?: Date;
   endTime?: Date;
@@ -148,6 +175,11 @@ export interface LiveAuction {
   winnerName?: string;
   createdAt?: Date;
   startedAt?: Date;
+  result?: {
+    vehicleImages?: string[] | string | null;
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface PendingPayment {
@@ -259,6 +291,32 @@ export const searchAdminVehicles = async (searchTerm: string, token?: string): P
 
   const data = await response.json();
   return data.vehicles || data || [];
+};
+
+export const getVehicleById = async (
+  vehicleId: number,
+  token?: string,
+): Promise<VehicleDetails | null> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch vehicle details');
+  }
+
+  const data = await response.json();
+  const payload = data.vehicle ?? data.data ?? null;
+  if (Array.isArray(payload)) {
+    return payload[0] ?? null;
+  }
+  return payload;
 };
 
 export const updateVehicleStatus = async (

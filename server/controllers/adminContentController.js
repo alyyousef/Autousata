@@ -11,7 +11,8 @@ const { getPendingKYCService,
     filterKYCByStatus,
     viewKYCDetails,
     viewuser,
-    getalluserskyc
+    getalluserskyc,
+    updaterole
 } = require('../services/adminContentService');
 
 //kyc
@@ -182,6 +183,8 @@ const viewUserController = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch user details' });
     }
 };
+
+
 
 
 module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController, viewUserController,getalluserskycController};

@@ -87,6 +87,7 @@ const getAllAuctionService = async () => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -111,6 +112,7 @@ const getAllAuctionService = async () => {
             LEFT JOIN DIP.USERS L ON A.LEADING_BIDDER_ID = L.ID
             LEFT JOIN DIP.USERS W ON A.WINNER_ID = W.ID
             LEFT JOIN DIP.VEHICLES V ON A.VEHICLE_ID = V.ID
+            WHERE V.STATUS='active'
             ORDER BY A.START_TIME DESC`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -124,6 +126,7 @@ const getAllAuctionService = async () => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -171,6 +174,7 @@ const filterauctionbyStatus= async (status) => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -209,6 +213,7 @@ const filterauctionbyStatus= async (status) => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -259,6 +264,7 @@ const searchAuctions = async (searchTerm) => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -309,6 +315,7 @@ const searchAuctions = async (searchTerm) => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -439,7 +446,8 @@ const getAuctionById = async (auctionId) => {
                 V.YEAR_MFG,
                 V.BODY_TYPE,
                 V.COLOR,
-                V.FUEL_TYPE,
+                V.FUEL_TYPE ,
+                V.IMAGES as VEHICLE_IMAGES,
                 V.LOCATION_CITY
             FROM DIP.AUCTIONS A
             JOIN DIP.USERS S ON A.SELLER_ID = S.ID
@@ -462,6 +470,7 @@ const getAuctionById = async (auctionId) => {
             vehicleMake: a.MAKE,
             vehicleModel: a.MODEL,
             vehicleYear: a.YEAR_MFG,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -871,6 +880,37 @@ const viewuser= async (userId) => {
     }
 };
 
+const updaterole= async(userId,newRole) =>{
+    let connection;
+    try{
+        connection= await oracledb.getConnection();
+        const result=await connection.execute(
+            `UPDATE DIP.USERS
+            SET ROLE=:newRole
+            WHERE ID=:userId`,
+            {newRole,userId},
+            {autoCommit:true}
+        );
+        return result.rowsAffected===1;
+    } 
+    catch(error){
+        console.error('Error updating user role:',error);
+        throw error;
+    }
+    finally{
+        if(connection){
+            try {
+                await connection.close();
+            }
+            catch (err) {
+                console.error('Error closing connection:', err);
+            }
+        }
+    }
+};
+
+
+
 module.exports = {
     getPendingKYCService,
     getAllAuctionService,
@@ -885,5 +925,6 @@ module.exports = {
     filterKYCByStatus,
     viewKYCDetails,
     viewuser,
-    getalluserskyc
+    getalluserskyc,
+    updaterole
 };
