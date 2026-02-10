@@ -33,6 +33,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const normalizeUser = (raw: any): User => {
     const nameFromParts = [raw?.firstName, raw?.lastName].filter(Boolean).join(' ').trim();
     const name = (raw?.name || nameFromParts || raw?.email || '').trim();
+    const statusRaw = raw?.kycStatus ?? raw?.KYC_STATUS ?? (raw?.isKycVerified ? 'approved' : undefined);
+    const kycStatus = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : statusRaw;
 
     return {
       id: String(raw?.id ?? raw?._id ?? ''),
@@ -42,7 +44,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: String(raw?.email ?? ''),
       phone: raw?.phone ? String(raw.phone) : undefined,
       role: normalizeRole(raw?.role),
-      isKycVerified: Boolean(raw?.isKycVerified ?? raw?.kycVerified ?? false),
+      isKycVerified: Boolean(
+        kycStatus === 'approved' || raw?.isKycVerified || raw?.kycVerified,
+      ),
+      kycStatus,
+      kycDocumentUrl: raw?.kycDocumentUrl || raw?.KYC_DOCUMENT_URL,
       avatar: raw?.avatar || raw?.profileImage || undefined,
       profileImage: raw?.profileImage || raw?.avatar || undefined,
       location: raw?.location,
