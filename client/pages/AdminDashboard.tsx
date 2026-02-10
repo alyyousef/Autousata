@@ -1104,7 +1104,31 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Priority Queues */}
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+          <div
+            className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover cursor-pointer"
+            onClick={() => {
+              setActiveTab("vehicles");
+              tabsRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }}
+          >
+           <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                Vehicles
+              </p>
+              
+              <p className="text-[10px] text-amber-600 font-bold mt-1">
+                
+              </p>
+            </div>
+          </div>
           <div
             className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover cursor-pointer"
             onClick={() => {
@@ -1122,10 +1146,10 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                 Pending KYC
               </p>
-              <h3 className="text-2xl font-black text-slate-900">24</h3>
+              {/* <h3 className="text-2xl font-black text-slate-900">24</h3>
               <p className="text-[10px] text-indigo-600 font-bold mt-1">
                 4 Urgent
-              </p>
+              </p> */}
             </div>
           </div>
           <div
@@ -1145,35 +1169,13 @@ const AdminDashboard: React.FC = () => {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                 Live Auctions
               </p>
-              <h3 className="text-2xl font-black text-slate-900">12</h3>
+              {/* <h3 className="text-2xl font-black text-slate-900">12</h3>
               <p className="text-[10px] text-amber-600 font-bold mt-1">
                 2 New Claims
-              </p>
+              </p> */}
             </div>
           </div>
-          <div
-            className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 premium-card-hover cursor-pointer"
-            onClick={() => {
-              setActiveTab("kyc");
-              tabsRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }}
-          >
-           <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl">
-              <AlertTriangle size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                Pending KYC
-              </p>
-              <h3 className="text-2xl font-black text-slate-900">12</h3>
-              <p className="text-[10px] text-amber-600 font-bold mt-1">
-                
-              </p>
-            </div>
-          </div>
+          
         </div>
 
         {/* Requirements Snapshot */}

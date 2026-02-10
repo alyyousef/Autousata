@@ -451,31 +451,36 @@ exports.banUser = async ({ userId, adminId, reason, evidence }) => {
   }
 };
 
-exports.updaterole= async(userId,newRole) =>{
-    let connection;
-    try{
-        connection= await oracledb.getConnection();
-        const result=await connection.execute(
-            `UPDATE DIP.USERS
-            SET ROLE=:newRole
-            WHERE ID=:userId`,
-            {newRole,userId},
-            {autoCommit:true}
-        );
-        return result.rowsAffected===1;
-    } 
-    catch(error){
-        console.error('Error updating user role:',error);
-        throw error;
+exports.updateRole = async ({ userId, newRole }) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+    const result = await connection.execute(
+      `UPDATE DIP.USERS
+       SET ROLE = :newRole,
+           UPDATED_AT = CURRENT_TIMESTAMP
+       WHERE ID = :userId`,
+      { newRole, userId },
+      { autoCommit: true },
+    );
+
+    if (result.rowsAffected !== 1) {
+      const err = new Error("User not found");
+      err.statusCode = 404;
+      throw err;
     }
-    finally{
-        if(connection){
-            try {
-                await connection.close();
-            }
-            catch (err) {
-                console.error('Error closing connection:', err);
-            }
-        }
+
+    return { id: userId, role: newRole };
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    throw error;
+  } finally {
+    if (connection) {
+      try {
+        await connection.close();
+      } catch (err) {
+        console.error("Error closing connection:", err);
+      }
     }
+  }
 };

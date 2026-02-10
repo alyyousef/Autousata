@@ -1065,3 +1065,44 @@ export const viewuser = async (userId: string, token?: string): Promise<AdminUse
     const result = await response.json();
     return result.data || null;
 };
+
+
+export const updateUserRole = async (
+  userId: string,
+  role: string,
+  token?: string,
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/users/${userId}/role`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ role }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: data.error || data.message || "Failed to update user role",
+      };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Network error",
+    };
+  }
+};

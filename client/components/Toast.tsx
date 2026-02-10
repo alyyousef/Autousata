@@ -1,37 +1,20 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { CheckCircle2, AlertCircle, Info, XCircle } from "lucide-react";
 
 const ToastContext = createContext(null);
 
 const getToastStyles = (type) => {
-  const baseStyles = "flex items-center gap-3 px-4 py-3 rounded-lg shadow-md border animate-fade-in";
-  
-  switch (type) {
-    case "success":
-      return `${baseStyles} bg-emerald-50 border-emerald-200 text-emerald-900`;
-    case "error":
-      return `${baseStyles} bg-red-50 border-red-200 text-red-900`;
-    case "warning":
-      return `${baseStyles} bg-amber-50 border-amber-200 text-amber-900`;
-    case "info":
-    default:
-      return `${baseStyles} bg-blue-50 border-blue-200 text-blue-900`;
-  }
-};
+  const baseStyles = "px-4 py-3 rounded-2xl shadow-lg border text-sm font-bold animate-fade-in";
 
-const getIcon = (type) => {
-  const iconProps = { className: "w-5 h-5 flex-shrink-0" };
-  
   switch (type) {
     case "success":
-      return <CheckCircle2 {...iconProps} className="w-5 h-5 flex-shrink-0 text-emerald-600" />;
+      return `${baseStyles} bg-emerald-50 border-emerald-200 text-emerald-700`;
     case "error":
-      return <XCircle {...iconProps} className="w-5 h-5 flex-shrink-0 text-red-600" />;
+      return `${baseStyles} bg-rose-50 border-rose-200 text-rose-700`;
     case "warning":
-      return <AlertCircle {...iconProps} className="w-5 h-5 flex-shrink-0 text-amber-600" />;
+      return `${baseStyles} bg-amber-50 border-amber-200 text-amber-700`;
     case "info":
     default:
-      return <Info {...iconProps} className="w-5 h-5 flex-shrink-0 text-blue-600" />;
+      return `${baseStyles} bg-slate-50 border-slate-200 text-slate-700`;
   }
 };
 
@@ -53,15 +36,14 @@ export const ToastProvider = ({ children }) => {
       {children}
 
       {/* Toast Container */}
-      <div className="fixed top-6 right-6 z-50 space-y-3 pointer-events-none">
+      <div className="fixed bottom-6 right-6 z-50 space-y-3 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={getToastStyles(toast.type)}
             style={{ pointerEvents: "auto" }}
           >
-            {getIcon(toast.type)}
-            <span className="text-sm font-medium">{toast.message}</span>
+            {toast.message}
           </div>
         ))}
       </div>
