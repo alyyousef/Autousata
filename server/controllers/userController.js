@@ -1,6 +1,8 @@
 const oracledb = require('oracledb');
 const db = require('../config/db');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
+   
+const{sellerlistings,garagelisting}= require('../services/userService');
 
 // ==========================================
 // 1. UPDATE TEXT PROFILE
@@ -155,9 +157,38 @@ async function uploadKYC(req, res) {
   }
 }
 
+const sellerListingsController=async(req,res)=>{
+    try{
+        const userId=req.user.id;
+        const listings=await sellerlistings(userId);
+        res.status(200).json({data:listings});
+
+    }
+    catch(error){
+        console.error('Error fetching seller listings:',error);
+        res.status(400).json({error:'Failed to fetch listings'});
+    }
+}
+
+const garageController=async(req,res)=>{
+    try{
+        const userId=req.user.id;
+        const listings=await garagelisting(userId);
+        res.status(200).json({data:listings});
+
+    }
+    catch(error){
+        console.error('Error fetching garage listings:',error);
+        res.status(400).json({error:'Failed to fetch listings'});
+    }
+}
+
+
 // ✅ EXPORT ALL FUNCTIONS CORRECTLY
 module.exports = { 
     updateProfile, 
     updateAvatar, 
-    uploadKYC 
+    uploadKYC ,
+    sellerListingsController,
+    garageController
 };

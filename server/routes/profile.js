@@ -13,4 +13,7 @@ router.put('/', authenticate, userController.updateProfile);
 // We use 'upload.single("avatar")' because that's what the frontend sends
 router.put('/avatar', authenticate, upload.single('avatar'), userController.updateAvatar);
 router.put('/kyc', authenticate, upload.single('kycDocument'), userController.uploadKYC);
+
+router.get('/listings',authenticate,userController.sellerListingsController);
+router.get('/mygarage',authenticate,userController.garageController);
 module.exports = router;
