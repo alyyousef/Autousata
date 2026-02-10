@@ -173,6 +173,9 @@ function initializeAuctionSocket(io) {
         socket.join(`auction:${auctionId}`);
         socket.currentAuctionId = auctionId;
 
+        console.log(`[Socket.IO] User ${user.id} (${socket.id}) joined room: auction:${auctionId}`);
+        console.log(`[Socket.IO] Room auction:${auctionId} now has ${io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0} members`);
+
         // Send current auction state
         socket.emit('auction_joined', {
           auctionId: auction.id,
@@ -267,10 +270,14 @@ function initializeAuctionSocket(io) {
           const bidderInfo = bidderInfoResult.rows[0];
 
           // Broadcast to all users in auction room
+          const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
+          console.log(`[Socket.IO] Broadcasting auction_updated to room auction:${auctionId} (${roomSize} members)`);
+          
           io.to(`auction:${auctionId}`).emit('auction_updated', {
             auctionId,
             currentBid: amount,
             bidCount: auction.bidCount + 1,
+            minBidIncrement: auction.minBidIncrement,
             leadingBidderId: user.id,
             newBid: {
               id: result.bid.id,
@@ -302,6 +309,14 @@ function initializeAuctionSocket(io) {
               newBid: amount,
               previousBid: auction.currentBid
             }, auction.leadingBidderId);
+
+            // Emit real-time notification to outbid user
+            io.to(`user:${auction.leadingBidderId}`).emit('user_outbid', {
+              auctionId,
+              newBid: amount,
+              yourBid: auction.currentBid
+            });
+            console.log(`[Socket.IO] Emitted user_outbid to user:${auction.leadingBidderId}`);
           }
 
           // Trigger bid.placed webhook

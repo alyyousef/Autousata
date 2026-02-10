@@ -7,6 +7,7 @@ import {
   MoreVertical, CheckCircle, XCircle, ArrowUpRight, BarChart3, Download, Eye
 } from 'lucide-react';
 import { VehicleItem, getAdminVehicles, filterAdminVehicles, searchAdminVehicles, updateVehicleStatus, createInspectionReport, CreateInspectionPayload, getreport, editreport, KYCDocument, getPendingKYC, updateKYC, viewuser, LiveAuction, PendingPayment, getPendingPayments, getAllAuctions, filterAuctions, searchAuctions, updateAuctionStatus, setAuctionStartTime, getAuctionById } from '../services/adminApi';
+import { TableRowSkeleton } from '../components/LoadingSkeleton';
 
 const AdminDashboard: React.FC = () => {
   // Read token from route state (passed from LoginPage)
@@ -328,7 +329,9 @@ const AdminDashboard: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {vehicleLoading && (
-                      <tr><td className="px-4 py-6" colSpan={6}>Loading vehicles…</td></tr>
+                      [...Array(8)].map((_, i) => (
+                        <TableRowSkeleton key={i} columns={7} />
+                      ))
                     )}
                     {vehicleError && !vehicleLoading && (
                       <tr><td className="px-4 py-6 text-rose-600" colSpan={6}>{vehicleError}</td></tr>

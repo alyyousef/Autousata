@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
+import { StatsCardSkeleton, TableRowSkeleton } from '../components/LoadingSkeleton';
 
 interface SellerVehicle {
   _id: string;
@@ -76,27 +77,37 @@ const SellerDashboard: React.FC = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600"><DollarSign size={20} /></div>
-            </div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Total Revenue', 'إجمالي الإيرادات')}</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">{formatCurrencyEGP(totalRevenue)}</h3>
-          </div>
-          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600"><Package size={20} /></div>
-            </div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Active Listings', 'القوائم النشطة')}</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">{formatNumber(activeCount)}</h3>
-          </div>
-          <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 rounded-xl bg-rose-50 text-rose-600"><TrendingUp size={20} /></div>
-            </div>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Vehicles Sold', 'سيارات مباعة')}</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-1">{formatNumber(soldCount)}</h3>
-          </div>
+          {loading ? (
+            <>
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+            </>
+          ) : (
+            <>
+              <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600"><DollarSign size={20} /></div>
+                </div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Total Revenue', 'إجمالي الإيرادات')}</p>
+                <h3 className="text-2xl font-black text-slate-900 mt-1">{formatCurrencyEGP(totalRevenue)}</h3>
+              </div>
+              <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600"><Package size={20} /></div>
+                </div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Active Listings', 'القوائم النشطة')}</p>
+                <h3 className="text-2xl font-black text-slate-900 mt-1">{formatNumber(activeCount)}</h3>
+              </div>
+              <div className="bg-white/95 rounded-3xl p-6 shadow-sm border border-slate-200 premium-card-hover">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 rounded-xl bg-rose-50 text-rose-600"><TrendingUp size={20} /></div>
+                </div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t('Vehicles Sold', 'سيارات مباعة')}</p>
+                <h3 className="text-2xl font-black text-slate-900 mt-1">{formatNumber(soldCount)}</h3>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Listings Table */}
@@ -106,8 +117,22 @@ const SellerDashboard: React.FC = () => {
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="animate-spin text-slate-400" size={32} />
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('Vehicle', 'السيارة')}</th>
+                    <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('Price', 'السعر')}</th>
+                    <th className="px-8 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('Status', 'الحالة')}</th>
+                    <th className="px-8 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('Action', 'إجراء')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[...Array(5)].map((_, i) => (
+                    <TableRowSkeleton key={i} columns={4} />
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : error ? (
             <div className="p-8 text-center">

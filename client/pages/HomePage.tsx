@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { apiService } from '../services/api';
 import ImageLightbox from '../components/ImageLightbox';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
+import { CardGridSkeleton } from '../components/LoadingSkeleton';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'year_desc';
 type SearchFilter = 'all' | 'make' | 'model' | 'year' | 'location';
@@ -107,6 +108,21 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     setSearchTerm(queryFromUrl);
   }, [queryFromUrl]);
+
+  // Refetch vehicles when user returns to this page (e.g., after purchase)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchVehicles();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchVehicles]);
 
   // Search suggestions derived from fetched vehicles
   const searchSuggestions = useMemo(() => {
@@ -299,27 +315,38 @@ const HomePage: React.FC = () => {
                 <option key={value} value={value} />
               ))}
             </datalist>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
-              {[
-                { value: 'all', label: t('All', 'الكل') },
-                { value: 'make', label: t('Make', 'الماركة') },
-                { value: 'model', label: t('Model', 'الموديل') },
-                { value: 'year', label: t('Year', 'السنة') },
-                { value: 'location', label: t('Location', 'الموقع') }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setSearchFilter(option.value as SearchFilter)}
-                  className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
-                    searchFilter === option.value
-                      ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {[
+                  { value: 'all', label: t('All', 'الكل') },
+                  { value: 'make', label: t('Make', 'الماركة') },
+                  { value: 'model', label: t('Model', 'الموديل') },
+                  { value: 'year', label: t('Year', 'السنة') },
+                  { value: 'location', label: t('Location', 'الموقع') }
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSearchFilter(option.value as SearchFilter)}
+                    className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
+                      searchFilter === option.value
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchVehicles()}
+                disabled={loading}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 size={12} className="animate-spin" /> : null}
+                {t('Refresh', 'تحديث')}
+              </button>
             </div>
 
             <div className="mt-6 space-y-6">
@@ -368,9 +395,7 @@ const HomePage: React.FC = () => {
         {/* Vehicle Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-slate-400" size={32} />
-            </div>
+            <CardGridSkeleton count={12} />
           ) : error ? (
             <div className="bg-white/95 border border-rose-200 rounded-2xl p-8 text-center">
               <p className="text-lg font-semibold text-rose-700 mb-2">{t('Error loading vehicles', 'خطأ في تحميل السيارات')}</p>

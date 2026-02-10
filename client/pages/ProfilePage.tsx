@@ -6,6 +6,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
 import { AuctionStatus, VehicleStatus } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ProfileSkeleton } from '../components/LoadingSkeleton';
 
 const ProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
@@ -173,7 +174,13 @@ const ProfilePage: React.FC = () => {
 
 // 4. Return early if loading or no user
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="bg-slate-50 min-h-screen py-12">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ProfileSkeleton />
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
