@@ -641,13 +641,9 @@ const renderKycBadge = () => {
                 )}
               </div>
 
-              {(user.role !== 'SELLER' && user.role !== 'DEALER') && (
-                <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
-                  Listings are available for sellers only.
-                </div>
-              )}
 
-              {(user.role === 'SELLER' || user.role === 'DEALER') && (
+
+              {(user.role === 'SELLER' || user.role === 'DEALER' || user.role === 'BUYER') && (
                 <>
                   {listingsLoading && (
                     <div className="text-sm text-slate-500">Loading your listings...</div>
