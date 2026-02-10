@@ -880,35 +880,6 @@ const viewuser= async (userId) => {
     }
 };
 
-const updaterole= async(userId,newRole) =>{
-    let connection;
-    try{
-        connection= await oracledb.getConnection();
-        const result=await connection.execute(
-            `UPDATE DIP.USERS
-            SET ROLE=:newRole
-            WHERE ID=:userId`,
-            {newRole,userId},
-            {autoCommit:true}
-        );
-        return result.rowsAffected===1;
-    } 
-    catch(error){
-        console.error('Error updating user role:',error);
-        throw error;
-    }
-    finally{
-        if(connection){
-            try {
-                await connection.close();
-            }
-            catch (err) {
-                console.error('Error closing connection:', err);
-            }
-        }
-    }
-};
-
 
 
 module.exports = {
@@ -925,6 +896,5 @@ module.exports = {
     filterKYCByStatus,
     viewKYCDetails,
     viewuser,
-    getalluserskyc,
-    updaterole
+    getalluserskyc
 };
