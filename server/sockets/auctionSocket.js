@@ -155,6 +155,8 @@ function initializeAuctionSocket(io) {
     socket.on('join_auction', async (data) => {
       const { auctionId } = data;
 
+      console.log(`[Socket.IO] User ${user.id} (${socket.id}) attempting to join auction: ${auctionId}`);
+
       if (!auctionId) {
         socket.emit('error', { message: 'Auction ID required' });
         return;
@@ -165,6 +167,7 @@ function initializeAuctionSocket(io) {
         const auction = await getAuctionDetails(auctionId);
 
         if (!auction) {
+          console.log(`[Socket.IO] Auction ${auctionId} not found`);
           socket.emit('error', { message: 'Auction not found' });
           return;
         }
@@ -173,7 +176,7 @@ function initializeAuctionSocket(io) {
         socket.join(`auction:${auctionId}`);
         socket.currentAuctionId = auctionId;
 
-        console.log(`[Socket.IO] User ${user.id} (${socket.id}) joined room: auction:${auctionId}`);
+        console.log(`[Socket.IO] ✅ User ${user.id} (${socket.id}) joined room: auction:${auctionId}`);
         console.log(`[Socket.IO] Room auction:${auctionId} now has ${io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0} members`);
 
         // Send current auction state
@@ -185,6 +188,8 @@ function initializeAuctionSocket(io) {
           status: auction.status,
           minBidIncrement: auction.minBidIncrement
         });
+
+        console.log(`[Socket.IO] Sent auction_joined event to ${socket.id} with currentBid: ${auction.currentBid}`);
 
         // Get and send recent bids
         const recentBids = await bidProcessingService.getRecentBids(auctionId, 10);
@@ -204,7 +209,7 @@ function initializeAuctionSocket(io) {
 
         socket.emit('bid_history', { bids: formattedBids });
 
-        console.log(`[Socket.IO] User ${user.id} joined auction ${auctionId}`);
+        console.log(`[Socket.IO] ✅ User ${user.id} successfully joined auction ${auctionId}, sent ${formattedBids.length} bids`);
       } catch (err) {
         console.error(`[Socket.IO] Error joining auction:`, err);
         socket.emit('error', { message: 'Failed to join auction' });
@@ -271,7 +276,10 @@ function initializeAuctionSocket(io) {
 
           // Broadcast to all users in auction room
           const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
-          console.log(`[Socket.IO] Broadcasting auction_updated to room auction:${auctionId} (${roomSize} members)`);
+          const roomMembers = Array.from(io.sockets.adapter.rooms.get(`auction:${auctionId}`) || []);
+          console.log(`[Socket.IO] 📢 Broadcasting auction_updated to room auction:${auctionId}`);
+          console.log(`[Socket.IO] Room has ${roomSize} members:`, roomMembers);
+          console.log(`[Socket.IO] Broadcasting data:`, { currentBid: amount, bidCount: auction.bidCount + 1 });
           
           io.to(`auction:${auctionId}`).emit('auction_updated', {
             auctionId,
@@ -289,6 +297,8 @@ function initializeAuctionSocket(io) {
             autoExtended: result.autoExtended,
             newEndTime: result.autoExtendInfo?.newEndTime
           });
+          
+          console.log(`[Socket.IO] ✅ Broadcast complete to ${roomSize} members`);
 
           // Notify previous leading bidder (outbid)
           if (auction.leadingBidderId && auction.leadingBidderId !== user.id) {

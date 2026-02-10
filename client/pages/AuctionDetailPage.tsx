@@ -231,15 +231,21 @@ const AuctionDetailPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
 
+    console.log('[AuctionDetail] Setting up socket for auction:', id);
     const socket = socketService.initializeSocket();
+    console.log('[AuctionDetail] Socket instance:', socket.id, 'Connected:', socket.connected);
     setSocketConnected(socket.connected);
 
     socket.on('connect', () => {
+      console.log('[AuctionDetail] Socket connected, joining auction:', id);
       setSocketConnected(true);
       addLocalNotification('Connected to live updates', 'success');
+      // Re-join auction room after reconnect
+      socketService.joinAuction(id);
     });
     
     socket.on('disconnect', () => {
+      console.log('[AuctionDetail] Socket disconnected');
       setSocketConnected(false);
       pushNotification(
         'Lost connection to live updates. Refresh to reconnect.',
@@ -248,11 +254,15 @@ const AuctionDetailPage: React.FC = () => {
       addLocalNotification('Connection lost. Refresh to reconnect.', 'warn');
     });
 
-    // Join the auction room
-    socketService.joinAuction(id);
+    // Join the auction room immediately if already connected
+    if (socket.connected) {
+      console.log('[AuctionDetail] Socket already connected, joining auction:', id);
+      socketService.joinAuction(id);
+    }
 
     // Server sends current state on join
     const handleAuctionJoined = (data: socketService.AuctionJoinedEvent) => {
+      console.log('[AuctionDetail] ✅ auction_joined event received:', data);
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
       setMinBidIncrement(data.minBidIncrement || 50);
@@ -266,6 +276,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // Server sends recent bid history on join
     const handleBidHistory = (data: { bids: any[] }) => {
+      console.log('[AuctionDetail] ✅ bid_history event received:', data.bids?.length, 'bids');
       const formattedBids: RealTimeBid[] = (data.bids || []).map((b: any) => ({
         id: b.id || Math.random().toString(36).slice(2),
         bidderId: b.isYou ? 'You' : (b.displayName || 'Bidder'),
@@ -302,10 +313,11 @@ const AuctionDetailPage: React.FC = () => {
 
     // Broadcast to all users in auction room
     const handleAuctionUpdated = (data: socketService.AuctionUpdate) => {
-      console.log('[Real-time Update] New bid received:', {
+      console.log('[AuctionDetail] ✅ ✅ ✅ auction_updated event received!', {
         currentBid: data.currentBid,
         bidCount: data.bidCount,
-        minBidIncrement: data.minBidIncrement
+        minBidIncrement: data.minBidIncrement,
+        timestamp: new Date().toISOString()
       });
       
       setCurrentBid(data.currentBid);
@@ -379,6 +391,7 @@ const AuctionDetailPage: React.FC = () => {
       addLocalNotification(error.message, 'warn');
     };
 
+    console.log('[AuctionDetail] Registering event listeners for auction:', id);
     socket.on('auction_joined', handleAuctionJoined);
     socket.on('bid_history', handleBidHistory);
     socket.on('bid_placed', handleBidPlaced);
@@ -387,8 +400,10 @@ const AuctionDetailPage: React.FC = () => {
     socketService.onAuctionEnded(handleAuctionEnded);
     socketService.onAuctionEndingSoon(handleAuctionEndingSoon);
     socketService.onBidError(handleBidError);
+    console.log('[AuctionDetail] All event listeners registered');
 
     return () => {
+      console.log('[AuctionDetail] Cleanup: removing event listeners and leaving auction:', id);
       socket.off('connect');
       socket.off('disconnect');
       socket.off('auction_joined', handleAuctionJoined);

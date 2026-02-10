@@ -123,9 +123,15 @@ export interface AuctionEndedEvent {
 // Join an auction room
 export const joinAuction = (auctionId: string): void => {
   const activeSocket = socket || initializeSocket();
+  console.log('[Socket.IO] joinAuction called for:', auctionId);
   console.log('[Socket.IO] Socket connected:', activeSocket.connected, 'Socket ID:', activeSocket.id);
+  
+  if (!activeSocket.connected) {
+    console.warn('[Socket.IO] ⚠️ Socket not connected, join_auction may fail');
+  }
+  
   activeSocket.emit('join_auction', { auctionId });
-  console.log(`[Socket.IO] Emitted join_auction for: ${auctionId}`);
+  console.log(`[Socket.IO] ✅ Emitted join_auction event for: ${auctionId}`);
 };
 
 // Leave an auction room
@@ -138,11 +144,11 @@ export const leaveAuction = (auctionId: string): void => {
 
 // Place a bid via Socket.IO
 export const placeBid = (auctionId: string, amount: number): void => {
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('place_bid', { auctionId, amount });
-    console.log(`[Socket.IO] Placed bid: ${amount} EGP on auction ${auctionId}`);
+    console.log(`[Socket.IO] ✅ Placed bid: ${amount} EGP on auction ${auctionId}`);
   } else {
-    console.error('[Socket.IO] Cannot place bid: Socket not connected');
+    console.error('[Socket.IO] ❌ Cannot place bid: Socket not connected. Connected:', socket?.connected);
   }
 };
 
