@@ -271,8 +271,34 @@ const buyerRefund=async(user_id,escrow_id,payment_id,vehicle_id,auction_id )=>{
                     { winnerId: nextWinner.BIDDER_ID },
                     { outFormat: oracledb.OUT_FORMAT_OBJECT }
                 )
-                sendEmail(email.rows[0].EMAIL, 'You are the winner!', 
-                    'Congratulations, you have won the auction.\nPlease proceed to payment within 24 hours to secure your purchase.');
+                const html=
+                `
+                    <!DOCTYPE html>
+                    <html>
+                    <head><style>${STYLES}</style></head>
+                    <body>
+                        <div class="wrapper">
+                            <div class="container">
+                                <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=600&auto=format&fit=crop" class="hero" alt="Victory Car" width="600">
+                                <div class="content">
+                                    <div class="logo">AUTOUSATA</div>
+                                    <h1>Congratulations! You've won the auction.</h1>
+                                    <p>You are now the highest bidder for auction #${auction_id} with a winning bid of <strong style="color: #D4AF37;">EGP ${nextWinner.AMOUNT_EGP}</strong>.</p>
+                                    <p>Please proceed to payment within 24 hours to secure your purchase and claim your vehicle.</p>
+                                    
+                                    <a href="${FRONTEND_URL}/#/my-garage" class="btn">Complete Payment</a>
+                                    
+                                    <p style="margin-top: 30px; font-size: 12px; color: #64748B;">
+                                        Time is of the essence. Don't miss this opportunity.
+                                    </p>
+                                </div>
+                                <div class="footer">&copy; ${new Date().getFullYear()} Autousata Inc. All rights reserved.</div>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+                sendEmail(email.rows[0].EMAIL, 'You are the winner!', html);
 
                 await connection.execute(
                     `UPDATE DIP.VEHICLES
