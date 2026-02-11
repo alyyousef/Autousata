@@ -11,13 +11,6 @@ const { authenticate, authorize } = require('../middleware/auth');
 router.post('/create-intent', authenticate, paymentController.createPaymentIntent);
 
 /**
- * @route   POST /api/payments/create-direct-intent
- * @desc    Create a Stripe Payment Intent for direct (fixed-price) vehicle purchase
- * @access  Private (Authenticated users only)
- */
-router.post('/create-direct-intent', authenticate, paymentController.createDirectPaymentIntent);
-
-/**
  * @route   POST /api/payments/:id/confirm
  * @desc    Confirm payment completion and create escrow
  * @access  Private (Buyer only)
@@ -441,12 +434,5 @@ router.get('/escrows/disputed', authenticate, authorize('admin'), async (req, re
         await connection.close();
     }
 });
-
-/**
- * @route   GET /api/payments/:id
- * @desc    Get payment details by payment ID (must be last GET to avoid catching specific routes)
- * @access  Private (Buyer, Seller, or Admin)
- */
-router.get('/:id', authenticate, paymentController.getPaymentById);
 
 module.exports = router;

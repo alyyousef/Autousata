@@ -7,6 +7,7 @@ import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { geminiService } from '../geminiService'; // Keeping AI service
 import { apiService } from '../services/api';
+import { handleApiError, handleFileUploadError } from '../utils/errorHandler';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
@@ -25,13 +26,13 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
   z.object({
     // Step 1: Vehicle Basics
     year: z.coerce
-      .number({ invalid_type_error: t('Year must be a valid number', 'سنة الصنع يجب ان تكون رقم صحيح') })
+      .number({ error: t('Year must be a valid number', 'سنة الصنع يجب ان تكون رقم صحيح') })
       .min(1900, t('Year must be 1900 or newer', 'سنة الصنع يجب ان تكون 1900 او احدث'))
       .max(new Date().getFullYear() + 1, t('Year cannot be in the future', 'سنة الصنع لا يمكن ان تكون في المستقبل')),
     make: z.string().min(1, t('Make is required - please select or type', 'الماركة مطلوبة - اختر او اكتب')),
     customMake: z.string().optional(),
     model: z.string().min(1, t('Model is required - please select or type', 'الموديل مطلوب - اختر او اكتب')),
-    mileage: z.coerce.number({ invalid_type_error: t('Please select mileage range', 'اختر نطاق المسافة') }).min(0, t('Mileage cannot be negative', 'المسافة لا يمكن ان تكون سالبة')),
+    mileage: z.coerce.number({ error: t('Please select mileage range', 'اختر نطاق المسافة') }).min(0, t('Mileage cannot be negative', 'المسافة لا يمكن ان تكون سالبة')),
     vin: z.preprocess(
       (val) => (val === '' ? undefined : val),
       z.string().length(17, t('VIN must be exactly 17 characters (letters and numbers)', 'رقم الشاسيه يجب ان يكون 17 حرف بالضبط')).regex(/^[A-HJ-NPR-Z0-9]{17}$/i, t('VIN contains invalid characters', 'رقم الشاسيه يحتوي على احرف غير صحيحة')).optional()
@@ -44,11 +45,11 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
         .optional()
     ),
     color: z.string().min(1, t('Color is required', 'اللون مطلوب')),
-    bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible'], { required_error: t('Body type is required', 'نوع الهيكل مطلوب') }),
-    transmission: z.enum(['manual', 'automatic', 'other'], { required_error: t('Transmission type is required', 'نوع ناقل الحركة مطلوب') }),
-    fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid'], { required_error: t('Fuel type is required', 'نوع الوقود مطلوب') }),
-    seats: z.coerce.number({ invalid_type_error: t('Please select number of seats', 'اختر عدد المقاعد') }).min(1, t('Must have at least 1 seat', 'يجب ان يكون مقعد واحد على الاقل')).max(10, t('Maximum 10 seats', 'حد اقصى 10 مقاعد')),
-    condition: z.enum(['excellent', 'good', 'fair', 'poor'], { required_error: t('Condition is required', 'الحالة مطلوبة') }),
+    bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible'], { error: t('Body type is required', 'نوع الهيكل مطلوب') }),
+    transmission: z.enum(['manual', 'automatic', 'other'], { error: t('Transmission type is required', 'نوع ناقل الحركة مطلوب') }),
+    fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid'], { error: t('Fuel type is required', 'نوع الوقود مطلوب') }),
+    seats: z.coerce.number({ error: t('Please select number of seats', 'اختر عدد المقاعد') }).min(1, t('Must have at least 1 seat', 'يجب ان يكون مقعد واحد على الاقل')).max(10, t('Maximum 10 seats', 'حد اقصى 10 مقاعد')),
+    condition: z.enum(['excellent', 'good', 'fair', 'poor'], { error: t('Condition is required', 'الحالة مطلوبة') }),
 
     // Step 2: Details & Media
     description: z.string().min(20, t('Description must be at least 20 characters - tell buyers about your vehicle', 'الوصف يجب ان يكون 20 حرف على الاقل - احكي للمشترين عن سيارتك')).max(2000, t('Description is too long (max 2000 characters)', 'الوصف طويل جدا (حد اقصى 2000 حرف)')),
@@ -58,10 +59,10 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
     // Step 3: Pricing & Sale Type
     location: z.string().min(2, t('Location is required (city name)', 'الموقع مطلوب (اسم المدينة)')).max(100, t('Location name is too long', 'اسم الموقع طويل جدا')),
     saleType: z.enum(['fixed_price', 'auction']).default('fixed_price'),
-    price: z.coerce.number({ invalid_type_error: t('Price must be a valid number', 'السعر يجب ان يكون رقم صحيح') }).min(1000, t('Price must be at least 1,000 EGP', 'السعر يجب ان يكون 1000 جنيه على الاقل')).max(50000000, t('Price seems unrealistic', 'السعر غير واقعي')),
+    price: z.coerce.number({ error: t('Price must be a valid number', 'السعر يجب ان يكون رقم صحيح') }).min(1000, t('Price must be at least 1,000 EGP', 'السعر يجب ان يكون 1000 جنيه على الاقل')).max(50000000, t('Price seems unrealistic', 'السعر غير واقعي')),
     // Auction-only fields (required when saleType === 'auction')
-    reservePrice: z.coerce.number({ invalid_type_error: t('Reserve price must be a number', 'سعر الحجز يجب ان يكون رقم') }).optional(),
-    startingBid: z.coerce.number({ invalid_type_error: t('Starting bid must be a number', 'سعر البداية يجب ان يكون رقم') }).optional(),
+    reservePrice: z.coerce.number({ error: t('Reserve price must be a number', 'سعر الحجز يجب ان يكون رقم') }).optional(),
+    startingBid: z.coerce.number({ error: t('Starting bid must be a number', 'سعر البداية يجب ان يكون رقم') }).optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
     // AI Notes
@@ -712,7 +713,7 @@ const CreateListingPage: React.FC = () => {
                       className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase font-mono text-sm", errors.vin ? "border-rose-300 bg-rose-50/20" : "border-slate-200")} 
                     />
                     {errors.vin && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.vin.message}</p>}
-                    {!errors.vin && formData.vin && formData.vin.length > 0 && formData.vin.length < 17 && (
+                    {!errors.vin && formData.vin && typeof formData.vin === 'string' && formData.vin.length > 0 && formData.vin.length < 17 && (
                       <p className="text-xs text-amber-600 flex items-center gap-1">
                         <AlertCircle size={12} />
                         {t('VIN must be exactly 17 characters', 'رقم الشاسيه يجب ان يكون 17 حرف بالضبط')}
@@ -772,7 +773,7 @@ const CreateListingPage: React.FC = () => {
                       value={formData.bodyType}
                       options={bodyTypeOptions}
                       className={errors.bodyType && validationAttempted ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('bodyType', String(value), { shouldValidate: true, shouldDirty: true })}
+                      onChange={(value) => setValue('bodyType', value as typeof formData.bodyType, { shouldValidate: true, shouldDirty: true })}
                     />
                     {errors.bodyType && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.bodyType.message}</p>}
                   </div>
@@ -784,7 +785,7 @@ const CreateListingPage: React.FC = () => {
                       value={formData.transmission}
                       options={transmissionOptions}
                       className={errors.transmission && validationAttempted ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('transmission', String(value), { shouldValidate: true, shouldDirty: true })}
+                      onChange={(value) => setValue('transmission', value as typeof formData.transmission, { shouldValidate: true, shouldDirty: true })}
                     />
                     {errors.transmission && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.transmission.message}</p>}
                   </div>
@@ -796,7 +797,7 @@ const CreateListingPage: React.FC = () => {
                       value={formData.fuelType}
                       options={fuelTypeOptions}
                       className={errors.fuelType && validationAttempted ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('fuelType', String(value), { shouldValidate: true, shouldDirty: true })}
+                      onChange={(value) => setValue('fuelType', value as typeof formData.fuelType, { shouldValidate: true, shouldDirty: true })}
                     />
                     {errors.fuelType && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.fuelType.message}</p>}
                   </div>
@@ -820,7 +821,7 @@ const CreateListingPage: React.FC = () => {
                       value={formData.condition}
                       options={conditionOptions}
                       className={errors.condition && validationAttempted ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('condition', String(value), { shouldValidate: true, shouldDirty: true })}
+                      onChange={(value) => setValue('condition', value as typeof formData.condition, { shouldValidate: true, shouldDirty: true })}
                     />
                     {errors.condition && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.condition.message}</p>}
                   </div>

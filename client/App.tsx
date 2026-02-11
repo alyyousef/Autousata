@@ -12,7 +12,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { UserRole } from "./types";
-
+import './index.css';
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
