@@ -10,7 +10,8 @@ const {
     addinspectionreport,
     selectinspector,
     viewreport,
-    editreport
+    editreport,
+    getVehicle
 } = require('../services/adminService');
 
 
@@ -24,7 +25,25 @@ const getAllVehicles = async (req, res) => {
     }
 };
 
+const  getVehicleController=async(req,res)=>{
+    try{
+        const {vehicleId}=req.params;
+        if(!vehicleId){
+            return res.status(400).json({error:'Vehicle ID is required'});
 
+        }
+
+        const vehicle= await getVehicle(vehicleId);
+        if(vehicle){
+            res.status(200).json({vehicle});
+        }
+
+    }
+    catch(error){
+        console.error('Controller - Get vehicle error:', error);
+        res.status(500).json({ error: 'Failed to get vehicle' });
+    }
+}
 
 const filterVehiclesByStatus = async (req, res) => {
     try {
@@ -329,5 +348,6 @@ module.exports = {
     createInspectionReportController,
     selectInspectorController,
     viewReportController,
-    editreportController
+    editreportController,
+    getVehicleController
 };

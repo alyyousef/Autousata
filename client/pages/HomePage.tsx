@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Clock, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X, Loader2 } from 'lucide-react';
+import { ChevronDown, MapPin, Search, ShieldCheck, SlidersHorizontal, Tag, X, Loader2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { apiService } from '../services/api';
 import ImageLightbox from '../components/ImageLightbox';
-import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'year_desc';
-type SearchFilter = 'all' | 'make' | 'model' | 'year' | 'location';
 
 interface BrowseVehicle {
   _id: string;
@@ -37,7 +35,6 @@ const HomePage: React.FC = () => {
   const { t, formatNumber, formatCurrencyEGP } = useLanguage();
 
   const [searchTerm, setSearchTerm] = useState(queryFromUrl);
-  const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
   const [conditionFilter, setConditionFilter] = useState('All');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -48,19 +45,6 @@ const HomePage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const conditionOptions: CustomSelectOption[] = [
-    { value: 'All', label: t('All', 'الكل') },
-    { value: 'Excellent', label: t('Excellent', 'ممتازة') },
-    { value: 'Good', label: t('Good', 'جيدة') },
-    { value: 'Fair', label: t('Fair', 'مقبولة') },
-    { value: 'Poor', label: t('Poor', 'ضعيفة') }
-  ];
-  const sortOptions: CustomSelectOption[] = [
-    { value: 'newest', label: t('Newest', 'الأحدث') },
-    { value: 'price_asc', label: t('Price: low to high', 'السعر من الأقل للأعلى') },
-    { value: 'price_desc', label: t('Price: high to low', 'السعر من الأعلى للأقل') },
-    { value: 'year_desc', label: t('Newest model year', 'أحدث سنة') }
-  ];
 
   const conditionLabel = (condition: string) => {
     const key = condition.toLowerCase();
@@ -108,53 +92,13 @@ const HomePage: React.FC = () => {
     setSearchTerm(queryFromUrl);
   }, [queryFromUrl]);
 
-  // Search suggestions derived from fetched vehicles
-  const searchSuggestions = useMemo(() => {
-    const values = new Set<string>();
-    vehicles.forEach(v => {
-      if (searchFilter === 'make') values.add(v.make);
-      else if (searchFilter === 'model') values.add(v.model);
-      else if (searchFilter === 'year') values.add(String(v.year));
-      else if (searchFilter === 'location') values.add(v.location);
-      else {
-        values.add(v.make);
-        values.add(v.model);
-        values.add(String(v.year));
-        if (v.location) values.add(v.location);
-      }
-    });
-    const query = searchTerm.trim().toLowerCase();
-    const allValues = Array.from(values);
-    const filtered = query
-      ? allValues.filter(value => value.toLowerCase().includes(query))
-      : allValues;
-    const sorted = filtered.sort((a, b) => {
-      const aLower = a.toLowerCase();
-      const bLower = b.toLowerCase();
-      const aStarts = query ? aLower.startsWith(query) : false;
-      const bStarts = query ? bLower.startsWith(query) : false;
-      if (aStarts && !bStarts) return -1;
-      if (!aStarts && bStarts) return 1;
-      return aLower.localeCompare(bLower);
-    });
-    return sorted.slice(0, 40);
-  }, [vehicles, searchFilter, searchTerm]);
-
   // Client-side filtering (search + condition) on top of server-side results
-  const filteredVehicles = useMemo(() => {
+  const filteredVehicles = vehicles.filter((v) => {
     const query = searchTerm.trim().toLowerCase();
-    return vehicles.filter((v) => {
-      const matchesCondition = conditionFilter === 'All' || v.condition === conditionFilter;
-      const matchesQuery = !query || (() => {
-        if (searchFilter === 'make') return v.make.toLowerCase().includes(query);
-        if (searchFilter === 'model') return v.model.toLowerCase().includes(query);
-        if (searchFilter === 'year') return v.year.toString().includes(query);
-        if (searchFilter === 'location') return (v.location || '').toLowerCase().includes(query);
-        return [v.make, v.model, v.year.toString(), v.location].some(val => (val || '').toLowerCase().includes(query));
-      })();
-      return matchesCondition && matchesQuery;
-    });
-  }, [vehicles, searchTerm, searchFilter, conditionFilter]);
+    const matchesCondition = conditionFilter === 'All' || v.condition === conditionFilter;
+    const matchesQuery = !query || [v.make, v.model, v.year.toString(), v.location].some(val => val.toLowerCase().includes(query));
+    return matchesCondition && matchesQuery;
+  });
 
   return (
     <>
@@ -170,22 +114,21 @@ const HomePage: React.FC = () => {
               </h1>
               <p className="text-slate-200/90 mt-4 text-sm md:text-base max-w-xl">
                 {t(
-                  'Explore our curated inventory, compare bids, and review condition details before you commit.',
-                  'استكشف العربيات المختارة بعناية، قارن المزايدات، وراجع تفاصيل الحالة قبل ما تقرر.'
+                  'Browse fixed-price vehicles from verified sellers. Find your perfect car and buy directly.',
+                  'تصفح السيارات بأسعار ثابتة من بائعين موثقين. اعثر على سيارتك المثالية واشترِ مباشرة.'
                 )}
               </p>
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-4 text-xs md:text-sm text-slate-200/90 relative">
               <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'بائعون موثقون')}</div>
-              <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'اسعار واضحة')}</div>
-              <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبق واضح')}</div>
+              <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Fixed prices', 'اسعار ثابتة')}</div>
             </div>
           </div>
         </section>
 
         {/* Search & Filters */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 relative z-30">
-          <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm relative z-30">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12">
+          <div className="bg-white/95 rounded-3xl shadow-lg border border-slate-200 p-6 md:p-8 backdrop-blur-sm">
             <div className="space-y-6">
               <div>
                 <p className="text-sm uppercase tracking-[0.32em] text-slate-600 font-semibold mb-3 text-center">
@@ -197,13 +140,6 @@ const HomePage: React.FC = () => {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Tab' && searchSuggestions.length > 0) {
-                        setSearchTerm(searchSuggestions[0]);
-                        e.preventDefault();
-                      }
-                    }}
-                    list="buy-search-suggestions"
                     placeholder={t('Search by make, model, year, or location', 'ابحث بالمصنع او الموديل او السنة او الموقع')}
                     className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   />
@@ -214,36 +150,7 @@ const HomePage: React.FC = () => {
                   )}
                 </div>
               </div>
-            </div>
-            <datalist id="buy-search-suggestions">
-              {searchSuggestions.map(value => (
-                <option key={value} value={value} />
-              ))}
-            </datalist>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
-              {[
-                { value: 'all', label: t('All', 'الكل') },
-                { value: 'make', label: t('Make', 'الماركة') },
-                { value: 'model', label: t('Model', 'الموديل') },
-                { value: 'year', label: t('Year', 'السنة') },
-                { value: 'location', label: t('Location', 'الموقع') }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setSearchFilter(option.value as SearchFilter)}
-                  className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
-                    searchFilter === option.value
-                      ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
 
-            <div className="mt-6 space-y-6">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
                   {t('Available', 'متاحة')}
@@ -260,11 +167,22 @@ const HomePage: React.FC = () => {
                     {t('Condition', 'الحالة')}
                   </label>
                   <div className="relative">
-                    <CustomSelect
+                    <select
                       value={conditionFilter}
-                      options={conditionOptions}
-                      onChange={(value) => setConditionFilter(String(value))}
-                    />
+                      onChange={(e) => setConditionFilter(e.target.value)}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      {[
+                        { value: 'All', label: t('All', 'الكل') },
+                        { value: 'Excellent', label: t('Excellent', 'ممتاز') },
+                        { value: 'Good', label: t('Good', 'جيد') },
+                        { value: 'Fair', label: t('Fair', 'مقبول') },
+                        { value: 'Poor', label: t('Poor', 'ضعيف') }
+                      ].map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
                 </div>
 
@@ -274,11 +192,17 @@ const HomePage: React.FC = () => {
                     {t('Sort by', 'ترتيب حسب')}
                   </label>
                   <div className="relative">
-                    <CustomSelect
+                    <select
                       value={sortBy}
-                      options={sortOptions}
-                      onChange={(value) => { setSortBy(value as SortOption); setPage(1); }}
-                    />
+                      onChange={(e) => { setSortBy(e.target.value as SortOption); setPage(1); }}
+                      className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    >
+                      <option value="newest">{t('Newest first', 'الاحدث اولا')}</option>
+                      <option value="price_asc">{t('Price: low to high', 'السعر من الاقل للاعلى')}</option>
+                      <option value="price_desc">{t('Price: high to low', 'السعر من الاعلى للاقل')}</option>
+                      <option value="year_desc">{t('Year: newest', 'السنة الاحدث')}</option>
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
                 </div>
               </div>

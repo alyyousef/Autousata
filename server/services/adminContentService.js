@@ -1,3 +1,4 @@
+const { get } = require("mongoose");
 const oracledb = require("oracledb");
 
 const getPendingPaymentsService = async () => {
@@ -86,6 +87,7 @@ const getAllAuctionService = async () => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -110,6 +112,7 @@ const getAllAuctionService = async () => {
             LEFT JOIN DIP.USERS L ON A.LEADING_BIDDER_ID = L.ID
             LEFT JOIN DIP.USERS W ON A.WINNER_ID = W.ID
             LEFT JOIN DIP.VEHICLES V ON A.VEHICLE_ID = V.ID
+            WHERE V.STATUS='active'
             ORDER BY A.START_TIME DESC`,
             [],
             { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -123,6 +126,7 @@ const getAllAuctionService = async () => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -170,6 +174,7 @@ const filterauctionbyStatus= async (status) => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -208,6 +213,7 @@ const filterauctionbyStatus= async (status) => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -258,6 +264,7 @@ const searchAuctions = async (searchTerm) => {
                 V.MAKE as VEHICLE_MAKE,
                 V.MODEL as VEHICLE_MODEL,
                 V.YEAR_MFG as VEHICLE_YEAR,
+                V.IMAGES as VEHICLE_IMAGES,
                 A.STATUS,
                 A.START_TIME,
                 A.END_TIME,
@@ -308,6 +315,7 @@ const searchAuctions = async (searchTerm) => {
             vehicleMake: a.VEHICLE_MAKE,
             vehicleModel: a.VEHICLE_MODEL,
             vehicleYear: a.VEHICLE_YEAR,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -438,7 +446,8 @@ const getAuctionById = async (auctionId) => {
                 V.YEAR_MFG,
                 V.BODY_TYPE,
                 V.COLOR,
-                V.FUEL_TYPE,
+                V.FUEL_TYPE ,
+                V.IMAGES as VEHICLE_IMAGES,
                 V.LOCATION_CITY
             FROM DIP.AUCTIONS A
             JOIN DIP.USERS S ON A.SELLER_ID = S.ID
@@ -461,6 +470,7 @@ const getAuctionById = async (auctionId) => {
             vehicleMake: a.MAKE,
             vehicleModel: a.MODEL,
             vehicleYear: a.YEAR_MFG,
+            vehicleImages:a.VEHICLE_IMAGES,
             status: a.STATUS,
             startTime: a.START_TIME,
             endTime: a.END_TIME,
@@ -516,7 +526,8 @@ const getPendingKYCService = async () => {
                 IS_ACTIVE,
                 IS_BANNED,
                 KYC_STATUS,
-                KYC_DOCUMENT_URL
+                KYC_DOCUMENT_URL,
+                PROFILE_PIC_URL
             FROM DIP.USERS 
             WHERE KYC_STATUS = 'pending'`,
             [],
@@ -532,7 +543,8 @@ const getPendingKYCService = async () => {
             isActive: row.IS_ACTIVE,
             isBanned: row.IS_BANNED,
             kycStatus: row.KYC_STATUS,
-            kycDocumentUrl: row.KYC_DOCUMENT_URL
+            kycDocumentUrl: row.KYC_DOCUMENT_URL,
+            profileurl: row.PROFILE_PIC_URL   
         }));
     } catch (error) {
         console.error('Error fetching pending KYC documents:', error);
@@ -553,7 +565,7 @@ const updateStatusKYC = async (userId, action = null) => {
     let connection;
     try {
         connection = await oracledb.getConnection();
-        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        const newStatus = action === 'approved' ? 'approved' : 'rejected';
         const res= await connection.execute(
             `UPDATE DIP.USERS
             SET KYC_STATUS = :newStatus
@@ -567,6 +579,48 @@ const updateStatusKYC = async (userId, action = null) => {
         console.error('Error updating KYC status:', error);
 
         
+    }
+    finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing connection:', err);
+            }
+        }
+    }
+};
+
+const getalluserskyc = async () => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT*
+            FROM DIP.USERS`,
+            [],
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        return result.rows.map((row) => ({
+            id: row.ID,
+            email: row.EMAIL,
+            phone: row.PHONE,
+            firstName: row.FIRST_NAME,
+            lastName: row.LAST_NAME,
+            isActive: row.IS_ACTIVE,
+            isBanned: row.IS_BANNED,
+            banreason: row.BAN_REASON,
+            bio: row.BIO,
+            locationCity: row.LOCATION_CITY,
+            profileurl: row.PROFILE_PIC_URL,
+            kycStatus: row.KYC_STATUS,
+            kycDocumentUrl: row.KYC_DOCUMENT_URL,
+            role: row.ROLE
+        }));
+    }
+    catch (error) {
+        console.error('Error fetching all users with KYC status:', error);
+        throw error;
     }
     finally {
         if (connection) {
@@ -596,7 +650,7 @@ const searchKYC = async (searchTerm) => {
                 U.BIO,
                 U.LOCATION_CITY,
                 U.ROLE,
-                U.KYC_DOCUMENT_URL,
+                U.KYC_DOCUMENT_URL
             FROM DIP.USERS U 
             WHERE LOWER(U.EMAIL) LIKE LOWER(:search)
                 OR LOWER(U.FIRST_NAME || ' ' || U.LAST_NAME) LIKE LOWER(:search)
@@ -826,6 +880,8 @@ const viewuser= async (userId) => {
     }
 };
 
+
+
 module.exports = {
     getPendingKYCService,
     getAllAuctionService,
@@ -839,5 +895,6 @@ module.exports = {
     searchKYC,
     filterKYCByStatus,
     viewKYCDetails,
-    viewuser
+    viewuser,
+    getalluserskyc
 };

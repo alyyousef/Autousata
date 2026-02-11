@@ -33,6 +33,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const normalizeUser = (raw: any): User => {
     const nameFromParts = [raw?.firstName, raw?.lastName].filter(Boolean).join(' ').trim();
     const name = (raw?.name || nameFromParts || raw?.email || '').trim();
+    const statusRaw = raw?.kycStatus ?? raw?.KYC_STATUS ?? (raw?.isKycVerified ? 'approved' : undefined);
+    const kycStatus = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : statusRaw;
 
     return {
       id: String(raw?.id ?? raw?._id ?? ''),
@@ -42,17 +44,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: String(raw?.email ?? ''),
       phone: raw?.phone ? String(raw.phone) : undefined,
       role: normalizeRole(raw?.role),
-      
       // ✅ KYC Status Mapping
-      kycStatus: raw?.kycStatus || 'not_uploaded',
-      kycDocumentUrl: raw?.kycDocumentUrl || undefined,
+      kycStatus: kycStatus || 'not_uploaded',
+      kycDocumentUrl: raw?.kycDocumentUrl || raw?.KYC_DOCUMENT_URL || undefined,
       
       // ✅ NEW: Maps backend 'kycAddressFromId' to frontend 'kycAddress'
       kycAddress: raw?.kycAddressFromId || raw?.kycAddress || undefined,
       kycNameFromId: raw?.kycNameFromId || undefined,
 
-      isKycVerified: raw?.kycStatus === 'verified' || raw?.kycStatus === 'approved',
-
+      isKycVerified: Boolean(
+        kycStatus === 'approved' || 
+        kycStatus === 'verified' || 
+        raw?.isKycVerified || 
+        raw?.kycVerified
+      ),
       avatar: raw?.avatar || raw?.profileImage || undefined,
       profileImage: raw?.profileImage || raw?.avatar || undefined,
       location: raw?.location,

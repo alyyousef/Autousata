@@ -7,43 +7,6 @@ const { rateLimitBid } = require('../middleware/rateLimiter');
 const bidProcessingService = require('../services/bidProcessingService');
 const { getIO } = require('../server');
 
-/**
- * Safely parse the IMAGES column from the database.
- * Handles: JSON arrays, plain URL strings, comma-separated URLs,
- * null/undefined, CLOB objects, and malformed data.
- * Always returns a string[] of image URLs.
- */
-function parseImagesColumn(raw) {
-  if (!raw) return [];
-  let str = raw;
-  if (typeof raw !== 'string') {
-    try { str = String(raw); } catch { return []; }
-  }
-  str = str.trim();
-  if (!str) return [];
-  if (str.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(str);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(item => typeof item === 'string' && item.length > 0);
-      }
-    } catch { /* fall through */ }
-  }
-  if (str.startsWith('http://') || str.startsWith('https://')) {
-    return str.split(',').map(u => u.trim()).filter(u => u.length > 0);
-  }
-  try {
-    const parsed = JSON.parse(str);
-    if (Array.isArray(parsed)) {
-      return parsed.filter(item => typeof item === 'string' && item.length > 0);
-    }
-    if (typeof parsed === 'string' && parsed.startsWith('http')) {
-      return [parsed];
-    }
-  } catch { /* fall through */ }
-  return [];
-}
-
 // POST /api/auctions - Create a new auction (draft)
 // Accepts durationDays instead of startTime/endTime.
 // Actual start/end times are calculated when admin approves the vehicle.
@@ -290,7 +253,10 @@ router.get('/', async (req, res) => {
         poor: 'Poor'
       };
 
-      let images = parseImagesColumn(row.IMAGES);
+      let images = [];
+      if (typeof row.IMAGES === 'string') {
+        try { images = JSON.parse(row.IMAGES); } catch (e) { images = []; }
+      }
 
       return {
         _id: row.AUCTION_ID,
@@ -447,7 +413,10 @@ router.get('/:id', async (req, res) => {
       poor: 'Poor'
     };
 
-    let images = parseImagesColumn(row.IMAGES);
+    let images = [];
+    if (typeof row.IMAGES === 'string') {
+      try { images = JSON.parse(row.IMAGES); } catch (e) { images = []; }
+    }
 
     res.json({
       _id: row.AUCTION_ID,

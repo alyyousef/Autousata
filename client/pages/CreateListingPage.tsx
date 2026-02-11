@@ -7,8 +7,12 @@ import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { geminiService } from '../geminiService'; // Keeping AI service
 import { apiService } from '../services/api';
+import { handleApiError, handleFileUploadError } from '../utils/errorHandler';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
+import Autocomplete from '../components/Autocomplete';
+import { getMakeOptions, getModelOptions, isValidMake } from '../data/carMakeModels';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -22,43 +26,43 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
   z.object({
     // Step 1: Vehicle Basics
     year: z.coerce
-      .number()
+      .number({ error: t('Year must be a valid number', 'سنة الصنع يجب ان تكون رقم صحيح') })
       .min(1900, t('Year must be 1900 or newer', 'سنة الصنع يجب ان تكون 1900 او احدث'))
-      .max(new Date().getFullYear() + 1, t('Year cannot be in the far future', 'سنة الصنع لا يمكن ان تكون بعيدة')),
-    make: z.string().min(1, t('Make is required', 'الماركة مطلوبة')),
+      .max(new Date().getFullYear() + 1, t('Year cannot be in the future', 'سنة الصنع لا يمكن ان تكون في المستقبل')),
+    make: z.string().min(1, t('Make is required - please select or type', 'الماركة مطلوبة - اختر او اكتب')),
     customMake: z.string().optional(),
-    model: z.string().min(1, t('Model is required', 'الموديل مطلوب')),
-    mileage: z.coerce.number().min(0, t('Mileage must be 0 or more', 'المسافة يجب ان تكون صفر او اكثر')),
+    model: z.string().min(1, t('Model is required - please select or type', 'الموديل مطلوب - اختر او اكتب')),
+    mileage: z.coerce.number({ error: t('Please select mileage range', 'اختر نطاق المسافة') }).min(0, t('Mileage cannot be negative', 'المسافة لا يمكن ان تكون سالبة')),
     vin: z.preprocess(
       (val) => (val === '' ? undefined : val),
-      z.string().length(17, t('VIN must be 17 characters', 'رقم الشاسيه يجب ان يكون 17 حرف')).optional()
+      z.string().length(17, t('VIN must be exactly 17 characters (letters and numbers)', 'رقم الشاسيه يجب ان يكون 17 حرف بالضبط')).regex(/^[A-HJ-NPR-Z0-9]{17}$/i, t('VIN contains invalid characters', 'رقم الشاسيه يحتوي على احرف غير صحيحة')).optional()
     ),
     plateNumber: z.preprocess(
       (val) => (val === '' ? undefined : val),
       z
         .string()
-        .regex(/^[A-Za-z]{1,3}[1-9]{1,4}$/, t('Plate number must be 1-3 letters then 1-4 numbers (no zeros)', 'رقم اللوحة يجب ان يكون 1-3 حروف وبعدها 1-4 أرقام (دون صفر)'))
+        .regex(/^[A-Za-z]{1,3}[1-9][0-9]{0,3}$/, t('Plate format: 1-3 letters + 1-4 digits (first digit cannot be 0)', 'صيغة اللوحة: 1-3 حروف + 1-4 أرقام (اول رقم لا يكون صفر)'))
         .optional()
     ),
     color: z.string().min(1, t('Color is required', 'اللون مطلوب')),
-    bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible']),
-    transmission: z.enum(['manual', 'automatic', 'other']),
-    fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid']),
-    seats: z.coerce.number().min(1, t('Seats must be at least 1', 'عدد المقاعد يجب ان يكون واحد او اكثر')),
-    condition: z.enum(['excellent', 'good', 'fair', 'poor']),
+    bodyType: z.enum(['sedan', 'suv', 'truck', 'coupe', 'hatchback', 'van', 'convertible'], { error: t('Body type is required', 'نوع الهيكل مطلوب') }),
+    transmission: z.enum(['manual', 'automatic', 'other'], { error: t('Transmission type is required', 'نوع ناقل الحركة مطلوب') }),
+    fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid'], { error: t('Fuel type is required', 'نوع الوقود مطلوب') }),
+    seats: z.coerce.number({ error: t('Please select number of seats', 'اختر عدد المقاعد') }).min(1, t('Must have at least 1 seat', 'يجب ان يكون مقعد واحد على الاقل')).max(10, t('Maximum 10 seats', 'حد اقصى 10 مقاعد')),
+    condition: z.enum(['excellent', 'good', 'fair', 'poor'], { error: t('Condition is required', 'الحالة مطلوبة') }),
 
     // Step 2: Details & Media
-    description: z.string().min(20, t('Description must be at least 20 characters', 'الوصف يجب ان يكون 20 حرف على الاقل')),
+    description: z.string().min(20, t('Description must be at least 20 characters - tell buyers about your vehicle', 'الوصف يجب ان يكون 20 حرف على الاقل - احكي للمشترين عن سيارتك')).max(2000, t('Description is too long (max 2000 characters)', 'الوصف طويل جدا (حد اقصى 2000 حرف)')),
     features: z.array(z.string()).default([]),
-    images: z.array(z.string()).min(1, t('Add at least one photo', 'اضف صورة واحدة على الاقل')),
+    images: z.array(z.string()).min(1, t('At least one clear photo is required', 'صورة واضحة واحدة على الاقل مطلوبة')).max(10, t('Maximum 10 photos allowed', 'حد اقصى 10 صور')),
 
     // Step 3: Pricing & Sale Type
-    location: z.string().min(1, t('Location is required', 'الموقع مطلوب')),
+    location: z.string().min(2, t('Location is required (city name)', 'الموقع مطلوب (اسم المدينة)')).max(100, t('Location name is too long', 'اسم الموقع طويل جدا')),
     saleType: z.enum(['fixed_price', 'auction']).default('fixed_price'),
-    price: z.coerce.number().min(1, t('Price is required', 'السعر مطلوب')),
+    price: z.coerce.number({ error: t('Price must be a valid number', 'السعر يجب ان يكون رقم صحيح') }).min(1000, t('Price must be at least 1,000 EGP', 'السعر يجب ان يكون 1000 جنيه على الاقل')).max(50000000, t('Price seems unrealistic', 'السعر غير واقعي')),
     // Auction-only fields (required when saleType === 'auction')
-    reservePrice: z.coerce.number().optional(),
-    startingBid: z.coerce.number().optional(),
+    reservePrice: z.coerce.number({ error: t('Reserve price must be a number', 'سعر الحجز يجب ان يكون رقم') }).optional(),
+    startingBid: z.coerce.number({ error: t('Starting bid must be a number', 'سعر البداية يجب ان يكون رقم') }).optional(),
     durationDays: z.enum(['1', '3', '7']).default('3'),
 
     // AI Notes
@@ -93,28 +97,20 @@ const createListingSchema = (t: (en: string, ar: string) => string) =>
   .refine(
     (data) => {
       if (data.saleType === 'auction') {
-        return (data.startingBid ?? 0) >= 1 && (data.reservePrice ?? 0) >= 1;
+        const starting = data.startingBid ?? 0;
+        const reserve = data.reservePrice ?? 0;
+        return starting >= 1000 && reserve >= 1000 && reserve >= starting;
       }
       return true;
     },
     {
-      message: t('Starting bid and reserve price are required for auctions', 'سعر البداية وسعر الحجز مطلوبين للمزاد'),
+      message: t('For auctions: starting bid and reserve price must be at least 1,000 EGP, and reserve must be >= starting bid', 'للمزاد: سعر البداية وسعر الحجز يجب ان يكونا 1000 جنيه على الاقل، وسعر الحجز >= سعر البداية'),
       path: ['startingBid'],
     }
   );
 
 type ListingFormInput = z.input<ReturnType<typeof createListingSchema>>;
 type ListingFormData = z.infer<ReturnType<typeof createListingSchema>>;
-
-const CAR_MAKES = [
-  'Toyota', 'Honda', 'Nissan', 'Mazda', 'Subaru', 'Mitsubishi',
-  'Hyundai', 'Kia', 'Genesis',
-  'Ford', 'Chevrolet', 'Dodge', 'Jeep', 'GMC', 'Cadillac', 'Chrysler',
-  'BMW', 'Mercedes-Benz', 'Audi', 'Volkswagen', 'Porsche', 'Mini',
-  'Lexus', 'Infiniti', 'Acura',
-  'Volvo', 'Jaguar', 'Land Rover',
-  'Tesla', 'Ferrari', 'Lamborghini', 'Maserati', 'Bentley', 'Rolls-Royce'
-];
 
 const MILEAGE_OPTIONS = [
   { value: 0, labelEn: '0 km', labelAr: '٠ كم' },
@@ -136,8 +132,82 @@ const CreateListingPage: React.FC = () => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [featureInput, setFeatureInput] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [validationAttempted, setValidationAttempted] = useState(false);
   
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const resolvedKycStatus = user
+    ? (user.kycStatus
+        ? String(user.kycStatus).toLowerCase()
+        : user.isKycVerified
+          ? 'approved'
+          : 'not_uploaded')
+    : null;
+
+  const getKycGateCopy = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return {
+          badge: t('KYC Review', 'مراجعة الهوية'),
+          title: t('Your verification is under review', 'جاري مراجعة هويتك'),
+          description: t(
+            'Please wait until our compliance team finishes reviewing your documents. We will notify you the moment it is approved.',
+            'من فضلك انتظر لغاية ما فريق المراجعة يخلص فحص المستندات، وهنبعتلك إشعار أول ما يتم الموافقة.',
+          ),
+          actionLabel: t('View KYC status', 'شوف حالة التحقق'),
+        };
+      case 'rejected':
+        return {
+          badge: t('KYC Required', 'مطلوب تحقق الهوية'),
+          title: t('Your previous submission was rejected', 'تم رفض مستنداتك السابقة'),
+          description: t(
+            'Please upload updated documents so we can verify your identity before you create listings.',
+            'من فضلك ارفع مستندات جديدة علشان نقدر نتحقق من هويتك قبل ما تنشئ إعلانات.',
+          ),
+          actionLabel: t('Resubmit documents', 'ارفع المستندات مرة تانية'),
+        };
+      default:
+        return {
+          badge: t('Verification Needed', 'مطلوب التحقق'),
+          title: t('Complete KYC to sell cars', 'كمّل التحقق علشان تعرض سيارتك'),
+          description: t(
+            'We need a quick identity verification before we publish any listings from your account.',
+            'لازم نعمل تحقق سريع من هويتك قبل ما ننشر أي إعلان من حسابك.',
+          ),
+          actionLabel: t('Start verification', 'ابدأ التحقق'),
+        };
+    }
+  };
+
+  const renderKycGate = (status: string) => {
+    const copy = getKycGateCopy(status);
+    const statusLabel = status.replace('_', ' ');
+
+    return (
+      <section className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="max-w-lg w-full bg-white border border-slate-200 shadow-xl rounded-3xl p-8 text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle size={28} />
+          </div>
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">{copy.badge}</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-900">{copy.title}</h1>
+          <p className="mt-3 text-sm text-slate-600 leading-relaxed">{copy.description}</p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            {t('Current status:', 'الحالة الحالية:')} <span className="text-slate-900">{statusLabel}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            {copy.actionLabel}
+          </button>
+        </div>
+      </section>
+    );
+  };
   const listingSchema = useMemo(() => createListingSchema(t), [t]);
   
   // ✅ FIX 1: Ensure this state is actually updated
@@ -185,6 +255,7 @@ const CreateListingPage: React.FC = () => {
 
   const handleAIHelp = async () => {
     setIsGeneratingAI(true);
+    setSubmitError(null);
     try {
       const notes = getValues('aiNotes');
       const basicInfo = {
@@ -198,6 +269,12 @@ const CreateListingPage: React.FC = () => {
       const generatedDescription = await geminiService.enhanceDescription(basicInfo);
       setValue('description', generatedDescription || '', { shouldValidate: true });
     } catch (error) {
+      setSubmitError(
+        t(
+          'AI description generation failed. Please write your own description.',
+          'فشل توليد الوصف بالذكاء الاصطناعي. اكتب الوصف بنفسك.'
+        )
+      );
       console.error("AI Generation failed", error);
     } finally {
       setIsGeneratingAI(false);
@@ -207,8 +284,39 @@ const CreateListingPage: React.FC = () => {
   const handleImagesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
-    // ✅ FIX 1: Add new files to the state so they can be uploaded
+    setImageUploadError(null);
+    setIsUploadingImages(true);
+    
     const newFiles = Array.from(files);
+    
+    // Validate file size and type
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    
+    for (const file of newFiles) {
+      if (file.size > MAX_SIZE) {
+        setImageUploadError(
+          handleFileUploadError(
+            new Error('file size'),
+            t
+          )
+        );
+        setIsUploadingImages(false);
+        return;
+      }
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setImageUploadError(
+          handleFileUploadError(
+            new Error('file type'),
+            t
+          )
+        );
+        setIsUploadingImages(false);
+        return;
+      }
+    }
+    
+    // Add new files to the state so they can be uploaded
     setImageFiles(prev => [...prev, ...newFiles]);
 
     // Generate previews
@@ -223,8 +331,16 @@ const CreateListingPage: React.FC = () => {
       const newImages = await Promise.all(newFiles.map(readFile));
       // Update form data with previews for display
       setValue('images', [...(formData.images || []), ...newImages], { shouldValidate: true });
+      setIsUploadingImages(false);
     } catch (err) {
       console.error(err);
+      setImageUploadError(
+        handleFileUploadError(
+          err instanceof Error ? err : new Error('upload failed'),
+          t
+        )
+      );
+      setIsUploadingImages(false);
     }
   };
 
@@ -245,9 +361,11 @@ const CreateListingPage: React.FC = () => {
     const current = getValues('images');
     setValue('images', current.filter((_, i) => i !== index));
     setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImageUploadError(null); // Clear error when removing images
   };
 
   const validateStep = async (targetStep: number) => {
+    setValidationAttempted(true);
     let fieldsToValidate: (keyof ListingFormData)[] = [];
     
     if (targetStep === 1) {
@@ -310,7 +428,7 @@ const CreateListingPage: React.FC = () => {
         features: data.features,
       };
 
-      // ✅ FIX 3: Use apiService (which handles Auth & Port 5005)
+      // ✅ FIX 3: Use apiService (which handles Auth & Port 5002)
       // Send vehiclePayload + imageFiles
       const vehicleRes = await apiService.createVehicle(vehiclePayload, imageFiles);
 
@@ -337,7 +455,7 @@ const CreateListingPage: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      const msg = err.message || t('Failed to create listing. Please try again.', 'تعذر انشاء الاعلان حاول مرة اخرى');
+      const msg = handleApiError(err, t);
       setSubmitError(msg);
     } finally {
       setIsSubmitting(false);
@@ -355,12 +473,6 @@ const CreateListingPage: React.FC = () => {
     value: option.value,
     label: t(option.labelEn, option.labelAr)
   }));
-
-  const makeOptions: CustomSelectOption[] = [
-    { value: '', label: t('Select make', 'اختار الماركة') },
-    ...CAR_MAKES.map(make => ({ value: make, label: make })),
-    { value: 'other', label: t('Other (type)', 'أخرى (اكتب)') }
-  ];
 
   const colorOptions: CustomSelectOption[] = [
     { value: '', label: t('Select color', 'اختار اللون') },
@@ -414,6 +526,41 @@ const CreateListingPage: React.FC = () => {
     { value: 'poor', label: t('Poor', 'ضعيفة') }
   ];
 
+  if (authLoading) {
+    return (
+      <section className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 py-10 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <p className="mt-4 text-sm font-medium text-slate-600">
+          {t('Loading your profile...', 'جاري تحميل بياناتك...')}
+        </p>
+      </section>
+    );
+  }
+
+  if (!authLoading && !user) {
+    return (
+      <section className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="max-w-lg w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+          <h1 className="text-2xl font-black text-slate-900">{t('Log in to create a listing', 'سجل دخولك علشان تنشئ إعلان')}</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            {t('Please sign in first so we can link the listing to your verified profile.', 'لازم تسجل دخول الأول علشان نربط الإعلان بملفك المتحقق.')}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/login', { state: { from: '/create-listing' } })}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            {t('Go to login', 'اذهب لتسجيل الدخول')}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (resolvedKycStatus && resolvedKycStatus !== 'approved') {
+    return renderKycGate(resolvedKycStatus);
+  }
+
   return (
     <div className="bg-slate-50 min-h-screen py-12 font-sans text-slate-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -425,10 +572,10 @@ const CreateListingPage: React.FC = () => {
             {steps.map((s, idx) => (
               <div key={idx} className="relative z-10 flex flex-col items-center">
                 <div className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all border-2",
-                  step > idx + 1 ? "bg-emerald-500 border-emerald-500 text-white" : 
-                  step === idx + 1 ? "bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-100" : 
-                  "bg-white border-slate-200 text-slate-400"
+                  "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300",
+                  step > idx + 1 ? "bg-green-100 text-green-600 border-2 border-green-500" :
+                  step === idx + 1 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-300/50 scale-110" :
+                  "bg-white border-2 border-slate-300 text-slate-400"
                 )}>
                   {step > idx + 1 ? <CheckCircle2 size={20} /> : <s.icon size={20} />}
                 </div>
@@ -482,19 +629,35 @@ const CreateListingPage: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Make', 'الماركة')}</label>
                     <input type="hidden" {...register('make')} />
-                    <CustomSelect
+                    <Autocomplete
                       value={formData.make}
-                      options={makeOptions}
-                      placeholder={t('Select make', 'اختار الماركة')}
-                      className={errors.make ? 'dropdown-error' : undefined}
+                      options={getMakeOptions(true).map(m => ({ value: m.value, label: m.label }))}
+                      placeholder={t('Search or select make...', 'ابحث او اختر الماركة...')}
+                      error={!!errors.make && validationAttempted}
+                      allowCustom={true}
+                      customPlaceholder={t('Type to search makes or enter custom...', 'ابحث عن الماركات او اكتب ماركة أخرى...')}
                       onChange={(value) => {
                         setValue('make', String(value), { shouldValidate: true, shouldDirty: true });
+                        // Reset model when make changes
+                        setValue('model', '', { shouldValidate: false });
+                        // Clear custom make if selecting from list
                         if (value !== 'other') {
                           setValue('customMake', '', { shouldValidate: true });
                         }
                       }}
+                      onCustomInput={(input) => {
+                        const sanitized = input.replace(/[^\p{L}]/gu, '').slice(0, 7);
+                        setValue('make', sanitized, { shouldValidate: true, shouldDirty: true });
+                        setValue('model', '', { shouldValidate: false });
+                      }}
                     />
-                    {errors.make && <p className="text-xs text-rose-600">{errors.make.message}</p>}
+                    {errors.make && validationAttempted && <p className="text-xs text-rose-600 font-medium">{errors.make.message}</p>}
+                    {formData.make && !isValidMake(formData.make) && formData.make !== 'other' && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {t('Custom make - will be reviewed', 'ماركة مخصصة - سيتم مراجعتها')}
+                      </p>
+                    )}
                   </div>
 
                   {selectedMake === 'other' && (
@@ -505,58 +668,89 @@ const CreateListingPage: React.FC = () => {
                         maxLength={7}
                         inputMode="text"
                         pattern="[A-Za-z\u0600-\u06FF]{1,7}"
-                        placeholder={t('Up to 7 letters', 'حد أقصى ٧ حروف')}
+                        placeholder={t('Up to 7 letters only', 'حد أقصى ٧ حروف فقط')}
                         value={customMakeValue}
-                        {...register('customMake')}
-                        onChange={(event) => {
-                          const sanitized = sanitizeMake(event.target.value);
+                        onChange={(e) => {
+                          const sanitized = sanitizeMake(e.target.value);
                           setValue('customMake', sanitized, { shouldValidate: true, shouldDirty: true });
                         }}
                         className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.customMake ? "border-rose-300" : "border-slate-200")}
                       />
-                      {errors.customMake && <p className="text-xs text-rose-600">{errors.customMake.message}</p>}
+                      {errors.customMake && <p className="text-xs text-rose-600 font-medium">{errors.customMake.message}</p>}
                     </div>
                   )}
-                  
+
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Model', 'الموديل')}</label>
-                    <input type="text" placeholder={t('Camry', 'كامري')} {...register('model')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none", errors.model ? "border-rose-300" : "border-slate-200")} />
-                    {errors.model && <p className="text-xs text-rose-600">{errors.model.message}</p>}
+                    <input type="hidden" {...register('model')} />
+                    <Autocomplete
+                      value={formData.model}
+                      options={getModelOptions(resolvedMake)}
+                      error={!!errors.model && validationAttempted}
+                      disabled={!formData.make}
+                      allowCustom={true}
+                      customPlaceholder={t('Type to search or enter custom model...', 'ابحث او اكتب موديل أخر...')}
+                      onChange={(value) => {
+                        setValue('model', String(value), { shouldValidate: true, shouldDirty: true });
+                      }}
+                      onCustomInput={(input) => {
+                        setValue('model', input.trim(), { shouldValidate: true, shouldDirty: true });
+                      }}
+                    />
+                    {errors.model && validationAttempted && <p className="text-xs text-rose-600 font-medium">{errors.model.message}</p>}
                   </div>
                   
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      {t('VIN', 'رقم الشاسيه')} 
+                      <span className="text-[10px] font-normal text-slate-400 ml-1">({t('Optional', 'اختياري')})</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      maxLength={17}
+                      {...register('vin')} 
+                      placeholder={t('e.g., 1HGBH41JXMN109186', 'مثلا: 1HGBH41JXMN109186')} 
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase font-mono text-sm", errors.vin ? "border-rose-300 bg-rose-50/20" : "border-slate-200")} 
+                    />
+                    {errors.vin && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.vin.message}</p>}
+                    {!errors.vin && formData.vin && typeof formData.vin === 'string' && formData.vin.length > 0 && formData.vin.length < 17 && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {t('VIN must be exactly 17 characters', 'رقم الشاسيه يجب ان يكون 17 حرف بالضبط')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      {t('Plate Number', 'رقم اللوحة')} 
+                      <span className="text-[10px] font-normal text-slate-400 ml-1">({t('Optional', 'اختياري')})</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={7}
+                      pattern="[A-Za-z]{1,3}[1-9][0-9]{0,3}"
+                      placeholder={t('e.g., ABC1234', 'مثلا: ABC1234')}
+                      {...register('plateNumber')}
+                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase font-mono", errors.plateNumber ? "border-rose-300 bg-rose-50/20" : "border-slate-200")}
+                    />
+                    {errors.plateNumber && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.plateNumber.message}</p>}
+                    {!errors.plateNumber && !formData.plateNumber && (
+                      <p className="text-xs text-slate-400">{t('Format: 1-3 letters + 1-4 digits', 'الصيغة: 1-3 حروف + 1-4 أرقام')}</p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Mileage', 'المسافة')}</label>
                     <input type="hidden" {...register('mileage')} />
                     <CustomSelect
                       value={Number(formData.mileage)}
                       options={mileageOptions}
-                      placeholder={t('Select mileage', 'اختار المسافة')}
-                      className={errors.mileage ? 'dropdown-error' : undefined}
+                      placeholder={t('Select mileage range', 'اختر نطاق المسافة')}
+                      className={errors.mileage && validationAttempted ? 'dropdown-error' : undefined}
                       onChange={(value) => setValue('mileage', Number(value), { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.mileage && <p className="text-xs text-rose-600">{errors.mileage.message}</p>}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('VIN', 'رقم الشاسيه')}</label>
-                    <input type="text" {...register('vin')} placeholder={t('17 alphanumeric characters', 'سبعة عشر حرف او رقم')} className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.vin ? "border-rose-300" : "border-slate-200")} />
-                    {errors.vin && <p className="text-xs text-rose-600">{errors.vin.message}</p>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Plate Number', 'رقم اللوحة')}</label>
-                    <input
-                      type="text"
-                      maxLength={7}
-                      pattern="[A-Za-z]{1,3}[1-9]{1,4}"
-                      placeholder={t('AB123', 'AB123')}
-                      onKeyDown={(event) => {
-                        if (event.key === '0') event.preventDefault();
-                      }}
-                      {...register('plateNumber')}
-                      className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none uppercase", errors.plateNumber ? "border-rose-300" : "border-slate-200")}
-                    />
-                    {errors.plateNumber && <p className="text-xs text-rose-600">{errors.plateNumber.message}</p>}
+                    {errors.mileage && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.mileage.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -565,11 +759,11 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={formData.color}
                       options={colorOptions}
-                      placeholder={t('Select color', 'اختار اللون')}
-                      className={errors.color ? 'dropdown-error' : undefined}
+                      placeholder={t('Select vehicle color', 'اختر لون السيارة')}
+                      className={errors.color && validationAttempted ? 'dropdown-error' : undefined}
                       onChange={(value) => setValue('color', String(value), { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.color && <p className="text-xs text-rose-600">{errors.color.message}</p>}
+                    {errors.color && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.color.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -578,10 +772,10 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={formData.bodyType}
                       options={bodyTypeOptions}
-                      className={errors.bodyType ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('bodyType', String(value), { shouldValidate: true, shouldDirty: true })}
+                      className={errors.bodyType && validationAttempted ? 'dropdown-error' : undefined}
+                      onChange={(value) => setValue('bodyType', value as typeof formData.bodyType, { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.bodyType && <p className="text-xs text-rose-600">{errors.bodyType.message}</p>}
+                    {errors.bodyType && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.bodyType.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -590,10 +784,10 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={formData.transmission}
                       options={transmissionOptions}
-                      className={errors.transmission ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('transmission', String(value), { shouldValidate: true, shouldDirty: true })}
+                      className={errors.transmission && validationAttempted ? 'dropdown-error' : undefined}
+                      onChange={(value) => setValue('transmission', value as typeof formData.transmission, { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.transmission && <p className="text-xs text-rose-600">{errors.transmission.message}</p>}
+                    {errors.transmission && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.transmission.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -602,10 +796,10 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={formData.fuelType}
                       options={fuelTypeOptions}
-                      className={errors.fuelType ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('fuelType', String(value), { shouldValidate: true, shouldDirty: true })}
+                      className={errors.fuelType && validationAttempted ? 'dropdown-error' : undefined}
+                      onChange={(value) => setValue('fuelType', value as typeof formData.fuelType, { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.fuelType && <p className="text-xs text-rose-600">{errors.fuelType.message}</p>}
+                    {errors.fuelType && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.fuelType.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -614,10 +808,10 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={Number(formData.seats)}
                       options={seatsOptions}
-                      className={errors.seats ? 'dropdown-error' : undefined}
+                      className={errors.seats && validationAttempted ? 'dropdown-error' : undefined}
                       onChange={(value) => setValue('seats', Number(value), { shouldValidate: true, shouldDirty: true })}
                     />
-                    {errors.seats && <p className="text-xs text-rose-600">{errors.seats.message}</p>}
+                    {errors.seats && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.seats.message}</p>}
                   </div>
                   
                   <div className="space-y-2">
@@ -626,9 +820,10 @@ const CreateListingPage: React.FC = () => {
                     <CustomSelect
                       value={formData.condition}
                       options={conditionOptions}
-                      className={errors.condition ? 'dropdown-error' : undefined}
-                      onChange={(value) => setValue('condition', String(value), { shouldValidate: true, shouldDirty: true })}
+                      className={errors.condition && validationAttempted ? 'dropdown-error' : undefined}
+                      onChange={(value) => setValue('condition', value as typeof formData.condition, { shouldValidate: true, shouldDirty: true })}
                     />
+                    {errors.condition && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.condition.message}</p>}
                   </div>
                 </div>
               </div>
@@ -643,17 +838,41 @@ const CreateListingPage: React.FC = () => {
                 </div>
 
                 {/* Photos */}
-                <div className={cn("bg-slate-50 border border-dashed rounded-2xl p-6 transition-colors", errors.images ? "border-rose-300 bg-rose-50/10" : "border-slate-300")}>
+                <div className={cn("bg-slate-50 border border-dashed rounded-2xl p-6 transition-colors", errors.images || imageUploadError ? "border-rose-300 bg-rose-50/10" : "border-slate-300")}>
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h4 className="font-bold text-slate-900">{t('Vehicle Photos', 'صور السيارة')}</h4>
                       <p className="text-xs text-slate-500">{t('Upload at least one clear image', 'ارفع صورة واضحة على الاقل')}</p>
                       {errors.images && <p className="text-xs text-rose-600 font-bold mt-1">{errors.images.message}</p>}
+                      {imageUploadError && (
+                        <p className="text-xs text-rose-600 font-bold mt-1 flex items-center gap-1">
+                          <AlertCircle size={12} /> {imageUploadError}
+                        </p>
+                      )}
                     </div>
-                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-800 transition">
-                      <Camera size={16} />
-                      {t('Add photos', 'اضف صور')}
-                      <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImagesSelected(e.target.files)} />
+                    <label className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-800 transition",
+                      isUploadingImages && "opacity-50 cursor-not-allowed"
+                    )}>
+                      {isUploadingImages ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          {t('Uploading...', 'جاري الرفع...')}
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={16} />
+                          {t('Add photos', 'اضف صور')}
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        className="hidden" 
+                        onChange={(e) => handleImagesSelected(e.target.files)}
+                        disabled={isUploadingImages}
+                      />
                     </label>
                   </div>
                   
@@ -725,10 +944,11 @@ const CreateListingPage: React.FC = () => {
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t('Full Description', 'الوصف الكامل')}</label>
                   <textarea 
                     {...register('description')}
-                    placeholder={t('Example: single owner, full service history, new tires...', 'مثال: مالك واحد، صيانة كاملة، كاوتش جديد...')}
-                    className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none min-h-[200px] text-sm", errors.description ? "border-rose-300" : "border-slate-200")}
+                    placeholder={t('Describe your vehicle: condition, service history, modifications, reason for selling...', 'صف سيارتك: الحالة، تاريخ الصيانة، التعديلات، سبب البيع...')}
+                    className={cn("w-full px-4 py-3 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-indigo-600 outline-none min-h-[200px] text-sm", errors.description && validationAttempted ? "border-rose-300 bg-rose-50/20" : "border-slate-200")}
                   />
-                  {errors.description && <p className="text-xs text-rose-600">{errors.description.message}</p>}
+                  {errors.description && validationAttempted && <p className="text-xs text-rose-600 font-medium flex items-center gap-1"><AlertCircle size={12} />{errors.description.message}</p>}
+                  <p className="text-xs text-slate-400">{formData.description?.length || 0} / 2000 {t('characters', 'حرف')}</p>
                 </div>
               </div>
             )}

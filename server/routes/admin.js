@@ -12,6 +12,7 @@ const {
   selectInspectorController,
   viewReportController,
   editreportController,
+  getVehicleController
 } = require("../controllers/adminController");
 const router = express.Router();
 const { authenticate, authorize } = require("../middleware/auth");
@@ -83,6 +84,9 @@ router.patch(
   authorize("admin"),
   editreportController,
 );
+
+router.get("/vehicles/:vehicleId",authenticate,authorize("admin"),getVehicleController);
+
 
 const adminFinanceController = require("../controllers/adminFinanceController");
 

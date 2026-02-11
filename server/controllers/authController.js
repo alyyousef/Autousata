@@ -16,8 +16,12 @@ async function register(req, res) {
     let connection;
 
     const phoneRegex = /^[0-9]{10,15}$/;
-    if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid phone format.' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password too weak.' });
+    if (!phoneRegex.test(phone)) {
+        return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
+    }
+    if (!password || password.length < 8) {
+        return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
+    }
 
     try {
         console.log(`👉 Registering: ${email}`);
@@ -50,8 +54,8 @@ async function register(req, res) {
                 `UPDATE users 
                  SET email_verification_token = :otp,
                      email_token_expiry = :expiry
-                 WHERE email = :email`,
-                { otp: otpCode, expiry: expiryTime, email: email },
+                 WHERE LOWER(email) = :email`,
+                { otp: otpCode, expiry: expiryTime, email: email.toLowerCase() },
                 { autoCommit: true }
             );
 
@@ -59,7 +63,7 @@ async function register(req, res) {
 
             const { accessToken, refreshToken } = generateTokens(newUserId);
             res.status(201).json({ 
-                message: 'User registered.', accessToken, refreshToken,
+                message: 'User registered successfully. Please verify your email.', accessToken, refreshToken,
                 user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
 
@@ -129,7 +133,7 @@ async function login(req, res) {
                         phoneVerified: dbUser.PHONE_VERIFIED == 1,
                         kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
                         kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
-                        // ✅ ADDED EXTRACTION FIELDS
+                        // ✅ Added extraction fields
                         kycAddressFromId: dbUser.KYC_ADDRESS_FROM_ID,
                         kycNameFromId: dbUser.KYC_NAME_FROM_ID,
                         location: { city: dbUser.LOCATION_CITY || '' } 
@@ -201,8 +205,10 @@ async function verifyEmailOtp(req, res) {
 async function refreshToken(req, res) {
     const { refreshToken: token } = req.body;
     if (!token) return res.status(400).json({ error: 'Refresh token required' });
+    
     const decoded = verifyRefreshToken(token);
-    if (!decoded) return res.status(403).json({ error: 'Invalid refresh token' });
+    if (!decoded) return res.status(403).json({ error: 'Invalid or expired refresh token' });
+    
     const tokens = generateTokens(decoded.userId);
     res.json({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
 }
@@ -253,11 +259,9 @@ async function getMe(req, res) {
                 emailVerified: dbUser.EMAIL_VERIFIED == '1' || dbUser.EMAIL_VERIFIED == 1,
                 phoneVerified: dbUser.PHONE_VERIFIED == '1' || dbUser.PHONE_VERIFIED == 1,
                 
-                // ✅ KYC MAPPING
+                // ✅ KYC Data
                 kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
                 kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
-                
-                // ✅ NEW FIELDS
                 kycAddressFromId: dbUser.KYC_ADDRESS_FROM_ID,
                 kycNameFromId: dbUser.KYC_NAME_FROM_ID,
 
@@ -359,4 +363,13 @@ async function resendOtp(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword, resendOtp };
+module.exports = { 
+    register, 
+    login, 
+    verifyEmailOtp, 
+    refreshToken, 
+    getMe, 
+    forgotPassword, 
+    resetPassword, 
+    resendOtp 
+};

@@ -8,6 +8,7 @@ import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ProfileSkeleton } from '../components/LoadingSkeleton';
 
 const ProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
@@ -42,7 +43,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const fetchFreshProfile = async () => {
       try {
-        const response = await apiService.getMe();
+        const response = await apiService.getCurrentUser();
         if (response.data && response.data.user) {
           console.log("🔄 Profile Synced:", response.data.user);
           updateUser(response.data.user);
@@ -144,8 +145,20 @@ const ProfilePage: React.FC = () => {
     return () => { isMounted = false; };
   }, [user]);
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  // 4. Return early if loading or no user
+  if (authLoading) {
+    return (
+      <div className="bg-slate-50 min-h-screen py-12">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ProfileSkeleton />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleLogout = async () => {
     await logout();
@@ -232,34 +245,46 @@ const ProfilePage: React.FC = () => {
   const isVerified = kycStatus === 'verified' || kycStatus === 'approved';
   const isPending = kycStatus === 'pending';
 
+  const getAuctionStatusBadge = (status?: string) => {
+    if (!status) return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
+    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
+    const map: Record<string, { label: string; className: string }> = {
+      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
+      scheduled: { label: 'Scheduled', className: 'bg-indigo-50 text-indigo-600' },
+      live: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
+      active: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
+      ended: { label: 'Ended', className: 'bg-rose-50 text-rose-600' },
+      settled: { label: 'Settled', className: 'bg-sky-50 text-sky-600' },
+      cancelled: { label: 'Cancelled', className: 'bg-amber-50 text-amber-700' }
+    };
+    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
+  };
+
+  const getVehicleStatusBadge = (status?: string) => {
+     const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
+     const map: Record<string, { label: string; className: string }> = {
+       draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
+       active: { label: 'Active', className: 'bg-emerald-50 text-emerald-600' },
+       sold: { label: 'Sold', className: 'bg-rose-50 text-rose-600' },
+       delisted: { label: 'Delisted', className: 'bg-amber-50 text-amber-700' }
+     };
+     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
+  };
+
   const renderKycBadge = () => {
+    // Use the variables defined above
     if (isVerified) {
-      return (
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded">
-          <CheckCircle size={10} /> Verified
-        </span>
-      );
+       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded"><CheckCircle size={10} /> Verified</span>;
     }
     if (isPending) {
-      return (
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded">
-          <AlertTriangle size={10} /> Pending
-        </span>
-      );
+       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded"><AlertTriangle size={10} /> Pending</span>;
     }
     if (kycStatus === 'denied' || kycStatus === 'failed') {
-      return (
-        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded">
-          <XCircle size={10} /> Failed
-        </span>
-      );
+       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Failed</span>;
     }
-    return (
-      <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">
-        Unverified
-      </span>
-    );
+    return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Unverified</span>;
   };
+
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page relative">
@@ -386,7 +411,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. ✅ KYC Verification Card (Dynamic Badge & Button) */}
+            {/* 3. ✅ KYC Verification Card */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText size={16} /> Identity Verification (KYC)
@@ -572,52 +597,69 @@ const ProfilePage: React.FC = () => {
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-black text-slate-900">My Listings</h3>
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  {sellerListings.length} total
-                </span>
+                {(user.role === 'SELLER' || user.role === 'DEALER') && (
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                    {sellerListings.length} total
+                  </span>
+                )}
               </div>
 
-              {listingsLoading && <div className="text-sm text-slate-500">Loading your listings...</div>}
-              {!listingsLoading && listingsError && <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">{listingsError}</div>}
-              {!listingsLoading && !listingsError && sellerListings.length === 0 && <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">You have no listings yet.</div>}
+              {/* Only show listings for Sellers/Dealers/Buyers */}
+              {(user.role === 'SELLER' || user.role === 'DEALER' || user.role === 'BUYER') && (
+                <>
+                  {listingsLoading && (
+                    <div className="text-sm text-slate-500">Loading your listings...</div>
+                  )}
 
-              {!listingsLoading && sellerListings.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {sellerListings.map((listing) => {
-                    const vehicleStatus = typeof listing.vehicle.status === 'string' ? listing.vehicle.status : 'draft';
-                    const auctionStatus = typeof listing.auctionStatus === 'string' ? listing.auctionStatus : 'draft';
-                    
-                    const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
-                    const image = listing.vehicle.images?.[0];
+                  {!listingsLoading && listingsError && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-2xl text-sm">
+                      {listingsError}
+                    </div>
+                  )}
 
-                    return (
-                      <div key={listing.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-all">
-                        <div className="flex items-start gap-4">
-                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
-                            {image ? (
-                              <img src={image} alt={title} className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{listing.vehicle.make?.slice(0, 2)?.toUpperCase() || 'CV'}</span>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <h4 className="font-bold text-slate-900">{title || 'Vehicle Listing'}</h4>
-                                <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
+                  {!listingsLoading && !listingsError && sellerListings.length === 0 && (
+                    <div className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-3 rounded-2xl text-sm">
+                      You have no listings yet.
+                    </div>
+                  )}
+
+                  {!listingsLoading && sellerListings.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {sellerListings.map((listing) => {
+                        const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
+                        const auctionBadge = getAuctionStatusBadge(listing.auctionStatus);
+                        const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
+                        const image = listing.vehicle.images?.[0];
+
+                        return (
+                          <div key={listing.id} className="p-5 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-200 transition-all">
+                            <div className="flex items-start gap-4">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+                                {image ? (
+                                  <img src={image} alt={title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{listing.vehicle.make?.slice(0, 2)?.toUpperCase() || 'CV'}</span>
+                                )}
                               </div>
-                              <div className="flex flex-col items-end gap-1">
-                                <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
-                                  {vehicleStatus}
-                                </span>
+                              <div className="flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <h4 className="font-bold text-slate-900">{title || 'Vehicle Listing'}</h4>
+                                    <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${vehicleBadge.className}`}>Vehicle: {vehicleBadge.label}</span>
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${auctionBadge.className}`}>Auction: {auctionBadge.label}</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

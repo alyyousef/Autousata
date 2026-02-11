@@ -40,7 +40,33 @@ export interface VehicleItem {
   inspection_req?: number;
   inspection_report?: string | null;
   sale_type?: 'auction' | 'fixed_price';
+  images?: string[] | string | null;
+  sellerId?: number;
+  fuel_type?: string;
+  seats?: number;
+  features?: string[] | string | null;
+  description?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  publishedAt?: string | Date | null;
+  deletedAt?: string | Date | null;
+  viewCount?: number;
+  seller_name?: string;
+  seller_email?: string;
+  seller_phone?: string;
+  seller_location?: string;
+  seller_bio?: string;
+  attributes?: {
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
+  result?: {
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
 }
+
+export interface VehicleDetails extends VehicleItem {}
 
 export interface CreateInspectionPayload {
   vehicleId: number;
@@ -86,6 +112,7 @@ export const listUsers = async (
 };
 
 export interface KYCDocument {
+  id?: string;
   userId: string;
   email?: string;
   phone?: string;
@@ -94,6 +121,8 @@ export interface KYCDocument {
   isActive?: number;
   isBanned?: number;
   kycStatus?: string;
+  status?: string;
+  locationCity?:string;
   role?: string;
   kycId: string;
   documentType?: string;
@@ -111,6 +140,11 @@ export interface KYCDocument {
   submittedAt?: Date;
   reviewedAt?: Date;
   reviewedByAdminId?: string;
+  kycDocumentUrl?:string;
+  banreason?:string;
+  bio?:string;
+  profileurl?:string;
+  doc?:string;
 }
 
 export interface LiveAuction {
@@ -121,6 +155,7 @@ export interface LiveAuction {
   vehicleMake?: string;
   vehicleModel?: string;
   vehicleYear?: number;
+  vehicleImages?: string[] | string | null;
   status: string;
   startTime?: Date;
   endTime?: Date;
@@ -140,6 +175,11 @@ export interface LiveAuction {
   winnerName?: string;
   createdAt?: Date;
   startedAt?: Date;
+  result?: {
+    vehicleImages?: string[] | string | null;
+    images?: string[] | string | null;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface PendingPayment {
@@ -251,6 +291,32 @@ export const searchAdminVehicles = async (searchTerm: string, token?: string): P
 
   const data = await response.json();
   return data.vehicles || data || [];
+};
+
+export const getVehicleById = async (
+  vehicleId: number,
+  token?: string,
+): Promise<VehicleDetails | null> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch vehicle details');
+  }
+
+  const data = await response.json();
+  const payload = data.vehicle ?? data.data ?? null;
+  if (Array.isArray(payload)) {
+    return payload[0] ?? null;
+  }
+  return payload;
 };
 
 export const updateVehicleStatus = async (
@@ -525,22 +591,65 @@ export const rejectInspectionReport = async (
 };
 
 export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('http://localhost:5000/api/admin/content/kyc', {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch KYC documents');
+  }
+
+  const data = await response.json();
+  return data.data || [];
+};
+
+export const searchKYC = async (searchTerm: string, token?: string): Promise<KYCDocument[]> => {
   const headers: HeadersInit = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/kyc/pending', {
+  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/search?searchTerm=${encodeURIComponent(searchTerm)}`, {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch pending KYC documents');
+    throw new Error('Failed to search KYC documents');
   }
 
   const data = await response.json();
-  return data.kycDocuments || data || [];
+  return data.data || [];
+};
+
+export const filterKYC = async (status: string, token?: string): Promise<KYCDocument[]> => {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/filter?status=${encodeURIComponent(status)}`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to filter KYC documents');
+  }
+
+  const data = await response.json();
+  return data.data || [];
 };
 
 export const approveKYC = async (kycId: string, token?: string): Promise<{ ok: boolean; message?: string }> => {
@@ -595,6 +704,8 @@ export const rejectKYC = async (kycId: string, reason: string, token?: string): 
     return { ok: false, message: error instanceof Error ? error.message : 'Network error' };
   }
 };
+
+
 
 export const getPendingPayments = async (token?: string): Promise<PendingPayment[]> => {
   const headers: HeadersInit = {};
@@ -702,7 +813,9 @@ export interface RevenueDashboardResponse {
  * Get all auctions
  */
 export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => {
-  const headers: HeadersInit = {};
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -710,6 +823,7 @@ export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => 
   const response = await fetch('http://localhost:5000/api/admin/content/auctions', {
     method: 'GET',
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -950,4 +1064,45 @@ export const viewuser = async (userId: string, token?: string): Promise<AdminUse
     }
     const result = await response.json();
     return result.data || null;
+};
+
+
+export const updateUserRole = async (
+  userId: string,
+  role: string,
+  token?: string,
+): Promise<{ ok: boolean; message?: string }> => {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/admin/users/${userId}/role`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ role }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: data.error || data.message || "Failed to update user role",
+      };
+    }
+
+    return { ok: true, message: data.message };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Network error",
+    };
+  }
 };

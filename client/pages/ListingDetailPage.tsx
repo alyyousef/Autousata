@@ -20,11 +20,38 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
+import porsche911Image from '../../assests/carsPictures/porsche911.png';
+import teslaModelSPlaidImage from '../../assests/carsPictures/teslaModelSPlaid.jpg';
+import fordBroncoImage from '../../assests/carsPictures/fordBroncoF.jpg';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
+
+const ARABIC_LISTING_COPY: Record<
+  string,
+  { description: string; longDescription: string; location: string }
+> = {
+  'auc-1': {
+    description: 'بورشه 911 لون طباشيري بداخلية نبيتي باقة سبورت كرونو',
+    longDescription:
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين',
+    location: 'القاهرة مصر'
+  },
+  'auc-2': {
+    description: 'تسلا موديل اس بلايد دفع رباعي شامل القيادة الذاتية حالة شبه جديدة',
+    longDescription:
+      'موديل بلايد ببطاريات قوية وتسارع عالي مقصورة نظيفة وتجهيزات حديثة مع حالة شبه جديدة',
+    location: 'الجيزة مصر'
+  },
+  'auc-3': {
+    description: 'فورد برونكو اصدار خاص باقة سكواتش اربعة ابواب لون ازرق كهربائي',
+    longDescription:
+      'اصدار محدود مع تجهيزات للطرق الوعرة وتجربة قيادة قوية مع عناية ممتازة بالمقصورة والهيكل',
+    location: 'الاسكندرية مصر'
+  }
+};
 
 const readDelistedIds = () => {
   if (typeof window === 'undefined') return new Set<string>();
@@ -179,6 +206,9 @@ const ListingDetailPage: React.FC = () => {
     });
   }, [bidSuccess]);
 
+  const fallbackImages = useMemo(() => [porsche911Image, teslaModelSPlaidImage, fordBroncoImage], []);
+  const arabicCopy = auction ? ARABIC_LISTING_COPY[auction.id] : undefined;
+
   const conditionLabel = (condition: string) => {
     const key = condition.toLowerCase();
     if (key === 'mint') return t('Mint', 'ممتازة جدا');
@@ -260,9 +290,7 @@ const ListingDetailPage: React.FC = () => {
 
         const raw = auctionResponse.data;
         const vehicle = raw.vehicleId || {};
-        const images = Array.isArray(vehicle.images) && vehicle.images.length > 0
-          ? vehicle.images.filter((img: any) => typeof img === 'string' && img.length > 0)
-          : [];
+        const images = Array.isArray(vehicle.images) && vehicle.images.length > 0 ? vehicle.images : fallbackImages;
 
         const mapped = {
           id: raw._id,
@@ -301,7 +329,7 @@ const ListingDetailPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, t]);
+  }, [fallbackImages, id, t]);
 
   useEffect(() => {
     if (!auction) return;
@@ -381,9 +409,6 @@ const ListingDetailPage: React.FC = () => {
   // ──── FIXED-PRICE VEHICLE DETAIL VIEW ────
   if (vehicleOnly) {
     const v = vehicleOnly;
-    const vehicleImages: string[] = Array.isArray(v.images)
-      ? v.images.filter((img: any) => typeof img === 'string' && img.length > 0)
-      : [];
     return (
       <div className="min-h-screen bg-slate-50 pb-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -393,41 +418,14 @@ const ListingDetailPage: React.FC = () => {
 
           {/* Image */}
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm mb-6">
-            {vehicleImages.length > 0 ? (
-              <img
-                src={vehicleImages[0]}
-                alt={`${v.year} ${v.make} ${v.model}`}
-                className="w-full h-72 md:h-96 object-cover cursor-zoom-in"
-                onClick={() => setLightboxIndex(0)}
-              />
+            {v.images && v.images.length > 0 ? (
+              <img src={v.images[0]} alt={`${v.year} ${v.make} ${v.model}`} className="w-full h-72 md:h-96 object-cover" />
             ) : (
               <div className="w-full h-72 md:h-96 bg-slate-100 flex items-center justify-center text-slate-300">
                 <Tag size={64} />
               </div>
             )}
           </div>
-
-          {/* Thumbnail Grid for fixed-price */}
-          {vehicleImages.length > 1 && (
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              {vehicleImages.slice(0, 4).map((image: string, index: number) => (
-                <div
-                  key={index}
-                  className="relative rounded-xl overflow-hidden border-2 border-white hover:border-slate-300 transition-all duration-300 cursor-pointer"
-                  onClick={() => setLightboxIndex(index)}
-                >
-                  <div className="aspect-square bg-slate-100">
-                    <img src={image} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  {index === 3 && vehicleImages.length > 4 && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-bold text-lg">
-                      +{vehicleImages.length - 4}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Details */}
@@ -511,15 +509,6 @@ const ListingDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {lightboxIndex !== null && vehicleImages.length > 0 && (
-          <ImageLightbox
-            images={vehicleImages}
-            startIndex={lightboxIndex}
-            alt={`${v.year} ${v.make} ${v.model}`}
-            onClose={() => setLightboxIndex(null)}
-          />
-        )}
       </div>
     );
   }
@@ -530,9 +519,17 @@ const ListingDetailPage: React.FC = () => {
   const effectiveBidCount = currentBidCount ?? auction.bidCount;
   const isEnded = new Date(auction.endTime).getTime() <= now;
   const paymentStatus = readPaymentStatus(auction.id);
-  const descriptionText = auction.vehicle.description || '';
-  const longDescriptionText = auction.vehicle.longDescription || auction.vehicle.description || '';
-  const locationText = auction.vehicle.location || '';
+  const descriptionText = t(
+    auction.vehicle.description,
+    arabicCopy?.description ?? auction.vehicle.description
+  );
+  const longDescriptionText = t(
+    auction.vehicle.longDescription ||
+      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
+    arabicCopy?.longDescription ||
+      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
+  );
+  const locationText = t(auction.vehicle.location, arabicCopy?.location ?? auction.vehicle.location);
 
   const handleDelist = () => {
     const confirmed = window.confirm(
@@ -705,7 +702,7 @@ const ListingDetailPage: React.FC = () => {
 
               {/* Thumbnail Grid */}
               <div className="grid grid-cols-4 gap-4">
-                {(auction.vehicle.images || []).slice(0, 4).map((image: string, index: number) => (
+                {auction.vehicle.images.slice(0, 4).map((image: string, index: number) => (
                   <div
                     key={index}
                     className={`relative rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
@@ -1211,9 +1208,9 @@ const ListingDetailPage: React.FC = () => {
         }
       `}</style>
 
-      {lightboxIndex !== null && (auction.vehicle.images || []).length > 0 && (
+      {lightboxIndex !== null && (
         <ImageLightbox
-          images={auction.vehicle.images || []}
+          images={auction.vehicle.images}
           startIndex={lightboxIndex}
           alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
           onClose={() => setLightboxIndex(null)}

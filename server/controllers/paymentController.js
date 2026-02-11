@@ -94,8 +94,29 @@ exports.createPaymentIntent = async (req, res) => {
         // Calculate payment breakdown
         const breakdown = calculatePaymentBreakdown(auction.currentBidEGP);
 
-        // Generate payment ID and create Stripe PaymentIntent first
+        // Create payment record in database
         const paymentId = uuidv4();
+        const insertPaymentQuery = `
+            INSERT INTO PAYMENTS (
+                ID, AUCTION_ID, BUYER_ID, SELLER_ID,
+                AMOUNT_EGP, CURRENCY, PAYMENT_METHOD, GATEWAY,
+                STATUS, INITIATED_AT
+            ) VALUES (
+                :paymentId, :auctionId, :buyerId, :sellerId,
+                :amount, 'EGP', 'card', 'Stripe',
+                'pending', SYSTIMESTAMP
+            )
+        `;
+
+        await connection.execute(insertPaymentQuery, {
+            paymentId,
+            auctionId: auction.id,
+            buyerId: userId,
+            sellerId: auction.sellerId,
+            amount: breakdown.totalAmount
+        });
+
+        // Create Stripe PaymentIntent
         const paymentIntent = await stripe.paymentIntents.create({
             amount: breakdown.totalAmount * 100, // Stripe uses smallest currency unit (piasters)
             currency: 'egp',
@@ -114,26 +135,10 @@ exports.createPaymentIntent = async (req, res) => {
             },
         });
 
-        // Create payment record with all required fields
+        // Update payment record with Stripe PaymentIntent ID
         await connection.execute(
-            `INSERT INTO PAYMENTS (
-                ID, AUCTION_ID, BUYER_ID, SELLER_ID,
-                AMOUNT_EGP, PROCESSOR_FEE_EGP, CURRENCY, PAYMENT_METHOD, GATEWAY,
-                GATEWAY_ORDER_ID, STATUS, INITIATED_AT
-            ) VALUES (
-                :paymentId, :auctionId, :buyerId, :sellerId,
-                :amount, :processorFee, 'EGP', 'card', 'Stripe',
-                :gatewayOrderId, 'pending', SYSTIMESTAMP
-            )`,
-            {
-                paymentId,
-                auctionId: auction.id,
-                buyerId: userId,
-                sellerId: auction.sellerId,
-                amount: breakdown.totalAmount,
-                processorFee: breakdown.stripeFee,
-                gatewayOrderId: paymentIntent.id
-            }
+            `UPDATE PAYMENTS SET GATEWAY_ORDER_ID = :gatewayOrderId WHERE ID = :paymentId`,
+            { gatewayOrderId: paymentIntent.id, paymentId }
         );
 
         await connection.commit();
@@ -177,7 +182,7 @@ exports.confirmPayment = async (req, res) => {
             SELECT 
                 p.ID, p.AUCTION_ID, p.BUYER_ID, p.SELLER_ID,
                 p.AMOUNT_EGP, p.STATUS, p.GATEWAY_ORDER_ID,
-                p.PROCESSOR_FEE_EGP, p.VEHICLE_ID, p.PURCHASE_TYPE
+                p.PROCESSOR_FEE_EGP
             FROM PAYMENTS p
             WHERE p.ID = :paymentId
         `;
@@ -196,9 +201,7 @@ exports.confirmPayment = async (req, res) => {
             amountEGP: paymentResult.rows[0][4],
             status: paymentResult.rows[0][5],
             gatewayOrderId: paymentResult.rows[0][6],
-            processorFeeEGP: paymentResult.rows[0][7],
-            vehicleId: paymentResult.rows[0][8],
-            purchaseType: paymentResult.rows[0][9] || 'auction'
+            processorFeeEGP: paymentResult.rows[0][7]
         };
 
         // Verify user is the buyer
@@ -216,17 +219,7 @@ exports.confirmPayment = async (req, res) => {
         }
 
         // Retrieve PaymentIntent from Stripe to verify status
-        // Retry up to 3 times with short delays for Stripe eventual consistency
-        let paymentIntent;
-        for (let attempt = 0; attempt < 3; attempt++) {
-            paymentIntent = await stripe.paymentIntents.retrieve(payment.gatewayOrderId, {
-                expand: ['latest_charge.balance_transaction']
-            });
-            if (paymentIntent.status === 'succeeded') break;
-            if (attempt < 2) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            }
-        }
+        const paymentIntent = await stripe.paymentIntents.retrieve(payment.gatewayOrderId);
 
         if (paymentIntent.status !== 'succeeded') {
             return res.status(400).json({ 
@@ -234,12 +227,6 @@ exports.confirmPayment = async (req, res) => {
                 stripeStatus: paymentIntent.status 
             });
         }
-
-        // Extract charge info safely
-        const latestCharge = paymentIntent.latest_charge;
-        const chargeId = (typeof latestCharge === 'object' ? latestCharge?.id : latestCharge) || paymentIntent.id;
-        const balanceTxFee = (typeof latestCharge === 'object' ? latestCharge?.balance_transaction?.fee : null);
-        const actualProcessorFee = balanceTxFee ? Math.round(balanceTxFee / 100) : payment.processorFeeEGP;
 
         // Update payment status
         await connection.execute(
@@ -250,57 +237,50 @@ exports.confirmPayment = async (req, res) => {
                  COMPLETED_AT = SYSTIMESTAMP 
              WHERE ID = :paymentId`,
             { 
-                transId: chargeId,
-                processorFee: actualProcessorFee,
+                transId: paymentIntent.charges.data[0]?.id || paymentIntent.id,
+                processorFee: Math.round(paymentIntent.charges.data[0]?.balance_transaction?.fee || 0) / 100,
                 paymentId 
             }
         );
 
-        // Calculate escrow breakdown from the original bid/price amount
-        const originalAmount = payment.amountEGP - Math.round((payment.amountEGP * (STRIPE_FEE_PERCENT + PLATFORM_COMMISSION_PERCENT)) / 100);
-        const breakdown = calculatePaymentBreakdown(originalAmount);
-
-        // Create escrow record — use VEHICLE_ID for direct purchases, AUCTION_ID for auctions
-        const escrowId = uuidv4();
-        await connection.execute(
-            `INSERT INTO ESCROWS (
-                ID, PAYMENT_ID, AUCTION_ID, VEHICLE_ID, SELLER_ID, BUYER_ID,
-                TOTAL_AMOUNT_EGP, COMMISSION_EGP, PROCESSOR_FEE_EGP,
-                SELLER_PAYOUT_EGP, STATUS, HELD_AT
-            ) VALUES (
-                :escrowId, :paymentId, :auctionId, :vehicleId, :sellerId, :buyerId,
-                :totalAmount, :commission, :processorFee,
-                :sellerPayout, 'held', SYSTIMESTAMP
-            )`,
-            {
-                escrowId,
-                paymentId: payment.id,
-                auctionId: payment.auctionId || null,
-                vehicleId: payment.vehicleId || null,
-                sellerId: payment.sellerId,
-                buyerId: payment.buyerId,
-                totalAmount: payment.amountEGP,
-                commission: breakdown.platformCommission,
-                processorFee: actualProcessorFee,
-                sellerPayout: breakdown.sellerPayout
-            }
+        // Calculate escrow breakdown
+        const breakdown = calculatePaymentBreakdown(
+            payment.amountEGP - Math.round((payment.amountEGP * (STRIPE_FEE_PERCENT + PLATFORM_COMMISSION_PERCENT)) / 100)
         );
 
-        // For auction purchases, update auction status
-        if (payment.auctionId) {
-            await connection.execute(
-                `UPDATE AUCTIONS SET PAYMENT_ID = :paymentId, STATUS = 'settled' WHERE ID = :auctionId`,
-                { paymentId: payment.id, auctionId: payment.auctionId }
-            );
-        }
+        // Create escrow record
+        const escrowId = uuidv4();
+        const insertEscrowQuery = `
+            INSERT INTO ESCROWS (
+                ID, PAYMENT_ID, AUCTION_ID, SELLER_ID, BUYER_ID,
+                TOTAL_AMOUNT_EGP, COMMISSION_EGP, PROCESSOR_FEE_EGP,
+                SELLER_PAYOUT_EGP, STATUS, CREATED_AT
+            ) VALUES (
+                :escrowId, :paymentId, :auctionId, :sellerId, :buyerId,
+                :totalAmount, :commission, :processorFee,
+                :sellerPayout, 'held', SYSTIMESTAMP
+            )
+        `;
 
-        // For direct purchases, mark vehicle as sold
-        if (payment.vehicleId) {
-            await connection.execute(
-                `UPDATE VEHICLES SET STATUS = 'sold' WHERE ID = :vehicleId`,
-                { vehicleId: payment.vehicleId }
-            );
-        }
+        await connection.execute(insertEscrowQuery, {
+            escrowId,
+            paymentId: payment.id,
+            auctionId: payment.auctionId,
+            sellerId: payment.sellerId,
+            buyerId: payment.buyerId,
+            totalAmount: payment.amountEGP,
+            commission: breakdown.platformCommission,
+            processorFee: paymentIntent.charges.data[0]?.balance_transaction?.fee 
+                ? Math.round(paymentIntent.charges.data[0].balance_transaction.fee / 100) 
+                : breakdown.stripeFee,
+            sellerPayout: breakdown.sellerPayout
+        });
+
+        // Update auction with payment ID
+        await connection.execute(
+            `UPDATE AUCTIONS SET PAYMENT_ID = :paymentId, STATUS = 'settled' WHERE ID = :auctionId`,
+            { paymentId: payment.id, auctionId: payment.auctionId }
+        );
 
         await connection.commit();
 
@@ -339,7 +319,7 @@ exports.getPaymentByAuction = async (req, res) => {
                 p.ID, p.AUCTION_ID, p.BUYER_ID, p.SELLER_ID,
                 p.AMOUNT_EGP, p.CURRENCY, p.PAYMENT_METHOD, p.GATEWAY,
                 p.STATUS, p.INITIATED_AT, p.COMPLETED_AT, p.FAILED_AT,
-                p.PROCESSOR_FEE_EGP, p.VEHICLE_ID, p.PURCHASE_TYPE,
+                p.PROCESSOR_FEE_EGP,
                 e.ID as ESCROW_ID, e.STATUS as ESCROW_STATUS,
                 e.COMMISSION_EGP, e.SELLER_PAYOUT_EGP,
                 e.BUYER_RECEIVED, e.SELLER_TRANSFER
@@ -369,15 +349,13 @@ exports.getPaymentByAuction = async (req, res) => {
             completedAt: row[10],
             failedAt: row[11],
             processorFeeEGP: row[12],
-            vehicleId: row[13],
-            purchaseType: row[14],
-            escrow: row[15] ? {
-                id: row[15],
-                status: row[16],
-                commissionEGP: row[17],
-                sellerPayoutEGP: row[18],
-                buyerReceived: row[19],
-                sellerTransfer: row[20]
+            escrow: row[13] ? {
+                id: row[13],
+                status: row[14],
+                commissionEGP: row[15],
+                sellerPayoutEGP: row[16],
+                buyerReceived: row[17],
+                sellerTransfer: row[18]
             } : null
         };
 
@@ -390,81 +368,6 @@ exports.getPaymentByAuction = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching payment:', error);
-        res.status(500).json({ 
-            error: 'Failed to fetch payment',
-            details: error.message 
-        });
-    } finally {
-        await connection.close();
-    }
-};
-
-/**
- * Get Payment by ID
- * GET /api/payments/:id
- */
-exports.getPaymentById = async (req, res) => {
-    const connection = await db.getConnection();
-    try {
-        const { id: paymentId } = req.params;
-        const userId = req.user.id;
-
-        const query = `
-            SELECT 
-                p.ID, p.AUCTION_ID, p.BUYER_ID, p.SELLER_ID,
-                p.AMOUNT_EGP, p.CURRENCY, p.PAYMENT_METHOD, p.GATEWAY,
-                p.STATUS, p.INITIATED_AT, p.COMPLETED_AT, p.FAILED_AT,
-                p.PROCESSOR_FEE_EGP, p.VEHICLE_ID, p.PURCHASE_TYPE,
-                e.ID as ESCROW_ID, e.STATUS as ESCROW_STATUS,
-                e.COMMISSION_EGP, e.SELLER_PAYOUT_EGP,
-                e.BUYER_RECEIVED, e.SELLER_TRANSFER
-            FROM PAYMENTS p
-            LEFT JOIN ESCROWS e ON p.ID = e.PAYMENT_ID
-            WHERE p.ID = :paymentId
-        `;
-
-        const result = await connection.execute(query, { paymentId });
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Payment not found' });
-        }
-
-        const row = result.rows[0];
-        const payment = {
-            id: row[0],
-            auctionId: row[1],
-            buyerId: row[2],
-            sellerId: row[3],
-            amountEGP: row[4],
-            currency: row[5],
-            paymentMethod: row[6],
-            gateway: row[7],
-            status: row[8],
-            initiatedAt: row[9],
-            completedAt: row[10],
-            failedAt: row[11],
-            processorFeeEGP: row[12],
-            vehicleId: row[13],
-            purchaseType: row[14],
-            escrow: row[15] ? {
-                id: row[15],
-                status: row[16],
-                commissionEGP: row[17],
-                sellerPayoutEGP: row[18],
-                buyerReceived: row[19],
-                sellerTransfer: row[20]
-            } : null
-        };
-
-        // Verify user is buyer or seller
-        if (payment.buyerId !== userId && payment.sellerId !== userId && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        res.status(200).json({ success: true, payment });
-
-    } catch (error) {
-        console.error('Error fetching payment by ID:', error);
         res.status(500).json({ 
             error: 'Failed to fetch payment',
             details: error.message 
@@ -555,84 +458,6 @@ exports.handleStripeWebhook = async (req, res) => {
  */
 async function handlePaymentIntentSucceeded(paymentIntent, connection) {
     const paymentId = paymentIntent.metadata.paymentId;
-    const purchaseType = paymentIntent.metadata.purchaseType || 'auction';
-    const vehicleId = paymentIntent.metadata.vehicleId;
-
-    if (!paymentId) {
-        console.error('No paymentId in metadata');
-        return;
-    }
-
-    // Update payment status
-    const updateResult = await connection.execute(
-        `UPDATE PAYMENTS 
-         SET STATUS = 'completed',
-             GATEWAY_TRANS_ID = :transId,
-             PROCESSOR_FEE_EGP = :processorFee,
-             COMPLETED_AT = SYSTIMESTAMP
-         WHERE ID = :paymentId AND STATUS = 'pending'`,
-        { 
-            transId: paymentIntent.charges.data[0]?.id || paymentIntent.id,
-            processorFee: (paymentIntent.charges.data[0]?.amount || paymentIntent.amount) * (STRIPE_FEE_PERCENT / 100) + STRIPE_FEE_FIXED_EGP,
-            paymentId 
-        }
-    );
-
-    // If this is a direct purchase, mark vehicle as sold
-    if (purchaseType === 'direct' && vehicleId) {
-        await connection.execute(
-            `UPDATE VEHICLES SET STATUS = 'sold' WHERE ID = :vehicleId`,
-            { vehicleId }
-        );
-        console.log(`Vehicle ${vehicleId} marked as sold`);
-
-        // Create escrow record for direct purchase
-        const metadata = paymentIntent.metadata;
-        const bidAmount = parseFloat(metadata.bidAmount || metadata.vehiclePrice || 0);
-        const platformCommission = parseFloat(metadata.platformCommission || 0);
-        const stripeFee = parseFloat(metadata.stripeFee || 0);
-        const sellerPayout = parseFloat(metadata.sellerPayout || bidAmount);
-        const sellerId = metadata.sellerId;
-        const userId = metadata.userId;
-
-        if (sellerId && userId) {
-            const escrowId = uuidv4();
-            await connection.execute(
-                `INSERT INTO ESCROWS (
-                    ID, PAYMENT_ID, AUCTION_ID, VEHICLE_ID, SELLER_ID, BUYER_ID,
-                    TOTAL_AMOUNT_EGP, COMMISSION_EGP, PROCESSOR_FEE_EGP, SELLER_PAYOUT_EGP,
-                    STATUS, HELD_AT
-                ) VALUES (
-                    :escrowId, :paymentId, NULL, :vehicleId, :sellerId, :buyerId,
-                    :totalAmount, :commission, :processorFee, :sellerPayout,
-                    'held', SYSTIMESTAMP
-                )`,
-                {
-                    escrowId,
-                    paymentId,
-                    vehicleId,
-                    sellerId,
-                    buyerId: userId,
-                    totalAmount: bidAmount,
-                    commission: platformCommission,
-                    processorFee: stripeFee,
-                    sellerPayout
-                }
-            );
-            console.log(`Escrow ${escrowId} created for direct purchase`);
-        }
-    }
-
-    console.log(`Payment ${paymentId} marked as completed via webhook`);
-}
-
-/**
- * Helper: Handle payment_intent.payment_failed event
- */
-async function handlePaymentIntentFailed(paymentIntent, connection) {
-    const paymentId = paymentIntent.metadata.paymentId;
-    const purchaseType = paymentIntent.metadata.purchaseType || 'auction';
-    const vehicleId = paymentIntent.metadata.vehicleId;
 
     if (!paymentId) {
         console.error('No paymentId in metadata');
@@ -642,31 +467,37 @@ async function handlePaymentIntentFailed(paymentIntent, connection) {
     // Update payment status
     await connection.execute(
         `UPDATE PAYMENTS 
-         SET STATUS = 'failed',
-             FAILURE_REASON = :reason,
-             FAILED_AT = SYSTIMESTAMP
-         WHERE ID = :paymentId`,
+         SET STATUS = 'completed',
+             GATEWAY_TRANS_ID = :transId,
+             COMPLETED_AT = SYSTIMESTAMP
+         WHERE ID = :paymentId AND STATUS = 'pending'`,
         { 
-            reason: paymentIntent.last_payment_error?.message || 'Payment failed',
+            transId: paymentIntent.charges.data[0]?.id || paymentIntent.id,
             paymentId 
         }
     );
 
-    // If this is a direct purchase, rollback vehicle status (if it was marked as sold)
-    // In our new flow, vehicle shouldn't be sold yet, but this is a safety measure
-    if (purchaseType === 'direct' && vehicleId) {
-        await connection.execute(
-            `UPDATE VEHICLES 
-             SET STATUS = 'active' 
-             WHERE ID = :vehicleId AND STATUS = 'sold'
-               AND ID NOT IN (
-                   SELECT VEHICLE_ID FROM PAYMENTS 
-                   WHERE VEHICLE_ID = :vehicleId AND STATUS = 'completed'
-               )`,
-            { vehicleId }
-        );
-        console.log(`Vehicle ${vehicleId} status rolled back to active due to payment failure`);
+    console.log(`Payment ${paymentId} marked as completed via webhook`);
+}
+
+/**
+ * Helper: Handle payment_intent.payment_failed event
+ */
+async function handlePaymentIntentFailed(paymentIntent, connection) {
+    const paymentId = paymentIntent.metadata.paymentId;
+
+    if (!paymentId) {
+        console.error('No paymentId in metadata');
+        return;
     }
+
+    await connection.execute(
+        `UPDATE PAYMENTS 
+         SET STATUS = 'failed',
+             FAILED_AT = SYSTIMESTAMP
+         WHERE ID = :paymentId`,
+        { paymentId }
+    );
 
     console.log(`Payment ${paymentId} marked as failed via webhook`);
 }
@@ -704,125 +535,5 @@ async function handleChargeRefunded(charge, connection) {
 
     console.log(`Payment ${paymentId} refunded via webhook`);
 }
-
-/**
- * Create Direct Payment Intent (Fixed-Price Purchase)
- * POST /api/payments/create-direct-intent
- */
-exports.createDirectPaymentIntent = async (req, res) => {
-    const connection = await db.getConnection();
-    try {
-        const { vehicleId } = req.body;
-        const userId = req.user.id;
-
-        if (!vehicleId) {
-            return res.status(400).json({ error: 'vehicleId is required' });
-        }
-
-        // Check vehicle availability (but don't mark as sold yet)
-        const availabilityCheck = await connection.execute(
-            `SELECT COUNT(*) FROM VEHICLES 
-             WHERE ID = :vehicleId AND STATUS = 'active'
-               AND ID NOT IN (SELECT VEHICLE_ID FROM AUCTIONS WHERE STATUS NOT IN ('cancelled'))
-               AND ID NOT IN (SELECT VEHICLE_ID FROM PAYMENTS WHERE STATUS = 'pending' AND VEHICLE_ID IS NOT NULL)`,
-            { vehicleId }
-        );
-
-        if (availabilityCheck.rows[0][0] === 0) {
-            return res.status(409).json({ error: 'Vehicle is no longer available for purchase' });
-        }
-
-        // Fetch vehicle details
-        const vehResult = await connection.execute(
-            `SELECT ID, SELLER_ID, MAKE, MODEL, YEAR_MFG, PRICE_EGP
-             FROM VEHICLES WHERE ID = :vehicleId`,
-            { vehicleId },
-            { outFormat: require('oracledb').OUT_FORMAT_OBJECT }
-        );
-
-        const vehicle = vehResult.rows[0];
-
-        if (vehicle.SELLER_ID === userId) {
-            return res.status(400).json({ error: 'You cannot buy your own vehicle' });
-        }
-
-        const priceEGP = Number(vehicle.PRICE_EGP);
-        const breakdown = calculatePaymentBreakdown(priceEGP);
-
-        // Generate payment ID and create Stripe PaymentIntent first
-        const paymentId = uuidv4();
-        const vehicleTitle = `${vehicle.YEAR_MFG} ${vehicle.MAKE} ${vehicle.MODEL}`;
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: breakdown.totalAmount * 100,
-            currency: 'egp',
-            metadata: {
-                vehicleId: vehicle.ID,
-                paymentId,
-                userId,
-                sellerId: vehicle.SELLER_ID,
-                vehicleDescription: vehicleTitle,
-                purchaseType: 'direct',
-                vehiclePrice: priceEGP,
-                platformCommission: breakdown.platformCommission,
-                stripeFee: breakdown.stripeFee,
-                bidAmount: priceEGP,
-                sellerPayout: breakdown.sellerPayout
-            },
-            description: `Direct purchase: ${vehicleTitle}`,
-            automatic_payment_methods: { enabled: true },
-        });
-
-        // Create payment record with all required fields
-        await connection.execute(
-            `INSERT INTO PAYMENTS (
-                ID, AUCTION_ID, VEHICLE_ID, BUYER_ID, SELLER_ID,
-                AMOUNT_EGP, PROCESSOR_FEE_EGP, CURRENCY, PAYMENT_METHOD, GATEWAY,
-                GATEWAY_ORDER_ID, STATUS, PURCHASE_TYPE, INITIATED_AT
-            ) VALUES (
-                :paymentId, NULL, :vehicleId, :buyerId, :sellerId,
-                :amount, :processorFee, 'EGP', 'card', 'Stripe',
-                :gatewayOrderId, 'pending', 'direct', SYSTIMESTAMP
-            )`,
-            {
-                paymentId,
-                vehicleId,
-                buyerId: userId,
-                sellerId: vehicle.SELLER_ID,
-                amount: breakdown.totalAmount,
-                processorFee: breakdown.stripeFee,
-                gatewayOrderId: paymentIntent.id
-            }
-        );
-
-        await connection.commit();
-
-        res.status(200).json({
-            success: true,
-            clientSecret: paymentIntent.client_secret,
-            paymentId,
-            breakdown: {
-                vehiclePrice: priceEGP,
-                platformCommission: breakdown.platformCommission,
-                stripeFee: breakdown.stripeFee,
-                totalAmount: breakdown.totalAmount,
-                sellerPayout: breakdown.sellerPayout
-            },
-            vehicle: {
-                id: vehicle.ID,
-                title: vehicleTitle
-            }
-        });
-
-    } catch (error) {
-        await connection.rollback();
-        console.error('Error creating direct payment intent:', error);
-        res.status(500).json({
-            error: 'Failed to create payment intent',
-            details: error.message
-        });
-    } finally {
-        await connection.close();
-    }
-};
 
 module.exports = exports;

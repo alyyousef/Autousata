@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { listUsers, searchUsers, type AdminUserSearchResult } from '../services/adminApi';
+import { TableRowSkeleton } from '../components/LoadingSkeleton';
 
 const LIMIT = 20;
 
@@ -21,7 +22,7 @@ const AdminUsersPage: React.FC = () => {
   const fetchData = async (query: string, p: number) => {
     setError('');
     setLoading(true);
-    try {
+    try { 
       const isSearching = query.trim().length >= 1;
 
       const data = isSearching
@@ -172,11 +173,9 @@ const AdminUsersPage: React.FC = () => {
 
                 <tbody className="divide-y divide-slate-100">
                   {loading && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-sm text-slate-500">
-                        Loading...
-                      </td>
-                    </tr>
+                    [...Array(10)].map((_, i) => (
+                      <TableRowSkeleton key={i} columns={6} />
+                    ))
                   )}
 
                   {!loading && users.length === 0 && !error && (

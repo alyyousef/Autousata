@@ -10,7 +10,9 @@ const { getPendingKYCService,
     searchKYC,
     filterKYCByStatus,
     viewKYCDetails,
-    viewuser
+    viewuser,
+    getalluserskyc,
+    updaterole
 } = require('../services/adminContentService');
 
 //kyc
@@ -82,6 +84,16 @@ const getPendingPayments= async (req, res) => {
 
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch pending payments' });
+    }
+};
+
+const getalluserskycController = async (req, res) => {
+    try {
+        const allUsersKYC = await getalluserskyc();
+        res.status(200).json({ data: allUsersKYC });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch all users KYC' });
     }
 };
 
@@ -173,4 +185,6 @@ const viewUserController = async (req, res) => {
 };
 
 
-module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController, viewUserController};
+
+
+module.exports = { getPendingKYC ,getAllAuction, getPendingPayments, updateAuction, setAuctionStartTime, filterAuctions, searchAuctionsController, getAuctionController, updateKYCcontroller, searchKYCController, filterKYCByStatusController, viewKYCDetailsController, viewUserController,getalluserskycController};

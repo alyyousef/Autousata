@@ -52,4 +52,11 @@ router.patch(
   adminUsersController.banUser,
 );
 
+router.patch(
+  "/:userId/role",
+  authenticate,
+  authorize("admin"),
+  adminUsersController.updateUserRoleController
+)
+
 module.exports = router;
