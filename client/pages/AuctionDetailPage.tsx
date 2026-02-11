@@ -313,7 +313,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // Broadcast to all users in auction room
     const handleAuctionUpdated = (data: socketService.AuctionUpdate) => {
-      console.log('[AuctionDetail] ✅ ✅ ✅ auction_updated event received!', {
+      console.log('[AuctionDetail] ✅ auction_updated event received!', {
         currentBid: data.currentBid,
         bidCount: data.bidCount,
         minBidIncrement: data.minBidIncrement,
@@ -416,7 +416,7 @@ const AuctionDetailPage: React.FC = () => {
       socketService.offBidError(handleBidError);
       socketService.leaveAuction(id);
     };
-  }, [id]); // Only re-register when auction ID changes - prevents stale closures (chat message pattern)
+  }, [id]);
 
   // ==================
   // HELPERS

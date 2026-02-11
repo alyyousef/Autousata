@@ -327,6 +327,7 @@ const ProfilePage: React.FC = () => {
       draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
       scheduled: { label: 'Scheduled', className: 'bg-indigo-50 text-indigo-600' },
       live: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
+      active: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
       ended: { label: 'Ended', className: 'bg-rose-50 text-rose-600' },
       settled: { label: 'Settled', className: 'bg-sky-50 text-sky-600' },
       cancelled: { label: 'Cancelled', className: 'bg-amber-50 text-amber-700' }
