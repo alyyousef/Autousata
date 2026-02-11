@@ -600,11 +600,11 @@ const renderKycBadge = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</label>
                   <p className="p-2 font-bold text-slate-500 flex items-center gap-2 bg-slate-50 rounded-lg border border-slate-200/50">
-                    <Mail size={14} /> {user.email}
+                    <Mail size={20} /> {user.email}
                     {/* Lock Icon */}
-                    <span className="ml-auto text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    {/* <span className="ml-auto text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
                        Locked
-                    </span>
+                    </span> */}
                   </p>
                 </div>
 
