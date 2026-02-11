@@ -23,7 +23,7 @@ const getInitialLanguage = (): Language => {
   if (legacyDir === 'rtl') return 'ar';
   const rootLang = document.documentElement.getAttribute('lang');
   if (rootLang === 'ar') return 'ar';
-  return 'ar';
+  return 'en';
 };
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
