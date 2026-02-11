@@ -287,27 +287,51 @@ const AuctionDetailPage: React.FC = () => {
       setBidHistory(formattedBids);
     };
 
-    // Bid placed confirmation (sent to bidder who placed it)
-    const handleBidPlaced = (data: socketService.BidPlacedEvent) => {
-      const bid = data.bid;
-      if (bid) {
-        const newBid: RealTimeBid = {
-          id: bid.id,
-          bidderId: 'You',
-          amount: bid.amount,
-          timestamp: bid.timestamp,
-          isYou: true,
-        };
-        setBidHistory(prev => [newBid, ...prev]);
-        addLocalNotification(
-          `Your bid of EGP ${bid.amount.toLocaleString()} was placed successfully!`,
-          'success'
-        );
+    // Bid placed confirmation (sent to everyone in the room)
+    const handleBidPlaced = (data: any) => {
+      console.log('[AuctionDetail] ✅ bid_placed event received:', data);
+      
+      const { bid, auction: updatedAuction } = data;
+      const isYou = bid.bidderId === currentUserIdRef.current; // Use Ref for current user ID to avoid stale closure
 
-        if (data.autoExtended && data.autoExtendInfo?.newEndTime) {
-          setAuctionEndTime(data.autoExtendInfo.newEndTime);
-          addLocalNotification('Auction time extended due to late bid!', 'warn');
+      // Update Top Stats
+      if (updatedAuction) {
+        setCurrentBid(updatedAuction.currentBid);
+        setBidCount(updatedAuction.bidCount);
+        // Only update end time if it was extended
+        if (updatedAuction.endTime) {
+            setAuctionEndTime(updatedAuction.endTime);
         }
+        setBidAmount(Math.max(updatedAuction.currentBid + (minBidIncrement || 50), MIN_BID));
+      }
+
+      // Update History
+      const newBid: RealTimeBid = {
+        id: bid.id,
+        bidderId: isYou ? 'You' : (bid.bidderId ? `User ${bid.bidderId.substring(0, 4)}***` : 'Bidder'),
+        amount: bid.amount,
+        timestamp: bid.timestamp,
+        isYou,
+      };
+
+      setBidHistory(prev => {
+        // Avoid duplicates
+        if (prev.some(b => b.id === newBid.id)) return prev;
+        return [newBid, ...prev];
+      });
+
+      // Notifications & Feedback
+      setBidJustUpdated(true);
+      setTimeout(() => setBidJustUpdated(false), 2000);
+
+      if (isYou) {
+        addLocalNotification(`Your bid of EGP ${bid.amount.toLocaleString()} was placed successfully!`, 'success');
+      } else {
+        addLocalNotification(`New bid: EGP ${bid.amount.toLocaleString()}`, 'info');
+      }
+
+      if (updatedAuction?.endTime && updatedAuction.endTime !== auctionEndTime) {
+         addLocalNotification('Auction time extended due to late bid!', 'warn');
       }
     };
 

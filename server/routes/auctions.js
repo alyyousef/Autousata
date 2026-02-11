@@ -7,62 +7,6 @@ const { rateLimitBid } = require('../middleware/rateLimiter');
 const bidProcessingService = require('../services/bidProcessingService');
 const { getIO } = require('../server');
 
-/**
- * Safely parse the IMAGES column from the database (VEHICLES.IMAGES).
- * Handles: JSON arrays, plain URL strings, comma-separated URLs,
- * null/undefined, CLOB objects, and malformed data.
- * Always returns a string[] of image URLs.
- */
-function parseImagesColumn(raw) {
-  if (!raw) return [];
-  let str = raw;
-  if (typeof raw !== 'string') {
-    try { str = String(raw); } catch { return []; }
-  }
-  str = str.trim();
-  if (!str) return [];
-  if (str.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(str);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(item => typeof item === 'string' && item.length > 0);
-      }
-    } catch { /* fall through */ }
-  }
-  if (str.startsWith('http://') || str.startsWith('https://')) {
-    return str.split(',').map(u => u.trim()).filter(u => u.length > 0);
-  }
-  try {
-    const parsed = JSON.parse(str);
-    if (Array.isArray(parsed)) {
-      return parsed.filter(item => typeof item === 'string' && item.length > 0);
-    }
-    if (typeof parsed === 'string' && parsed.startsWith('http')) {
-      return [parsed];
-    }
-  } catch { /* fall through */ }
-  return [];
-}
-
-/**
- * Normalize auction status from database format to API format.
- * Maps lowercase DB values to uppercase frontend-expected values.
- * Example: 'live' → 'ACTIVE', 'draft' → 'DRAFT'
- */
-function normalizeAuctionStatus(dbStatus) {
-  if (!dbStatus) return 'UNKNOWN';
-  const statusMap = {
-    'draft': 'DRAFT',
-    'scheduled': 'SCHEDULED',
-    'live': 'ACTIVE',
-    'ended': 'ENDED',
-    'settled': 'SETTLED',
-    'cancelled': 'CANCELLED'
-  };
-  const normalized = statusMap[String(dbStatus).toLowerCase()];
-  return normalized || String(dbStatus).toUpperCase();
-}
-
 // POST /api/auctions - Create a new auction (draft)
 // Accepts durationDays instead of startTime/endTime.
 // Actual start/end times are calculated when admin approves the vehicle.
@@ -245,7 +189,7 @@ router.get('/', async (req, res) => {
     const countResult = await connection.execute(
       `SELECT COUNT(*) AS total
        FROM auctions a
-       WHERE a.status = 'live'`,
+       WHERE LOWER(a.status) = 'live'`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -261,7 +205,6 @@ router.get('/', async (req, res) => {
         a.start_time,
         a.end_time,
         a.current_bid_egp,
-        a.bid_count,
         v.make,
         v.model,
         v.year_mfg,
@@ -273,10 +216,11 @@ router.get('/', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
-        v.images
+        v.images,
+        (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
-      WHERE a.status = 'live'
+      WHERE LOWER(a.status) = 'live'
       ORDER BY ${orderBy}
       OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
     `;
@@ -309,8 +253,10 @@ router.get('/', async (req, res) => {
         poor: 'Poor'
       };
 
-      // Parse vehicle images from VEHICLES.IMAGES column
-      let images = parseImagesColumn(row.IMAGES);
+      let images = [];
+      if (typeof row.IMAGES === 'string') {
+        try { images = JSON.parse(row.IMAGES); } catch (e) { images = []; }
+      }
 
       return {
         _id: row.AUCTION_ID,
@@ -323,7 +269,7 @@ router.get('/', async (req, res) => {
           vin: row.VIN,
           condition: conditionMap[conditionValue] || 'Good',
           description: row.DESCRIPTION || '',
-          
+          images,
           location: row.LOCATION_CITY || '',
           features
         },
@@ -333,7 +279,7 @@ router.get('/', async (req, res) => {
         reservePrice: Number(row.PRICE_EGP) || 0,
         bidCount: Number(row.BID_COUNT) || 0,
         endTime: row.END_TIME,
-        status: normalizeAuctionStatus(row.STATUS)
+        status: row.STATUS
       };
     });
 
@@ -384,7 +330,7 @@ router.get('/seller', auth, async (req, res) => {
       _id: row.ID,
       vehicleId: row.VEHICLE_ID,
       sellerId: row.SELLER_ID,
-      status: normalizeAuctionStatus(row.STATUS),
+      status: row.STATUS,
       startTime: row.START_TIME,
       endTime: row.END_TIME,
       currentBid: Number(row.CURRENT_BID_EGP) || 0
@@ -421,7 +367,6 @@ router.get('/:id', async (req, res) => {
         a.end_time,
         a.current_bid_egp,
         a.min_bid_increment,
-        a.bid_count,
         v.make,
         v.model,
         v.year_mfg,
@@ -433,7 +378,8 @@ router.get('/:id', async (req, res) => {
         v.description,
         v.location_city,
         v.features,
-        v.images
+        v.images,
+        (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
       WHERE a.id = :auctionId`,
@@ -467,8 +413,10 @@ router.get('/:id', async (req, res) => {
       poor: 'Poor'
     };
 
-    // Parse vehicle images from VEHICLES.IMAGES column
-    let images = parseImagesColumn(row.IMAGES);
+    let images = [];
+    if (typeof row.IMAGES === 'string') {
+      try { images = JSON.parse(row.IMAGES); } catch (e) { images = []; }
+    }
 
     res.json({
       _id: row.AUCTION_ID,
@@ -492,7 +440,7 @@ router.get('/:id', async (req, res) => {
       bidCount: Number(row.BID_COUNT) || 0,
       minBidIncrement: Number(row.MIN_BID_INCREMENT) || 50,
       endTime: row.END_TIME,
-      status: normalizeAuctionStatus(row.STATUS)
+      status: row.STATUS
     });
   } catch (err) {
     console.error(err.message);
