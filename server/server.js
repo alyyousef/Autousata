@@ -33,6 +33,11 @@ const auctionRoutes = require('./routes/auctions');
 const paymentRoutes = require('./routes/payments');
 const adminFinanceRoutes = require("./routes/adminFinance");
 const userRoutes = require("./routes/user");
+const authLimiter=require("./middleware/rateLimiter").authLimiter;
+const adminAuthRoutes = require("./routes/adminAuth");
+const adminUsersRoutes = require("./routes/adminUsers");
+const adminContentRoutes = require("./routes/adminContent");
+const adminRoutes = require("./routes/admin");
 
 
 app.use('/api/auth', authRoutes);
