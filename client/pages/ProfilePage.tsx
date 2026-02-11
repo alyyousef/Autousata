@@ -58,7 +58,7 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     const fetchFreshProfile = async () => {
       try {
-        const response = await apiService.getMe();
+        const response = await apiService.getCurrentUser();
         if (response.data && response.data.user) {
           console.log("🔄 Profile Synced:", response.data.user);
           updateUser(response.data.user); // Updates Context + Local State via dependency below
