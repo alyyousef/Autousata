@@ -1,70 +1,78 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 
-interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-}
+  interface ApiResponse<T> {
+    data?: T;
+    error?: string;
+  }
+  type TransactionsResponse = {
+    page: number;
+    limit: number;
+    items: any[];
+  };
 
-type TransactionsResponse = {
-  page: number;
-  limit: number;
-  items: any[];
-};
 
-export interface KycItem {
-  id: string;
-  email?: string;
-  phone?: string;
-  firstName?: string;
-  lastName?: string;
-  documentType?: string;
-  status?: string;
-  submittedAt?: string;
-}
 
-class ApiService {
-  // 1. Get tokens from storage
-  private getAccessToken(): string | null {
-    return localStorage.getItem('accessToken');
+
+
+
+
+  export interface KycItem {
+    id: string;
+    email?: string;
+    phone?: string;
+    firstName?: string;
+    lastName?: string;
+    documentType?: string;
+    status?: string;
+    submittedAt?: string;
   }
 
-  private getRefreshToken(): string | null {
-    return localStorage.getItem('refreshToken');
-  }
 
-  // 2. Helper to save both tokens
-  private setTokens(accessToken: string, refreshToken: string) {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-  }
+    class ApiService {
+      // 1. Get tokens from storage
+      private getAccessToken(): string | null {
+        return localStorage.getItem('accessToken');
+      }
 
-  private clearTokens() {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-  }
+      private getRefreshToken(): string | null {
+        return localStorage.getItem('refreshToken');
+      }
 
-  // =========================================================
-  // CORE REQUEST HANDLER (With Auto-Refresh Logic)
-  // =========================================================
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    isRetry = false
-  ): Promise<ApiResponse<T>> {
-    const token = this.getAccessToken();
-    const isFormData = options.body instanceof FormData;
+      // 2. Helper to save both tokens
+      private setTokens(accessToken: string, refreshToken: string) {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+      }
 
-    const headers: HeadersInit = {
-      ...(!isFormData && { 'Content-Type': 'application/json' }),
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    };
+      private clearTokens() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-      });
+      // =========================================================
+      // CORE REQUEST HANDLER (With Auto-Refresh Logic)
+      // =========================================================
+      private async request<T>(
+        endpoint: string,
+        options: RequestInit = {},
+        isRetry = false // Prevents infinite loops // Prevents infinite loops
+      ): Promise<ApiResponse<T>> {
+    
+        
+        const token = this.getAccessToken();
+        const isFormData = options.body instanceof FormData;
+
+        const headers: HeadersInit = {
+          ...(!isFormData && { 'Content-Type': 'application/json' }),
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...options.headers,
+        };
+
+        try {
+          const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            ...options,
+            headers,
+          });
 
       if (response.ok) {
         return { data: await response.json() };
@@ -72,15 +80,19 @@ class ApiService {
 
       const errorData = await response.json();
 
-      if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
-        const success = await this.refreshAccessToken();
-        if (success) {
-          return this.request<T>(endpoint, options, true);
+        // B. If Token Expired (401), try to refresh!
+        if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
+          const success = await this.refreshAccessToken();
+          if (success) {
+            // Retry the ORIGINAL request with the NEW token
+            return this.request<T>(endpoint, options, true);
+          } else {
+            // Refresh failed -> Logout user
+            this.logout();
+            window.location.href = '/login'; 
+            return { error: 'Session expired. Please login again.' };
+          }
         }
-        this.logout();
-        window.location.href = '/login';
-        return { error: 'Session expired. Please login again.' };
-      }
 
       return { error: errorData.error || 'Request failed' };
     } catch (error) {
@@ -95,12 +107,12 @@ class ApiService {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
 
       if (response.ok) {
         const data = await response.json();
@@ -198,7 +210,7 @@ class ApiService {
   }
 
   // =========================================================
-  // PASSWORD RESET METHODS
+  // PASSWORD RESET METHODS (Correctly placed inside class)
   // =========================================================
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
@@ -276,17 +288,8 @@ class ApiService {
   // =========================================================
   // BROWSE / BUY-NOW METHODS (Public)
   // =========================================================
-  async browseVehicles(
-    params: {
-      page?: number;
-      limit?: number;
-      make?: string;
-      minPrice?: number;
-      maxPrice?: number;
-      bodyType?: string;
-      sort?: string;
-    } = {}
-  ) {
+
+  async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
     const qp = new URLSearchParams();
     if (params.page) qp.set('page', params.page.toString());
     if (params.limit) qp.set('limit', params.limit.toString());
@@ -305,13 +308,7 @@ class ApiService {
   }
 
   async getLandingStats() {
-    return this.request<{
-      activeListings: number;
-      verifiedSellers: number;
-      soldVehicles: number;
-      avgTimeToSell: string;
-      escrowProtected: string;
-    }>('/vehicles/stats');
+    return this.request<{ activeListings: number; verifiedSellers: number; soldVehicles: number; avgTimeToSell: string; escrowProtected: string }>('/vehicles/stats');
   }
 
   async getFeaturedVehicles() {
@@ -430,138 +427,135 @@ class ApiService {
     });
   }
 
-  async confirmPayment(paymentId: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      paymentId: string;
-      escrowId: string;
-    }>(`/payments/${paymentId}/confirm`, {
-      method: 'POST',
-    });
-  }
+  
 
-  async getPaymentByAuction(auctionId: string) {
-    return this.request<{
-      success: boolean;
-      payment: {
-        id: string;
-        auctionId: string;
-        amountEGP: number;
-        status: string;
-        initiatedAt: string;
-        completedAt?: string;
-        escrow?: {
+    /**
+     * Get payment details by auction ID
+     */
+    async getPaymentByAuction(auctionId: string) {
+      return this.request<{
+        success: boolean;
+        payment: {
           id: string;
+          auctionId: string;
+          amountEGP: number;
           status: string;
+          initiatedAt: string;
+          completedAt?: string;
+          escrow?: {
+            id: string;
+            status: string;
+            commissionEGP: number;
+            sellerPayoutEGP: number;
+          };
+        };
+      }>(`/payments/auction/${auctionId}`);
+    }
+
+ 
+      
+
+    /**
+     * Confirm payment completion
+     */
+    async confirmPayment(paymentId: string) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        paymentId: string;
+        escrowId: string;
+      }>(`/payments/${paymentId}/confirm`, {
+        method: 'POST',
+      });
+    }
+
+   
+    /**
+     * Get escrow details
+     */
+    async getEscrowDetails(escrowId: string) {
+      return this.request<{
+        success: boolean;
+        escrow: {
+          id: string;
+          auctionId: string;
+          totalAmountEGP: number;
           commissionEGP: number;
           sellerPayoutEGP: number;
-        };
-      };
-    }>(`/payments/auction/${auctionId}`);
-  }
-
-  async getPaymentById(paymentId: string) {
-    return this.request<{
-      success: boolean;
-      payment: {
-        id: string;
-        auctionId: string | null;
-        vehicleId: string | null;
-        purchaseType: string;
-        amountEGP: number;
-        status: string;
-        initiatedAt: string;
-        completedAt?: string;
-        escrow?: {
-          id: string;
           status: string;
-          commissionEGP: number;
+          buyerReceived?: string;
+          vehicle: {
+            year: number;
+            make: string;
+            model: string;
+          };
+        };
+      }>(`/payments/escrows/${escrowId}`);
+    }
+
+
+
+     /**
+       * Buyer confirms vehicle receipt (releases escrow)
+       */
+      async confirmVehicleReceipt(escrowId: string) {
+        return this.request<{
+          success: boolean;
+          message: string;
+          escrowId: string;
           sellerPayoutEGP: number;
-        };
-      };
-    }>(`/payments/${paymentId}`);
-  }
+        }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+          method: 'POST',
+        });
+      }
 
-  async getEscrowDetails(escrowId: string) {
-    return this.request<{
-      success: boolean;
-      escrow: {
-        id: string;
-        auctionId: string;
-        totalAmountEGP: number;
-        commissionEGP: number;
-        sellerPayoutEGP: number;
-        status: string;
-        buyerReceived?: string;
-        vehicle: {
-          year: number;
-          make: string;
-          model: string;
-        };
-      };
-    }>(`/payments/escrows/${escrowId}`);
-  }
 
-  async confirmVehicleReceipt(escrowId: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      escrowId: string;
-      sellerPayoutEGP: number;
-    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
-      method: 'POST',
-    });
-  }
+         async getDisputedEscrows() {
+      return this.request<{
+        success: boolean;
+        disputes: Array<{
+          id: string;
+          auctionId: string;
+          totalAmountEGP: number;
+          disputeReason: string;
+          disputedAt: string;
+          vehicle: {
+            year: number;
+            make: string;
+            model: string;
+          };
+          buyer: {
+            name: string;
+            email: string;
+          };
+          seller: {
+            name: string;
+            email: string;
+          };
+        }>;
+      }>('/payments/escrows/disputed');
+    }
 
-  async initiateDispute(escrowId: string, reason: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      escrowId: string;
-    }>(`/payments/escrows/${escrowId}/dispute`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-  }
 
-  async getDisputedEscrows() {
-    return this.request<{
-      success: boolean;
-      disputes: Array<{
-        id: string;
-        auctionId: string;
-        totalAmountEGP: number;
-        disputeReason: string;
-        disputedAt: string;
-        vehicle: {
-          year: number;
-          make: string;
-          model: string;
-        };
-        buyer: {
-          name: string;
-          email: string;
-        };
-        seller: {
-          name: string;
-          email: string;
-        };
-      }>;
-    }>('/payments/escrows/disputed');
-  }
+    /**
+     * Admin: Get all disputed escrows
+     */
+ 
 
-  async processRefund(paymentId: string, reason: string, amount?: number) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      refundId: string;
-      amountRefundedEGP: number;
-    }>(`/payments/${paymentId}/refund`, {
-      method: 'POST',
-      body: JSON.stringify({ reason, amount }),
-    });
-  }
+    /**
+     * Admin: Process refund
+     */
+    async processRefund(paymentId: string, reason: string, amount?: number) {
+      return this.request<{
+        success: boolean;
+        message: string;
+        refundId: string;
+        amountRefundedEGP: number;
+      }>(`/payments/${paymentId}/refund`, {
+        method: 'POST',
+        body: JSON.stringify({ reason, amount }),
+      });
+    }
 
   // ===================== Admin Content =====================
   async getPendingKYC() {
@@ -589,7 +583,7 @@ class ApiService {
       limit: number;
       total: number;
       totalPages: number;
-    }>(`/admin/users?page=${page}&limit=${limit}`, { method: 'GET' });
+    }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
   }
 
   public adminSearchUsers(q: string, page = 1, limit = 20) {
@@ -599,36 +593,44 @@ class ApiService {
       limit: number;
       total: number;
       totalPages: number;
-    }>(
-      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
-      { method: 'GET' }
-    );
+    }>(`/admin/users?q=${q}&page=${page}&limit=${limit}`, { method: "GET" });
   }
+
+  /**
+   * Get escrow details
+   */
+ 
+
 
   adminGetUserTransactions(userId: string, queryString: string) {
     const qs = queryString ? `?${queryString}` : '';
     return this.request<TransactionsResponse>(
       `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
-      { method: 'GET' }
+      { method: "GET" }
     );
+
   }
 
   adminSuspendUser(userId: string, body: { reason: string }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
   }
 
-  adminReactivateUser(userId: string) {
+
+
+  async adminReactivateUser(userId: string) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
-      method: 'PATCH',
+      method: "PATCH",
     });
   }
 
-  adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
+
+
+  async adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
   }

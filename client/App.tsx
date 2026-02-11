@@ -12,7 +12,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { UserRole } from "./types";
-
+import './index.css';
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
@@ -41,6 +41,8 @@ import PaymentConfirmationPage from "./pages/PaymentConfirmationPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
+import KYCProcessPage from "./pages/KYCProcessPage";
+
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
@@ -91,6 +93,10 @@ const AppRoutes: React.FC = () => {
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
+          
+          {/* ✅ KYC Route Added Here */}
+          <Route path="/kyc-process" element={<KYCProcessPage />} />
+          
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
