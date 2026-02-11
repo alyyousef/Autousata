@@ -32,20 +32,17 @@ const vehicleRoutes = require('./routes/vehicles');
 const auctionRoutes = require('./routes/auctions');
 const paymentRoutes = require('./routes/payments');
 const adminFinanceRoutes = require("./routes/adminFinance");
-const userRoutes = require("./routes/user");
-const authLimiter=require("./middleware/rateLimiter").authLimiter;
 const adminAuthRoutes = require("./routes/adminAuth");
 const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
 const adminRoutes = require("./routes/admin");
-
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/auctions", auctionRoutes);
