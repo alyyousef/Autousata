@@ -265,6 +265,14 @@ class ApiService {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
+  async getMyListings() {
+    return this.request<{ data: any[] }>('/profile/listings');
+  }
+
+  async getMyGarage() {
+    return this.request<{ data: any[] }>('/profile/mygarage');
+  }
+
   // =========================================================
   // BROWSE / BUY-NOW METHODS (Public)
   // =========================================================

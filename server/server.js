@@ -85,6 +85,7 @@ const adminAuthRoutes = require("./routes/adminAuth");
 const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
 const adminRoutes = require("./routes/admin");
+const userRoutes = require("./routes/user");
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/profile", profileRoutes);
@@ -97,6 +98,7 @@ app.use("/api/admin/content", adminContentRoutes);
 const adminFinanceRoutes = require("./routes/adminFinance");
 app.use("/api/admin/finance", adminFinanceRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/user", userRoutes);
 
 // Stripe redirect handler for 3D Secure / hash router compatibility
 // Stripe cannot redirect to hash URLs, so we redirect here first

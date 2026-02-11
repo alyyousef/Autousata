@@ -2,7 +2,7 @@ const oracledb = require('oracledb');
 const db = require('../config/db');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
    
-const{sellerlistings,garagelisting}= require('../services/userService');
+const{sellerlistings,garagelisting,sellerConfirmation,buyerConfirmation,buyerRefund}= require('../services/userService');
 
 // ==========================================
 // 1. UPDATE TEXT PROFILE
@@ -183,6 +183,42 @@ const garageController=async(req,res)=>{
     }
 }
 
+const sellerTransferController=async(req,res)=>{
+    try{
+        const {escrow_id}=req.body;
+        const result=await sellerConfirmation(escrow_id);
+        res.status(200).json({message:result});
+    }
+    catch(error){
+        console.error('Error during seller transfer:',error);
+        res.status(400).json({error:'Failed to confirm transfer'});
+    }
+};
+
+const buyerReceivedController=async(req,res)=>{
+    try{
+        const {escrow_id}=req.body;
+        const result=await buyerConfirmation(escrow_id);
+        res.status(200).json({message:result});
+    }
+    catch(error){
+        console.error('Error during buyer confirmation:',error);
+        res.status(400).json({error:'Failed to confirm transfer'});
+    }
+};
+
+const buyerRefundController=async(req,res)=>{
+    try{
+        const {user_id,escrow_id,payment_id,vehicle_id,auction_id}=req.body;
+        const result=await buyerRefund(user_id,escrow_id,payment_id,vehicle_id,auction_id);
+        res.status(200).json({message:result});
+    }
+    catch(error){
+        console.error('Error during buyer refund:',error);
+        res.status(400).json({error:'Failed to process refund'});
+    }
+};
+
 
 // ✅ EXPORT ALL FUNCTIONS CORRECTLY
 module.exports = { 
@@ -190,5 +226,8 @@ module.exports = {
     updateAvatar, 
     uploadKYC ,
     sellerListingsController,
-    garageController
+    garageController,
+    sellerTransferController,
+    buyerReceivedController,
+    buyerRefundController
 };
