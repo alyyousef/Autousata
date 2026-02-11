@@ -6,7 +6,6 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
-  // UPDATE 1: Added profileImage as an optional 6th parameter
   register: (firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
@@ -30,6 +29,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return UserRole.BUYER;
   };
 
+  // ✅ CRITICAL UPDATE: Mapping Extracted Data
   const normalizeUser = (raw: any): User => {
     const nameFromParts = [raw?.firstName, raw?.lastName].filter(Boolean).join(' ').trim();
     const name = (raw?.name || nameFromParts || raw?.email || '').trim();
@@ -42,32 +42,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: String(raw?.email ?? ''),
       phone: raw?.phone ? String(raw.phone) : undefined,
       role: normalizeRole(raw?.role),
-      isKycVerified: Boolean(raw?.isKycVerified ?? raw?.kycVerified ?? false),
+      
+      // ✅ KYC Status Mapping
+      kycStatus: raw?.kycStatus || 'not_uploaded',
+      kycDocumentUrl: raw?.kycDocumentUrl || undefined,
+      
+      // ✅ NEW: Maps backend 'kycAddressFromId' to frontend 'kycAddress'
+      kycAddress: raw?.kycAddressFromId || raw?.kycAddress || undefined,
+      kycNameFromId: raw?.kycNameFromId || undefined,
+
+      isKycVerified: raw?.kycStatus === 'verified' || raw?.kycStatus === 'approved',
+
       avatar: raw?.avatar || raw?.profileImage || undefined,
       profileImage: raw?.profileImage || raw?.avatar || undefined,
       location: raw?.location,
-      emailVerified: raw?.emailVerified,
-      phoneVerified: raw?.phoneVerified,
+      emailVerified: Boolean(raw?.emailVerified),
+      phoneVerified: Boolean(raw?.phoneVerified),
     };
   };
 
   useEffect(() => {
-    // Check if user is logged in on mount
     const checkAuth = async () => {
       const token = localStorage.getItem('accessToken');
       if (token) {
         try {
-          const response = await apiService.getCurrentUser();
+          const response = await apiService.getCurrentUser(); 
           if (response.data?.user) {
+            console.log("🔄 AuthContext User:", response.data.user); 
             setUser(normalizeUser(response.data.user));
           } else {
-            // Token invalid? Clear everything
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
           }
         } catch (error) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          console.error("Auth Check Failed:", error);
         }
       }
       setLoading(false);
@@ -105,6 +113,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     await apiService.logout();
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     setUser(null);
   };
 

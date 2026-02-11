@@ -7,7 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
-import { AuctionStatus, VehicleStatus } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePage: React.FC = () => {
@@ -35,19 +34,7 @@ const ProfilePage: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsError, setListingsError] = useState('');
-  const [sellerListings, setSellerListings] = useState<Array<{
-    id: string;
-    vehicle: {
-      id: string;
-      make: string;
-      model: string;
-      year?: number;
-      price?: number;
-      status?: VehicleStatus | string;
-      images?: string[];
-    };
-    auctionStatus?: AuctionStatus | string;
-  }>>([]);
+  const [sellerListings, setSellerListings] = useState<any[]>([]);
 
   // =========================================================
   // Sync User Data
@@ -240,50 +227,39 @@ const ProfilePage: React.FC = () => {
     }).format(value);
   };
 
-  const getVehicleStatusBadge = (status?: VehicleStatus | string) => {
-    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
-    const map: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
-      active: { label: 'Active', className: 'bg-emerald-50 text-emerald-600' },
-      sold: { label: 'Sold', className: 'bg-rose-50 text-rose-600' },
-      delisted: { label: 'Delisted', className: 'bg-amber-50 text-amber-700' }
-    };
-    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
-  };
+  // ✅ HELPER: Correct KYC Status Logic
+  const kycStatus = user.kycStatus || 'not_uploaded'; // 'verified', 'pending', 'denied'
+  const isVerified = kycStatus === 'verified' || kycStatus === 'approved';
+  const isPending = kycStatus === 'pending';
 
-  const getAuctionStatusBadge = (status?: AuctionStatus | string) => {
-    if (!status) return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
-    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
-    const map: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
-      scheduled: { label: 'Scheduled', className: 'bg-indigo-50 text-indigo-600' },
-      live: { label: 'Live', className: 'bg-emerald-50 text-emerald-600' },
-      ended: { label: 'Ended', className: 'bg-rose-50 text-rose-600' },
-      settled: { label: 'Settled', className: 'bg-sky-50 text-sky-600' },
-      cancelled: { label: 'Cancelled', className: 'bg-amber-50 text-amber-700' }
-    };
-    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
-  };
-
-  // Helper for Small Badges
   const renderKycBadge = () => {
-    const status = user.kycStatus || 'not_uploaded';
-    switch (status) {
-      case 'verified': // New Backend Status
-      case 'approved': // Legacy Status
-        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded"><CheckCircle size={10} /> Verified</span>;
-      case 'pending':
-        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded"><AlertTriangle size={10} /> Pending</span>;
-      case 'denied':
-      case 'failed':
-        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Failed</span>;
-      default:
-        return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Unverified</span>;
+    if (isVerified) {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded">
+          <CheckCircle size={10} /> Verified
+        </span>
+      );
     }
+    if (isPending) {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded">
+          <AlertTriangle size={10} /> Pending
+        </span>
+      );
+    }
+    if (kycStatus === 'denied' || kycStatus === 'failed') {
+      return (
+        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded">
+          <XCircle size={10} /> Failed
+        </span>
+      );
+    }
+    return (
+      <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">
+        Unverified
+      </span>
+    );
   };
-
-  // Helper to determine if we should show the "Verify Now" button
-  const isVerified = user.kycStatus === 'verified' || user.kycStatus === 'approved';
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page relative">
@@ -410,7 +386,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. ✅ KYC Verification Card (UPDATED) */}
+            {/* 3. ✅ KYC Verification Card (Dynamic Badge & Button) */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText size={16} /> Identity Verification (KYC)
@@ -425,18 +401,59 @@ const ProfilePage: React.FC = () => {
 
                 {/* Status-Based Content */}
                 {isVerified ? (
-                  // ✅ VERIFIED STATE (Green Badge)
-                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800">
-                    <div className="bg-white p-2 rounded-full shadow-sm text-emerald-600">
-                      <ShieldCheck size={20} />
+                  <>
+                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800 animate-in fade-in zoom-in-95 duration-300">
+                      <div className="bg-white p-2 rounded-full shadow-sm text-emerald-600">
+                        <ShieldCheck size={20} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">Identity Verified</p>
+                        <p className="text-xs opacity-80">You can now sell & bid freely.</p>
+                      </div>
+                    </div>
+
+                    {/* ✅ NEW: Extracted Address Section */}
+                    {user.kycAddress && (
+                      <div className="mt-2 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
+                         <div className="flex items-start gap-3">
+                            <MapPin size={16} className="text-slate-400 mt-1" />
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                  Official Address (From ID)
+                                </p>
+                                <p className="text-sm font-semibold text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                  {user.kycAddress}
+                                </p>
+                            </div>
+                         </div>
+                         
+                         {user.kycNameFromId && (
+                           <div className="flex items-start gap-3 mt-3">
+                              <User size={16} className="text-slate-400 mt-1" />
+                              <div>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                    Name on ID
+                                  </p>
+                                  <p className="text-xs font-bold text-slate-600">
+                                    {user.kycNameFromId}
+                                  </p>
+                              </div>
+                           </div>
+                         )}
+                      </div>
+                    )}
+                  </>
+                ) : isPending ? (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-center gap-3 text-amber-800">
+                    <div className="bg-white p-2 rounded-full shadow-sm text-amber-600">
+                      <AlertTriangle size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold">Identity Verified</p>
-                      <p className="text-xs opacity-80">You can now sell & bid freely.</p>
+                       <p className="text-sm font-bold">Verification Pending</p>
+                       <p className="text-xs opacity-80">We are reviewing your ID.</p>
                     </div>
                   </div>
                 ) : (
-                  // ❌ UNVERIFIED STATE (Verify Now Button)
                   <>
                     <p className="text-xs text-slate-500 leading-relaxed">
                       To sell or bid on vehicles, you must complete the identity verification process.
@@ -459,7 +476,7 @@ const ProfilePage: React.FC = () => {
                     rel="noreferrer" 
                     className="flex items-center justify-center gap-1 w-full py-2 text-xs text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors mt-2"
                   >
-                    <ExternalLink size={12} /> View Previous Upload
+                    <ExternalLink size={12} /> View Uploaded ID
                   </a>
                 )}
               </div>
@@ -537,7 +554,7 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="profile-location" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
                   {isEditing ? (
                     <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
                       placeholder="e.g. Cairo"
@@ -567,8 +584,9 @@ const ProfilePage: React.FC = () => {
               {!listingsLoading && sellerListings.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {sellerListings.map((listing) => {
-                    const vehicleBadge = getVehicleStatusBadge(listing.vehicle.status);
-                    const auctionBadge = getAuctionStatusBadge(listing.auctionStatus);
+                    const vehicleStatus = typeof listing.vehicle.status === 'string' ? listing.vehicle.status : 'draft';
+                    const auctionStatus = typeof listing.auctionStatus === 'string' ? listing.auctionStatus : 'draft';
+                    
                     const title = `${listing.vehicle.year || ''} ${listing.vehicle.make} ${listing.vehicle.model}`.trim();
                     const image = listing.vehicle.images?.[0];
 
@@ -589,8 +607,9 @@ const ProfilePage: React.FC = () => {
                                 <p className="text-xs text-slate-500 mt-1">{formatEgp(listing.vehicle.price)}</p>
                               </div>
                               <div className="flex flex-col items-end gap-1">
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${vehicleBadge.className}`}>Vehicle: {vehicleBadge.label}</span>
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${auctionBadge.className}`}>Auction: {auctionBadge.label}</span>
+                                <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                                  {vehicleStatus}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -617,4 +636,5 @@ const ProfilePage: React.FC = () => {
     </div>
   );
 };
+
 export default ProfilePage;

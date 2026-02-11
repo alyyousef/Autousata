@@ -14,12 +14,10 @@ const CUSTOM_MODEL_ARN = "arn:aws:rekognition:eu-central-1:666053141333:project/
 
 // ==============================================================================
 // 🛡️ STAGE 2 HELPER FUNCTIONS: THE "SUPPORT CODE"
-// These only run if the AI model passes first.
 // ==============================================================================
 
 /**
  * HELPER 1: Strict Face Position Check
- * Ensures a face exists and is located on the LEFT side of the card.
  */
 async function performStrictFaceCheck(imageBuffer) {
     console.log("   Addon Check 1: Verifying Face Position...");
@@ -27,84 +25,107 @@ async function performStrictFaceCheck(imageBuffer) {
     const faceResult = await rekognition.detectFaces(faceParams).promise();
 
     if (faceResult.FaceDetails.length === 0) {
-        throw new Error("Validation Failed: No face detected on the document.");
+        throw new Error("Validation Failed: We didn't find a face on the document, so rejected.");
     }
 
-    // Get the largest/most prominent face
     const face = faceResult.FaceDetails.reduce((prev, current) => 
         (prev.BoundingBox.Height * prev.BoundingBox.Width > current.BoundingBox.Height * current.BoundingBox.Width) ? prev : current
     );
 
-    console.log(`   -> Face found at horizontal position: ${face.BoundingBox.Left.toFixed(2)} (0.0=Left, 1.0=Right)`);
+    console.log(`   -> Face found at position: ${face.BoundingBox.Left.toFixed(2)} (Target: < 0.55)`);
 
-    // AWS coordinates: 0.0 is far left, 1.0 is far right.
-    // The center point of the face should be in the left half (< 0.5).
     const faceCenterPoint = face.BoundingBox.Left + (face.BoundingBox.Width / 2);
     
-    // We give a little padding, so < 0.55 means it's generally on the left side.
     if (faceCenterPoint >= 0.55) {
-        throw new Error("Validation Failed: Face detected on the wrong side. Egyptian IDs have the photo on the left.");
+        throw new Error("Validation Failed: We found a face but it was on the RIGHT side (Egyptian IDs have it on the LEFT), so rejected.");
     }
-    console.log("   ✅ Face Position verified (Left Side).");
+    console.log("   ✅ Face Position verified.");
     return true;
 }
 
 /**
  * HELPER 2: Strict Text & Data Layout Check
- * Verifies Arabic text presence and the critical 14-digit number.
+ * Returns the detected text lines if successful.
  */
 async function performStrictTextDataCheck(imageBuffer) {
-    console.log("   Addon Check 2: Verifying Text & 14-Digit ID...");
+    console.log("   Addon Check 2: Verifying Text Layout & Security Features...");
     const textParams = { Image: { Bytes: imageBuffer } };
     const textResult = await rekognition.detectText(textParams).promise();
 
-    // 1. Extract all detected text (Fixed Typo Here)
+    // ✅ CAPTURE ALL LINES for extraction later
     const detectedBlocks = textResult.TextDetections; 
-    const fullTextString = detectedBlocks.map(t => t.DetectedText).join(' ');
+    const lines = detectedBlocks.filter(t => t.Type === 'LINE').map(t => t.DetectedText);
+    const fullTextString = lines.join(' ');
 
-    // --- Rule B: The 14-Digit National ID Number ---
-    // We look for a distinct "WORD" block that is exactly 14 digits.
+    // ---------------------------------------------------------
+    // RULE A: The 14-Digit National ID Number
+    // ---------------------------------------------------------
     const fourteenDigitRegex = /^\d{14}$/;
     const foundIdNumber = detectedBlocks.some(block => 
         block.Type === 'WORD' && fourteenDigitRegex.test(block.DetectedText)
     );
 
     if (!foundIdNumber) {
-         // Fallback check: sometimes OCR adds spaces (e.g., "2990101 1234567"). 
-         // Strip spaces from the whole text and look for a 14-digit sequence.
          const digitsOnly = fullTextString.replace(/\D/g, '');
-         // We need at least one sequence of 14 digits to exist.
          if (digitsOnly.length < 14 || !/\d{14}/.test(digitsOnly)) {
-             console.error("   ❌ 14-digit number missing. Digits found:", digitsOnly.substring(0, 20) + "...");
-             throw new Error("Validation Failed: The required 14-digit National ID number was not found at the bottom of the card.");
+             console.error(`   ❌ Failed Rule A: Digits found: ${digitsOnly.substring(0,15)}...`);
+             throw new Error("Validation Failed: We didn't find the 14-digit National ID number, so rejected.");
          }
-         console.log("   ✅ 14-Digit ID Number found (via fallback numeric scan).");
+         console.log("   ✅ 14-Digit ID Number found (via fallback).");
     } else {
-         console.log("   ✅ 14-Digit ID Number found distinctly.");
+         console.log("   ✅ 14-Digit ID Number found.");
     }
 
-
-    // --- Rule C: Presence of Arabic Text Fields (Name/Address) ---
-    // We don't need to read the exact name, but we must ensure there is a significant 
-    // amount of Arabic characters, which corresponds to the Name and Address lines.
-    // Arabic Unicode range: \u0600-\u06FF
+    // ---------------------------------------------------------
+    // RULE B: Presence of Arabic Text
+    // ---------------------------------------------------------
     const arabicRegex = /[\u0600-\u06FF]/g;
     const arabicCharacterCount = (fullTextString.match(arabicRegex) || []).length;
     
-    console.log(`   -> Found ${arabicCharacterCount} Arabic characters.`);
-
-    // Threshold: An ID should easily have 20+ Arabic characters.
     if (arabicCharacterCount < 20) {
-        throw new Error("Please Put an Egyptian ID");
+        throw new Error(`Validation Failed: We didn't find enough Arabic text (found ${arabicCharacterCount} chars, needed 20+), so rejected.`);
     }
     console.log("   ✅ Arabic Text Fields confirmed.");
 
-    return true;
+    // ---------------------------------------------------------
+    // RULE C: The 9-Character Factory Number (Bottom Left)
+    // ---------------------------------------------------------
+    const foundFactoryNumber = detectedBlocks.find(block => {
+        const box = block.Geometry.BoundingBox;
+        const isBottomLeft = box.Left < 0.45 && box.Top > 0.65;
+        const cleanText = block.DetectedText.replace(/[^A-Z0-9]/gi, '');
+        // Allow length 8-10 to account for minor OCR errors
+        const isCorrectFormat = (cleanText.length >= 8 && cleanText.length <= 10) && /\d/.test(cleanText);
+        return isBottomLeft && isCorrectFormat;
+    });
+
+    if (!foundFactoryNumber) {
+        const cornerText = detectedBlocks.filter(b => b.Geometry.BoundingBox.Left < 0.45 && b.Geometry.BoundingBox.Top > 0.65)
+                                         .map(b => b.DetectedText).join(', ');
+        console.error(`   ❌ Failed Rule C: Text in corner was [${cornerText}]`);
+        throw new Error("Validation Failed: We didn't find the Factory Number (Bottom Left), so rejected.");
+    }
+    console.log(`   ✅ Factory Number Found: ${foundFactoryNumber.DetectedText}`);
+
+    // ---------------------------------------------------------
+    // RULE D: Official Headers Check (Top Right)
+    // ---------------------------------------------------------
+    const hasRepublic = fullTextString.includes("جمهورية") && fullTextString.includes("مصر");
+    const hasCardType = fullTextString.includes("بطاقة") && fullTextString.includes("تحقيق");
+
+    if (!hasRepublic || !hasCardType) {
+        console.error(`   ❌ Failed Rule D: Header status (Republic: ${hasRepublic}, CardType: ${hasCardType})`);
+        throw new Error("Validation Failed: We didn't find the official headers 'جمهورية مصر العربية' or 'بطاقة تحقيق شخصية', so rejected.");
+    }
+    console.log("   ✅ Official Government Headers Verified.");
+
+    // ✅ RETURN THE LINES (Crucial for data extraction)
+    return lines;
 }
 
 
 // ==============================================================================
-// 🚀 MAIN VALIDATION FUNCTION (The Hybrid Controller)
+// 🚀 MAIN VALIDATION FUNCTION
 // ==============================================================================
 
 async function validateDocument(imageBuffer) {
@@ -112,13 +133,13 @@ async function validateDocument(imageBuffer) {
     console.log("🛡️ STARTING HYBRID 2-STAGE VALIDATION");
     console.log("============================================");
 
-    // ----- STAGE 1: THE AI MODEL GATEKEEPER -----
+    // ----- STAGE 1: AI MODEL -----
     console.log("1️⃣ STAGE 1: Custom AI Model Check...");
     try {
         const params = {
             Image: { Bytes: imageBuffer },
             ProjectVersionArn: CUSTOM_MODEL_ARN,
-            MinConfidence: 65 // Confidence Threshold
+            MinConfidence: 65 
         };
 
         const result = await rekognition.detectCustomLabels(params).promise();
@@ -130,54 +151,39 @@ async function validateDocument(imageBuffer) {
         );
 
         if (!match) {
-            // 🚨 STAGE 1 FAILED - REJECT IMMEDIATELY
-            console.error("❌ STAGE 1 FAILED: AI Model did not accept the document.");
-            if (customLabels.length > 0) {
-                 console.log(`   (Model saw: ${customLabels.map(l => `${l.Name} @ ${Math.round(l.Confidence)}%`).join(', ')})`);
-            }
-            throw new Error("Verification Failed: Our AI system does not recognize this as a valid Egyptian ID.");
+            console.error("❌ STAGE 1 FAILED.");
+            throw new Error("Validation Failed: The AI Model didn't recognize this as an Egyptian ID, so rejected.");
         }
-
         console.log(`✅ STAGE 1 PASSED: Model accepted as '${match.Name}' (${Math.round(match.Confidence)}%)`);
 
     } catch (err) {
-        // Catch AWS system errors specifically
         if (err.code === 'ResourceNotReadyException') throw new Error("System Error: AI Model is starting, please try again in 2 minutes.");
         if (err.code === 'ResourceNotFoundException') throw new Error("System Error: Model Configuration Error (wrong ARN).");
-        // Throw validation error back up
         throw err; 
     }
 
-
-    // ----- STAGE 2: THE SUPPORT CODE (STRICT LAYOUT CHECK) -----
-    // This only runs if Stage 1 passed without throwing an error.
-    console.log("\n2️⃣ STAGE 2: Running Strict Layout & Data Support Code...");
+    // ----- STAGE 2: STRICT LAYOUT -----
+    console.log("\n2️⃣ STAGE 2: Running Strict Layout Checks...");
     try {
-        // Run both checks in parallel for speed
-        await Promise.all([
+        // Run checks in parallel, capture the lines from the text check
+        const [_, textLines] = await Promise.all([
             performStrictFaceCheck(imageBuffer),
             performStrictTextDataCheck(imageBuffer)
         ]);
 
         console.log("\n🎉 FINAL RESULT: All Checks Passed. Document Accepted.");
-        return true;
+        
+        // Return the lines so the controller can use them
+        return textLines;
 
     } catch (supportError) {
-        // 🚨 STAGE 2 FAILED - REJECT
-        // Even though the AI liked it, it failed the strict rules.
         console.error(`❌ STAGE 2 FAILED: ${supportError.message}`);
-        // Re-throw the specific error message from the support code
         throw supportError;
     }
 }
 
-
-/**
- * MAIN VERIFICATION FLOW (Unchanged, just calls the new validateDocument)
- */
 async function verifyFaceMatch(sourceBase64, targetBase64) {
     try {
-        // 0. Hash Check
         const hash1 = crypto.createHash('md5').update(sourceBase64).digest('hex');
         const hash2 = crypto.createHash('md5').update(targetBase64).digest('hex');
         if (hash1 === hash2) return { isMatch: false, message: "Security Alert: You cannot use the same image file twice." };
@@ -185,10 +191,10 @@ async function verifyFaceMatch(sourceBase64, targetBase64) {
         const sourceBuffer = Buffer.from(sourceBase64.replace(/^data:image\/\w+;base64,/, ""), 'base64');
         const targetBuffer = Buffer.from(targetBase64.replace(/^data:image\/\w+;base64,/, ""), 'base64');
 
-        // 1. Run the new Hybrid Validation
-        await validateDocument(sourceBuffer);
+        // 1. Run Hybrid Validation & Get Text
+        const textLines = await validateDocument(sourceBuffer);
 
-        // 2. Face Matching (Only happens if Step 1 passes)
+        // 2. Face Matching
         const params = {
             SourceImage: { Bytes: sourceBuffer },
             TargetImage: { Bytes: targetBuffer },
@@ -201,7 +207,8 @@ async function verifyFaceMatch(sourceBase64, targetBase64) {
             return {
                 isMatch: true,
                 similarity: result.FaceMatches[0].Similarity,
-                confidence: result.FaceMatches[0].Face.Confidence
+                confidence: result.FaceMatches[0].Face.Confidence,
+                extractedText: textLines // ✅ Send text back to controller
             };
         } else {
             return { isMatch: false, message: "Face verification failed. The selfie does not match the photo on the ID." };
