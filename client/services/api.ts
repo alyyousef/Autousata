@@ -1,9 +1,15 @@
-const API_BASE_URL = 'http://localhost:5005/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5005') + '/api';
 
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
+
+type TransactionsResponse = {
+  page: number;
+  limit: number;
+  items: any[];
+};
 
 export interface KycItem {
   id: string;
@@ -87,7 +93,7 @@ class ApiService {
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Network error' };
     }
-  };
+  }
 
   // =========================================================
   // HELPER: Call the Backend to Swap Refresh Token
@@ -117,55 +123,16 @@ class ApiService {
   }
 
   // =========================================================
-  // 🟢 NEW: DOCUMENT VALIDATION (For Upload Button)
-  // =========================================================
-  async validateDocumentOnly(image: string) {
-    return this.request<{ success: boolean; message: string }>('/profile/validate-document', {
-      method: 'POST',
-      body: JSON.stringify({ image }),
-    });
-  }
-
-  async validateID(idImage: string) {
-    return this.request<{ success: boolean; message: string }>('/profile/validate-id', {
-      method: 'POST',
-      body: JSON.stringify({ idImage }),
-    });
-  }
-
-  async verifyIdentity(idImage: string, selfieImage: string) {
-    return this.request<{ 
-      success: boolean; 
-      status: string; 
-      similarity: number; 
-      message: string; 
-    }>('/profile/verify-identity', {
-      method: 'POST',
-      body: JSON.stringify({ idImage, selfieImage }),
-    });
-  }
-
-  async uploadKYC(file: File) {
-    const formData = new FormData();
-    formData.append('kycDocument', file); 
-
-    return this.request<{ kycStatus: string; kycDocumentUrl: string }>('/profile/kyc', {
-      method: 'PUT',
-      body: formData,
-    });
-  }
-
-  // =========================================================
   // AUTH METHODS
   // =========================================================
-  async resendOtp(email: string) {
-    return this.request<{ message: string }>('/auth/resend-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }
-
-  async register(firstName: string, lastName: string, email: string, phone: string, password: string, profileImage?: File) {
+  async register(
+    firstName: string,
+    lastName: string,
+    email: string,
+    phone: string,
+    password: string,
+    profileImage?: File
+  ) {
     const formData = new FormData();
     formData.append('firstName', firstName);
     formData.append('lastName', lastName);
@@ -174,7 +141,11 @@ class ApiService {
     formData.append('password', password);
     if (profileImage) formData.append('profileImage', profileImage);
 
-    const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/register', {
+    const response = await this.request<{
+      accessToken: string;
+      refreshToken: string;
+      user: any;
+    }>('/auth/register', {
       method: 'POST',
       body: formData,
     });
@@ -185,15 +156,12 @@ class ApiService {
     return response;
   }
 
-  async verifyEmailOtp(email: string, otp: string) {
-    return this.request('/auth/verify-email-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp }),
-    });
-  }
-
   async login(email: string, password: string) {
-    const response = await this.request<{ accessToken: string; refreshToken: string; user: any }>('/auth/login', {
+    const response = await this.request<{
+      accessToken: string;
+      refreshToken: string;
+      user: any;
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -209,8 +177,26 @@ class ApiService {
     return { data: { success: true } };
   }
 
+  async verifyEmailOtp(email: string, otp: string) {
+    return this.request('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  async resendOtp(email: string) {
+    return this.request<{ message: string }>('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
   async getCurrentUser() {
     return this.request<{ user: any }>('/auth/me');
+  }
+
+  async getLoginHistory() {
+    return this.request<{ loginHistory: any[] }>('/auth/login-history');
   }
 
   // =========================================================
@@ -231,128 +217,15 @@ class ApiService {
   }
 
   // =========================================================
-  // BROWSE / BUY-NOW METHODS
+  // PROFILE & KYC METHODS
   // =========================================================
-  async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
-    const qp = new URLSearchParams();
-    if (params.page) qp.set('page', params.page.toString());
-    if (params.limit) qp.set('limit', params.limit.toString());
-    if (params.make) qp.set('make', params.make);
-    if (params.minPrice) qp.set('minPrice', params.minPrice.toString());
-    if (params.maxPrice) qp.set('maxPrice', params.maxPrice.toString());
-    if (params.bodyType) qp.set('bodyType', params.bodyType);
-    if (params.sort) qp.set('sort', params.sort);
-    return this.request<{ vehicles: any[]; page: number; limit: number; total: number; totalPages: number }>(`/vehicles/browse?${qp.toString()}`);
-  }
-
-  async getLandingStats() {
-    return this.request<{ activeListings: number; verifiedSellers: number; soldVehicles: number; avgTimeToSell: string; escrowProtected: string }>('/vehicles/stats');
-  }
-
-  async getFeaturedVehicles() {
-    return this.request<{ vehicles: any[] }>('/vehicles/featured');
-  }
-
-  async getPublicVehicle(vehicleId: string) {
-    return this.request<any>(`/vehicles/browse/${vehicleId}`);
-  }
-
-  async createDirectPaymentIntent(vehicleId: string) {
-    return this.request<{
-      success: boolean;
-      clientSecret: string;
-      paymentId: string;
-      breakdown: {
-        vehiclePrice: number;
-        platformCommission: number;
-        stripeFee: number;
-        totalAmount: number;
-        sellerPayout: number;
-      };
-      vehicle: {
-        id: string;
-        title: string;
-      };
-    }>('/payments/create-direct-intent', {
-      method: 'POST',
-      body: JSON.stringify({ vehicleId }),
-    });
-  }
-
-  // =========================================================
-  // VEHICLE & AUCTION CREATION METHODS
-  // =========================================================
-  async createVehicle(data: any, files: File[]) {
-    const formData = new FormData();
-    Object.keys(data).forEach(key => {
-        if (data[key] !== undefined && data[key] !== null && key !== 'images') {
-             if(Array.isArray(data[key])) {
-                 formData.append(key, JSON.stringify(data[key]));
-             } else {
-                 formData.append(key, String(data[key]));
-             }
-        }
-    });
-    files.forEach((file) => {
-        formData.append('images', file);
-    });
-    return this.request<{ _id: string }>('/vehicles', {
-      method: 'POST',
-      body: formData, 
-    });
-  }
-
-  async createAuction(data: any) {
-    return this.request<any>('/auctions', {
-        method: 'POST',
-        body: JSON.stringify(data)
-    });
-  }
-
-  // =========================================================
-  // AUCTION & LISTING GETTERS
-  // =========================================================
-  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      sortBy,
-    });
-    return this.request<{ auctions: any[]; pagination: any }>(`/auctions?${queryParams.toString()}`);
-  }
-
-  async getAuctionById(auctionId: string) {
-    return this.request<any>(`/auctions/${auctionId}`);
-  }
-
-  async getAuctionBids(auctionId: string, limit = 20) {
-    const queryParams = new URLSearchParams({ limit: limit.toString() });
-    return this.request<{ bids: any[] }>(`/auctions/${auctionId}/bids?${queryParams.toString()}`);
-  }
-
-  async placeBid(auctionId: string, amount: number) {
-    return this.request<{ bid: any; currentBid: number }>(`/auctions/${auctionId}/bids`, {
-      method: 'POST',
-      body: JSON.stringify({ amount })
-    });
-  }
-
-  async getSellerVehicles() {
-    return this.request<any[]>('/vehicles');
-  }
-
-  async getVehicleById(vehicleId: string) {
-    return this.request<any>(`/vehicles/${vehicleId}`);
-  }
-
-  async getSellerAuctions() {
-    return this.request<{ auctions: any[] }>('/auctions/seller');
-  }
-
-  // =========================================================
-  // PROFILE METHODS
-  // =========================================================
-  async updateProfile(data: { name?: string; firstName?: string; lastName?: string; phone?: string; location?: { city: string; country?: string } }) {
+  async updateProfile(data: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    location?: { city: string; country?: string };
+  }) {
     return this.request<{ user: any }>('/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -366,6 +239,169 @@ class ApiService {
       method: 'PUT',
       body: formData,
     });
+  }
+
+  async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file);
+
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>(
+      '/profile/kyc',
+      {
+        method: 'PUT',
+        body: formData,
+      }
+    );
+  }
+
+  async validateID(idImage: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-id', {
+      method: 'POST',
+      body: JSON.stringify({ idImage }),
+    });
+  }
+
+  async validateDocumentOnly(image: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-document', {
+      method: 'POST',
+      body: JSON.stringify({ image }),
+    });
+  }
+
+  async verifyIdentity(idImage: string, selfieImage: string) {
+    return this.request<{ 
+      success: boolean; 
+      status: string; 
+      similarity: number; 
+      message: string; 
+    }>('/profile/verify-identity', {
+      method: 'POST',
+      body: JSON.stringify({ idImage, selfieImage }),
+    });
+  }
+
+  // =========================================================
+  // VEHICLE & AUCTION CREATION/GETTERS
+  // =========================================================
+  async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+        if (Array.isArray(data[key])) {
+          formData.append(key, JSON.stringify(data[key]));
+        } else {
+          formData.append(key, String(data[key]));
+        }
+      }
+    });
+    files.forEach((file) => {
+      formData.append('images', file);
+    });
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  async getSellerVehicles() {
+    return this.request<any[]>('/vehicles');
+  }
+
+  async getVehicleById(vehicleId: string) {
+    return this.request<any>(`/vehicles/${vehicleId}`);
+  }
+
+  async createAuction(data: any) {
+    return this.request<any>('/auctions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+    });
+    return this.request<{ auctions: any[]; pagination: any }>(
+      `/auctions?${queryParams.toString()}`
+    );
+  }
+
+  async getAuctionById(auctionId: string) {
+    return this.request<any>(`/auctions/${auctionId}`);
+  }
+
+  async getAuctionBids(auctionId: string, limit = 20) {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    return this.request<{ bids: any[] }>(
+      `/auctions/${auctionId}/bids?${queryParams.toString()}`
+    );
+  }
+
+  async placeBid(auctionId: string, amount: number) {
+    return this.request<{ bid: any; currentBid: number }>(
+      `/auctions/${auctionId}/bids`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }
+    );
+  }
+
+  async getSellerAuctions() {
+    return this.request<{ auctions: any[] }>('/auctions/seller');
+  }
+
+  // =========================================================
+  // PUBLIC BROWSE METHODS
+  // =========================================================
+  async browseVehicles(
+    params: {
+      page?: number;
+      limit?: number;
+      make?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      bodyType?: string;
+      sort?: string;
+    } = {}
+  ) {
+    const qp = new URLSearchParams();
+    if (params.page) qp.set('page', params.page.toString());
+    if (params.limit) qp.set('limit', params.limit.toString());
+    if (params.make) qp.set('make', params.make);
+    if (params.minPrice) qp.set('minPrice', params.minPrice.toString());
+    if (params.maxPrice) qp.set('maxPrice', params.maxPrice.toString());
+    if (params.bodyType) qp.set('bodyType', params.bodyType);
+    if (params.sort) qp.set('sort', params.sort);
+    
+    return this.request<{
+      vehicles: any[];
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }>(`/vehicles/browse?${qp.toString()}`);
+  }
+
+  async getLandingStats() {
+    return this.request<{
+      activeListings: number;
+      verifiedSellers: number;
+      soldVehicles: number;
+      avgTimeToSell: string;
+      escrowProtected: string;
+    }>('/vehicles/stats');
+  }
+
+  async getFeaturedVehicles() {
+    return this.request<{ vehicles: any[] }>('/vehicles/featured');
+  }
+
+  async getPublicVehicle(vehicleId: string) {
+    return this.request<any>(`/vehicles/browse/${vehicleId}`);
   }
 
   // =========================================================
@@ -394,6 +430,39 @@ class ApiService {
     });
   }
 
+  async createDirectPaymentIntent(vehicleId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        vehiclePrice: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      vehicle: {
+        id: string;
+        title: string;
+      };
+    }>('/payments/create-direct-intent', {
+      method: 'POST',
+      body: JSON.stringify({ vehicleId }),
+    });
+  }
+
+  async confirmPayment(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      paymentId: string;
+      escrowId: string;
+    }>(`/payments/${paymentId}/confirm`, {
+      method: 'POST',
+    });
+  }
+
   async getPaymentByAuction(auctionId: string) {
     return this.request<{
       success: boolean;
@@ -414,15 +483,26 @@ class ApiService {
     }>(`/payments/auction/${auctionId}`);
   }
 
-  async confirmPayment(paymentId: string) {
+  async getPaymentById(paymentId: string) {
     return this.request<{
       success: boolean;
-      message: string;
-      paymentId: string;
-      escrowId: string;
-    }>(`/payments/${paymentId}/confirm`, {
-      method: 'POST',
-    });
+      payment: {
+        id: string;
+        auctionId: string | null;
+        vehicleId: string | null;
+        purchaseType: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/${paymentId}`);
   }
 
   async getEscrowDetails(escrowId: string) {
@@ -467,103 +547,6 @@ class ApiService {
     });
   }
 
-  // =========================================================
-  // ADMIN METHODS
-  // =========================================================
-  async getPendingKYC() {
-    return this.request<KycItem[]>('/admin/kyc/pending', { method: 'GET' });
-  }
-
-  async getLiveAuctions() {
-    return this.request<unknown[]>('/admin/auctions/live', { method: 'GET' });
-  }
-
-  async getPendingPayments() {
-    return this.request<unknown[]>('/admin/payments/pending', { method: 'GET' });
-  }
-
-  async adminListUsers(page = 1, limit = 20) {
-    return this.request<{
-      items: any[];
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
-  }
-
-  async getPaymentById(paymentId: string) {
-    return this.request<{
-      success: boolean;
-      payment: {
-        id: string;
-        auctionId: string | null;
-        vehicleId: string | null;
-        purchaseType: string;
-        amountEGP: number;
-        status: string;
-        initiatedAt: string;
-        completedAt?: string;
-        escrow?: {
-          id: string;
-          status: string;
-          commissionEGP: number;
-          sellerPayoutEGP: number;
-        };
-      };
-    }>(`/payments/${paymentId}`);
-  }
-
-  async adminGetUserTransactions(userId: string, queryString: string) {
-    const qs = queryString ? `?${queryString}` : "";
-    return this.request<any>(
-      `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
-      { method: "GET" }
-    );
-  }
-  
-  async adminSuspendUser(userId: string, body: { reason: string }) {
-    return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
-  }
-
-  async adminReactivateUser(userId: string) {
-    return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
-      method: "PATCH",
-    });
-  }
-
-  async adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
-    return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
-  }
-
-  async adminGetRevenueDashboard(params: { from: string; to: string; groupBy?: "day" | "week" | "month" }) {
-    const qs = new URLSearchParams({
-      from: params.from,
-      to: params.to,
-      groupBy: params.groupBy || "day",
-    }).toString();
-    return this.request(`/admin/finance/revenue?${qs}`, { method: "GET" });
-  }
-
-  async adminSearchUsers(q: string, page = 1, limit = 20) {
-    return this.request<{
-      items: any[];
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-    }>(
-      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
-      { method: "GET" }
-    );
-  }
-
   async getDisputedEscrows() {
     return this.request<{
       success: boolean;
@@ -600,6 +583,81 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ reason, amount }),
     });
+  }
+
+  // =========================================================
+  // ADMIN METHODS
+  // =========================================================
+  async getPendingKYC() {
+    return this.request<KycItem[]>('/admin/kyc/pending', { method: 'GET' });
+  }
+
+  async getLiveAuctions() {
+    return this.request<unknown[]>('/admin/auctions/live', { method: 'GET' });
+  }
+
+  async getPendingPayments() {
+    return this.request<unknown[]>('/admin/payments/pending', { method: 'GET' });
+  }
+
+  async adminListUsers(page = 1, limit = 20) {
+    return this.request<{
+      items: any[];
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }>(`/admin/users?page=${page}&limit=${limit}`, { method: "GET" });
+  }
+
+  async adminSearchUsers(q: string, page = 1, limit = 20) {
+    return this.request<{
+      items: any[];
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    }>(
+      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+      { method: 'GET' }
+    );
+  }
+
+  async adminGetUserTransactions(userId: string, queryString: string) {
+    const qs = queryString ? `?${queryString}` : "";
+    return this.request<TransactionsResponse>(
+      `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
+      { method: "GET" }
+    );
+  }
+  
+  async adminSuspendUser(userId: string, body: { reason: string }) {
+    return this.request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async adminReactivateUser(userId: string) {
+    return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
+      method: "PATCH",
+    });
+  }
+
+  async adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
+    return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async adminGetRevenueDashboard(params: { from: string; to: string; groupBy?: "day" | "week" | "month" }) {
+    const qs = new URLSearchParams({
+      from: params.from,
+      to: params.to,
+      groupBy: params.groupBy || "day",
+    }).toString();
+    return this.request(`/admin/finance/revenue?${qs}`, { method: "GET" });
   }
 }
 

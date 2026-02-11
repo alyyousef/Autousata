@@ -13,6 +13,7 @@ import {
   type RevenueDashboardResponse,
   type RevenueGroupBy,
 } from "../services/adminApi";
+import { TableRowSkeleton, StatsCardSkeleton } from '../components/LoadingSkeleton';
 
 const kpiCard = (
   title: string,
@@ -315,29 +316,40 @@ const AdminRevenueDashboard: React.FC = () => {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-          {kpiCard(
-            "Platform Revenue",
-            money(kpis?.commissionEgp || 0),
-            <TrendingUp size={22} />,
-            "Commission earned"
-          )}
-          {kpiCard(
-            "GMV",
-            money(kpis?.gmvEgp || 0),
-            <Wallet size={22} />,
-            "Total transaction volume"
-          )}
-          {kpiCard(
-            "Seller Payout",
-            money(kpis?.sellerPayoutEgp || 0),
-            <Receipt size={22} />,
-            "Paid out to sellers"
-          )}
-          {kpiCard(
-            "Gateway Fees",
-            money(kpis?.processorFeesEgp || 0),
-            <ShieldAlert size={22} />,
-            "Processor costs"
+          {loading ? (
+            <>
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+            </>
+          ) : (
+            <>
+              {kpiCard(
+                "Platform Revenue",
+                money(kpis?.commissionEgp || 0),
+                <TrendingUp size={22} />,
+                "Commission earned"
+              )}
+              {kpiCard(
+                "GMV",
+                money(kpis?.gmvEgp || 0),
+                <Wallet size={22} />,
+                "Total transaction volume"
+              )}
+              {kpiCard(
+                "Seller Payout",
+                money(kpis?.sellerPayoutEgp || 0),
+                <Receipt size={22} />,
+                "Paid out to sellers"
+              )}
+              {kpiCard(
+                "Gateway Fees",
+                money(kpis?.processorFeesEgp || 0),
+                <ShieldAlert size={22} />,
+                "Processor costs"
+              )}
+            </>
           )}
         </div>
 
@@ -464,11 +476,9 @@ const AdminRevenueDashboard: React.FC = () => {
 
               <tbody className="divide-y divide-slate-100">
                 {loading && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-sm text-slate-500">
-                      Loading...
-                    </td>
-                  </tr>
+                  [...Array(10)].map((_, i) => (
+                    <TableRowSkeleton key={i} columns={4} />
+                  ))
                 )}
 
                 {!loading && (data?.series?.length || 0) === 0 && (

@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, BadgeCheck, Ban, CreditCard, Gavel, Shield, User, Wallet  ,PauseCircle, PlayCircle, FileText, Link as LinkIcon, AlertTriangle } from "lucide-react";
-import { getUserTransactions, type AdminUserSearchResult, type TransactionType, type UserTransactionItem , suspendUser, reactivateUser, banUser  } from "../services/adminApi";
+import {
+  getUserTransactions,
+  suspendUser,
+  reactivateUser,
+  banUser,
+  updateUserRole,
+  type AdminUserSearchResult,
+  type TransactionType,
+  type UserTransactionItem,
+} from "../services/adminApi";
 
 
 
@@ -36,9 +45,12 @@ const TypeIcon: React.FC<{ type: TransactionType }> = ({ type }) => {
 const AdminUserProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const location = useLocation();
+  const locationState = location.state as { user?: AdminUserSearchResult; token?: string } | undefined;
 
   // We prefer to receive basic user data from previous page via Link state
-const passedUser = (location.state as any)?.user as AdminUserSearchResult | undefined;
+const passedUser = locationState?.user;
+const adminToken = locationState?.token;
+const effectiveToken = adminToken || localStorage.getItem("accessToken") || undefined;
 
   const [tab, setTab] = useState<"overview" | "transactions">("overview");
 
@@ -50,6 +62,7 @@ const passedUser = (location.state as any)?.user as AdminUserSearchResult | unde
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 const [user, setUser] = useState<AdminUserSearchResult | undefined>(passedUser);
+const [selectedRole, setSelectedRole] = useState<string>(passedUser?.role || "client");
 
 const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
@@ -62,6 +75,13 @@ const [evidenceLinks, setEvidenceLinks] = useState<string>(""); // one per line
 const [evidenceNotes, setEvidenceNotes] = useState<string>("");
 
 const [actionLoading, setActionLoading] = useState(false);
+const [roleUpdating, setRoleUpdating] = useState(false);
+
+useEffect(() => {
+  if (user?.role) {
+    setSelectedRole(user.role);
+  }
+}, [user?.role]);
 
  const displayName = useMemo(() => {
   const fn = user?.firstName || "";
@@ -183,6 +203,37 @@ const onBan = async () => {
     showToast("err", e instanceof Error ? e.message : "Failed to ban user");
   } finally {
     setActionLoading(false);
+  }
+};
+
+const roleOptions: Array<"inspector" | "admin" | "client"> = ["inspector", "admin", "client"];
+
+const handleRoleUpdate = async () => {
+  if (!userId) return;
+  const normalizedRole = selectedRole.trim();
+  const currentRole = user?.role || "";
+  if (!normalizedRole) {
+    showToast("err", "Role cannot be empty.");
+    return;
+  }
+  if (normalizedRole === currentRole) {
+    showToast("ok", "Role unchanged.");
+    return;
+  }
+
+  setRoleUpdating(true);
+  try {
+    const res = await updateUserRole(userId, normalizedRole, effectiveToken);
+    if (!res.ok) {
+      showToast("err", res.message || "Failed to update user role");
+      return;
+    }
+    setUser((prev) => (prev ? { ...prev, role: normalizedRole } : prev));
+    showToast("ok", "Role updated successfully.");
+  } catch (e) {
+    showToast("err", e instanceof Error ? e.message : "Failed to update user role");
+  } finally {
+    setRoleUpdating(false);
   }
 };
 
@@ -483,6 +534,26 @@ const onBan = async () => {
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
             <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Role</div>
             <div className="mt-2 text-sm font-bold text-slate-900">{user?.role || "-"}</div>
+            <div className="mt-3 flex flex-col gap-3">
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              >
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleRoleUpdate}
+                disabled={roleUpdating}
+                className="inline-flex items-center justify-center px-3 py-2 text-xs font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {roleUpdating ? "Updating..." : "Apply Role"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">

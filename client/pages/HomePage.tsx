@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { apiService } from '../services/api';
 import ImageLightbox from '../components/ImageLightbox';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
+import { CardGridSkeleton } from '../components/LoadingSkeleton';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'year_desc';
 type SearchFilter = 'all' | 'make' | 'model' | 'year' | 'location';
@@ -108,6 +109,21 @@ const HomePage: React.FC = () => {
     setSearchTerm(queryFromUrl);
   }, [queryFromUrl]);
 
+  // Refetch vehicles when user returns to this page (e.g., after purchase)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchVehicles();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchVehicles]);
+
   // Search suggestions derived from fetched vehicles
   const searchSuggestions = useMemo(() => {
     const values = new Set<string>();
@@ -156,6 +172,18 @@ const HomePage: React.FC = () => {
     });
   }, [vehicles, searchTerm, searchFilter, conditionFilter]);
 
+  // Static buyer insight demo data
+  const buyerBidHistory = [
+    { id: 'bh-1', vehicle: '2021 Porsche 911 Carrera', amount: 95000, status: 'Leading' },
+    { id: 'bh-2', vehicle: '2022 Audi RS7', amount: 88000, status: 'Outbid' }
+  ];
+  const buyerNotifications = [
+    'Outbid on 2022 Audi RS7. Increase your max to regain the lead.',
+    'Proxy bid placed at EGP 95,000 on 2021 Porsche 911.'
+  ];
+  const buyerPayments = [
+    { id: 'pay-1', vehicle: '2019 BMW M4 Competition', status: 'Unpaid', amount: 120000 }
+  ];
   return (
     <>
       <div className="bg-slate-50 min-h-screen pb-20">
@@ -179,6 +207,73 @@ const HomePage: React.FC = () => {
               <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-emerald-400" />{t('Verified sellers', 'بائعون موثقون')}</div>
               <div className="flex items-center gap-2"><Tag size={16} className="text-amber-300" />{t('Transparent pricing', 'اسعار واضحة')}</div>
               <div className="flex items-center gap-2"><Clock size={16} className="text-indigo-300" />{t('Clear time remaining', 'وقت متبق واضح')}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Buyer Insights Panel */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 relative z-10">
+          <div className="buyer-insights-panel mx-auto max-w-6xl bg-white/95 border border-slate-200 rounded-3xl p-6 md:p-8 shadow-lg premium-card-hover no-hover-rise">
+            <div className="mb-6 text-center">
+              <h3 className="text-xl font-semibold text-slate-900">{t('Bid history, notifications, and payments', 'سجل المزايدات والاشعارات والمدفوعات')}</h3>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-3 text-left">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Bid history', 'سجل المزايدات')}</h4>
+                <div className="space-y-4 text-sm">
+                  {buyerBidHistory.map(entry => (
+                    <div key={entry.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+                      <div className="space-y-2">
+                        <p className="text-slate-800 font-semibold">{entry.vehicle}</p>
+                        <span className={`buyer-insights-status inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                          entry.status === 'Leading'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          {entry.status === 'Leading' ? t('Leading', 'متقدم') : t('Outbid', 'تم تجاوزك')}
+                        </span>
+                      </div>
+                      <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
+                        {formatCurrencyEGP(entry.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Outbid notifications', 'اشعارات تجاوز المزايدة')}</h4>
+                <div className="space-y-4 text-sm text-slate-600">
+                  {buyerNotifications.map((note, index) => (
+                    <div key={index} className="buyer-insights-note w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-700">
+                      {t(note, 'اتسبقت في المزايدة. زود الحد الأقصى عشان ترجع الأول.')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800 mb-4">{t('Payment status', 'حالة الدفع')}</h4>
+                <div className="space-y-4 text-sm">
+                  {buyerPayments.map(payment => (
+                    <div key={payment.id} className="buyer-insights-item flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-4">
+                      <div className="space-y-2">
+                        <p className="text-slate-800 font-semibold">{payment.vehicle}</p>
+                        <span className="buyer-insights-status inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                          {payment.status === 'Unpaid' ? t('Unpaid', 'غير مدفوع') : payment.status}
+                        </span>
+                      </div>
+                      <span className="buyer-insights-amount inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white whitespace-nowrap">
+                        {formatCurrencyEGP(payment.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="buyer-insights-helper text-xs text-slate-400 mt-3">
+                    {t(
+                      'Payment methods and Stripe checkout are placeholders for API integration.',
+                      'طرق الدفع وStripe دلوقتي مجرد شكل تجريبي لحد ما API يتوصل.'
+                    )}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -220,27 +315,38 @@ const HomePage: React.FC = () => {
                 <option key={value} value={value} />
               ))}
             </datalist>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
-              {[
-                { value: 'all', label: t('All', 'الكل') },
-                { value: 'make', label: t('Make', 'الماركة') },
-                { value: 'model', label: t('Model', 'الموديل') },
-                { value: 'year', label: t('Year', 'السنة') },
-                { value: 'location', label: t('Location', 'الموقع') }
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setSearchFilter(option.value as SearchFilter)}
-                  className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
-                    searchFilter === option.value
-                      ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              {/* <div className="flex flex-wrap items-center gap-2 text-xs">
+                {[
+                  { value: 'all', label: t('All', 'الكل') },
+                  { value: 'make', label: t('Make', 'الماركة') },
+                  { value: 'model', label: t('Model', 'الموديل') },
+                  { value: 'year', label: t('Year', 'السنة') },
+                  { value: 'location', label: t('Location', 'الموقع') }
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSearchFilter(option.value as SearchFilter)}
+                    className={`rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors ${
+                      searchFilter === option.value
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div> */}
+              <button
+                type="button"
+                onClick={() => fetchVehicles()}
+                disabled={loading}
+                className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] border border-slate-200 bg-white text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 size={12} className="animate-spin" /> : null}
+                {t('Refresh', 'تحديث')}
+              </button>
             </div>
 
             <div className="mt-6 space-y-6">
@@ -289,9 +395,7 @@ const HomePage: React.FC = () => {
         {/* Vehicle Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-slate-400" size={32} />
-            </div>
+            <CardGridSkeleton count={12} />
           ) : error ? (
             <div className="bg-white/95 border border-rose-200 rounded-2xl p-8 text-center">
               <p className="text-lg font-semibold text-rose-700 mb-2">{t('Error loading vehicles', 'خطأ في تحميل السيارات')}</p>

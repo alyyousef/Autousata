@@ -295,11 +295,19 @@ exports.confirmPayment = async (req, res) => {
         }
 
         // For direct purchases, mark vehicle as sold
+        // SAFETY CHECK: Only update if vehicle is currently 'active'
         if (payment.vehicleId) {
-            await connection.execute(
-                `UPDATE VEHICLES SET STATUS = 'sold' WHERE ID = :vehicleId`,
+            const updateResult = await connection.execute(
+                `UPDATE VEHICLES 
+                 SET STATUS = 'sold' 
+                 WHERE ID = :vehicleId 
+                   AND STATUS = 'active'`,
                 { vehicleId: payment.vehicleId }
             );
+            
+            if (updateResult.rowsAffected === 0) {
+                console.warn(`⚠ Vehicle ${payment.vehicleId} NOT marked as sold in confirmPayment - may already be sold or not active`);
+            }
         }
 
         await connection.commit();
@@ -563,6 +571,12 @@ async function handlePaymentIntentSucceeded(paymentIntent, connection) {
         return;
     }
 
+    // ✅ CRITICAL: Verify payment intent status is truly 'succeeded'
+    if (paymentIntent.status !== 'succeeded') {
+        console.warn(`⚠ Webhook received for payment_intent.succeeded but status is '${paymentIntent.status}' for payment ${paymentId}`);
+        return;
+    }
+
     // Update payment status
     const updateResult = await connection.execute(
         `UPDATE PAYMENTS 
@@ -578,13 +592,47 @@ async function handlePaymentIntentSucceeded(paymentIntent, connection) {
         }
     );
 
+    if (updateResult.rowsAffected === 0) {
+        console.warn(`⚠ Payment ${paymentId} was not updated - may already be completed or not found`);
+        return; // Don't proceed if payment wasn't updated
+    }
+
+    console.log(`✓ Payment ${paymentId} marked as completed via webhook`);
+
     // If this is a direct purchase, mark vehicle as sold
+    // SAFETY CHECK: Only update if vehicle is currently 'active' and no other completed payment exists
     if (purchaseType === 'direct' && vehicleId) {
-        await connection.execute(
-            `UPDATE VEHICLES SET STATUS = 'sold' WHERE ID = :vehicleId`,
+        const updateResult = await connection.execute(
+            `UPDATE VEHICLES 
+             SET STATUS = 'sold' 
+             WHERE ID = :vehicleId 
+               AND STATUS = 'active'
+               AND ID NOT IN (
+                   SELECT VEHICLE_ID FROM PAYMENTS 
+                   WHERE VEHICLE_ID = :vehicleId 
+                     AND STATUS = 'completed'
+                     AND ID != :paymentId
+               )`,
+            { vehicleId, paymentId },
+            { autoCommit: false }
+        );
+        
+        if (updateResult.rowsAffected > 0) {
+            console.log(`✓ Vehicle ${vehicleId} marked as sold via webhook (${updateResult.rowsAffected} rows affected)`);
+        } else {
+            console.warn(`⚠ Vehicle ${vehicleId} NOT marked as sold - may already be sold or not active`);
+        }
+        
+        // Verify update
+        const verifyResult = await connection.execute(
+            `SELECT STATUS FROM VEHICLES WHERE ID = :vehicleId`,
             { vehicleId }
         );
-        console.log(`Vehicle ${vehicleId} marked as sold`);
+        if (verifyResult.rows.length > 0) {
+            console.log(`✓ Verification: Vehicle ${vehicleId} status is now: ${verifyResult.rows[0][0]}`);
+        } else {
+            console.error(`✗ WARNING: Could not verify vehicle ${vehicleId} after status update`);
+        }
 
         // Create escrow record for direct purchase
         const metadata = paymentIntent.metadata;
@@ -719,17 +767,29 @@ exports.createDirectPaymentIntent = async (req, res) => {
             return res.status(400).json({ error: 'vehicleId is required' });
         }
 
-        // Check vehicle availability (but don't mark as sold yet)
+        // ✅ Enhanced availability check - ensures vehicle is truly available
+        // Checks: 1) Vehicle is active, 2) Not in an active auction, 3) No pending/completed payments
         const availabilityCheck = await connection.execute(
             `SELECT COUNT(*) FROM VEHICLES 
-             WHERE ID = :vehicleId AND STATUS = 'active'
-               AND ID NOT IN (SELECT VEHICLE_ID FROM AUCTIONS WHERE STATUS NOT IN ('cancelled'))
-               AND ID NOT IN (SELECT VEHICLE_ID FROM PAYMENTS WHERE STATUS = 'pending' AND VEHICLE_ID IS NOT NULL)`,
+             WHERE ID = :vehicleId 
+               AND STATUS = 'active'
+               AND ID NOT IN (
+                   SELECT VEHICLE_ID FROM AUCTIONS 
+                   WHERE STATUS NOT IN ('cancelled')
+               )
+               AND ID NOT IN (
+                   SELECT VEHICLE_ID FROM PAYMENTS 
+                   WHERE VEHICLE_ID IS NOT NULL 
+                     AND STATUS IN ('pending', 'completed')
+               )`,
             { vehicleId }
         );
 
         if (availabilityCheck.rows[0][0] === 0) {
-            return res.status(409).json({ error: 'Vehicle is no longer available for purchase' });
+            return res.status(409).json({ 
+                error: 'Vehicle is no longer available for purchase',
+                message: 'This vehicle may have been sold or is currently being purchased by another buyer.'
+            });
         }
 
         // Fetch vehicle details

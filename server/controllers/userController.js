@@ -1,7 +1,35 @@
 const oracledb = require('oracledb');
 const db = require('../config/db');
 const { uploadToS3 } = require('../middleware/uploadMiddleware');
-const { verifyFaceMatch, validateDocument } = require('../services/rekognitionService'); // ✅ Imported validateDocument
+const { verifyFaceMatch, validateDocument } = require('../services/rekognitionService');
+const { sellerlistings, garagelisting } = require('../services/userService');
+
+// ==========================================
+// HELPER: Parse Egyptian ID Text (From Rekognition Lines)
+// ==========================================
+function parseIDText(lines) {
+    const data = { name: "", address: "" };
+    
+    // Filter out obvious headers or short garbage text
+    const cleanLines = lines.filter(l => 
+        !l.includes("جمهورية") && !l.includes("مصر") && !l.includes("وزارة") && 
+        !l.includes("بطاقة") && !l.includes("شخصية") && l.length > 3
+    );
+
+    // 1. Find ID Number Index (The anchor point)
+    const idIndex = cleanLines.findIndex(l => /\d{14}/.test(l));
+
+    if (idIndex > -1) {
+        // Address is usually the 2 lines directly ABOVE the ID number
+        const addressParts = cleanLines.slice(Math.max(0, idIndex - 2), idIndex);
+        data.address = addressParts.join("، "); 
+        
+        // Name is usually the lines BEFORE the address
+        const nameParts = cleanLines.slice(0, Math.max(0, idIndex - 2));
+        data.name = nameParts.slice(0, 2).join(" ");
+    }
+    return data;
+}
 
 // ==========================================
 // 1. UPDATE TEXT PROFILE
@@ -75,26 +103,20 @@ async function updateAvatar(req, res) {
     try {
         console.log(`📸 Uploading avatar for User ID: ${userId}`);
 
-        // A. Upload to AWS S3
         const avatarUrl = await uploadToS3(file, 'avatars');
         if (!avatarUrl) throw new Error('S3 Upload failed');
 
-        // B. Update Database Record
         connection = await db.getConnection();
         
-        const sql = `
-            UPDATE users 
-            SET profile_pic_url = :url,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :u_id
-        `;
+        await connection.execute(
+            `UPDATE users 
+             SET profile_pic_url = :url,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = :u_id`,
+            { url: avatarUrl, u_id: userId },
+            { autoCommit: true }
+        );
 
-        await connection.execute(sql, {
-            url: avatarUrl,
-            u_id: userId
-        }, { autoCommit: true });
-
-        // C. Respond
         res.json({
             message: 'Profile picture updated successfully',
             avatar: avatarUrl
@@ -111,24 +133,18 @@ async function updateAvatar(req, res) {
 }
 
 // ==========================================
-// 3. UPLOAD KYC DOCUMENT (Old method, kept for safety)
+// 3. UPLOAD KYC DOCUMENT (Legacy)
 // ==========================================
 async function uploadKYC(req, res) {
   let connection;
   try {
-    if (!req.file) {
-      return res.status(400).json({ msg: 'No file uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ msg: 'No file uploaded' });
 
-    // 1. Upload PDF to S3 'kyc' folder
     console.log('📄 Uploading KYC Document...');
     const kycUrl = await uploadToS3(req.file, 'kyc');
 
-    if (!kycUrl) {
-      throw new Error('Failed to upload to S3');
-    }
+    if (!kycUrl) throw new Error('Failed to upload to S3');
 
-    // 2. Update User Record in DB
     connection = await oracledb.getConnection();
     
     await connection.execute(
@@ -157,7 +173,7 @@ async function uploadKYC(req, res) {
 }
 
 // ==========================================
-// 4. VALIDATE ID STEP (NEW)
+// 4. VALIDATE ID STEP (AI Check)
 // ==========================================
 async function validateIDStep(req, res) {
     const { idImage } = req.body;
@@ -165,10 +181,7 @@ async function validateIDStep(req, res) {
 
     try {
         const buffer = Buffer.from(idImage.replace(/^data:image\/\w+;base64,/, ""), 'base64');
-        
-        // This throws an error if validation fails
-        await validateDocument(buffer);
-
+        await validateDocument(buffer); // Throws error if invalid
         res.json({ success: true, message: "ID accepted." });
     } catch (error) {
         console.error("❌ ID Validation Failed:", error.message);
@@ -177,53 +190,72 @@ async function validateIDStep(req, res) {
 }
 
 // ==========================================
-// 5. VERIFY IDENTITY (FINAL STEP)
+// 5. VERIFY IDENTITY (Final Step + Text Extraction)
 // ==========================================
 async function verifyIdentity(req, res) {
     const { idImage, selfieImage } = req.body;
     const userId = req.user.id || req.user.userId; 
 
-    if (!idImage || !selfieImage) {
-        return res.status(400).json({ error: "Both ID image and Selfie are required." });
-    }
+    if (!idImage || !selfieImage) return res.status(400).json({ error: "Missing images." });
 
     let connection;
-
     try {
-        console.log(`🔍 Starting AI Verification for User ID: ${userId}...`);
+        console.log(`🔍 Verifying User: ${userId}...`);
 
-        // 1. Call AWS Rekognition Service
+        // 1. Run Verification (Rekognition)
         const result = await verifyFaceMatch(idImage, selfieImage);
 
-        console.log("🤖 AI Result:", result);
-
         if (result.isMatch && result.similarity > 85) {
-            // 2. SUCCESS: Update Database instantly
+            
+            // 2. Parse Text (Using data from Rekognition)
+            const { name, address } = parseIDText(result.extractedText || []);
+            console.log(`   📝 Extracted: Name=[${name}], Addr=[${address}]`);
+
+            // 3. Upload Images to S3
+            const idBuffer = Buffer.from(idImage.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+            const selfieBuffer = Buffer.from(selfieImage.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+
+            const [kycUrl, selfieUrl] = await Promise.all([
+                uploadToS3({ buffer: idBuffer, originalname: `id_${userId}.jpg`, mimetype: 'image/jpeg' }, 'kyc'),
+                uploadToS3({ buffer: selfieBuffer, originalname: `selfie_${userId}.jpg`, mimetype: 'image/jpeg' }, 'kyc')
+            ]);
+
+            // 4. Update Database
             connection = await db.getConnection();
             
-            await connection.execute(
-                `UPDATE users 
-                 SET kyc_status = 'verified', 
-                     kyc_verified_at = CURRENT_TIMESTAMP
-                 WHERE id = :id`,
-                { id: userId },
-                { autoCommit: true }
-            );
+            // Simple logic to guess a "City" from the full address
+            const shortCity = address.split(',').pop()?.trim() || "Egypt";
 
-            return res.json({ 
+            const sql = `
+                UPDATE users 
+                SET kyc_status = 'verified', 
+                    kyc_verified_at = CURRENT_TIMESTAMP,
+                    kyc_document_url = :doc_url,
+                    profile_pic_url = :selfie_url,
+                    kyc_address_from_id = :addr,
+                    kyc_name_from_id = :full_name,
+                    location_city = NVL(location_city, :short_addr) 
+                WHERE id = :u_id
+            `;
+
+            await connection.execute(sql, {
+                doc_url: kycUrl,
+                selfie_url: selfieUrl,
+                addr: address || "Address Not Detectable",
+                full_name: name || "Name Not Detectable",
+                short_addr: shortCity,
+                u_id: userId
+            }, { autoCommit: true });
+
+            res.json({ 
                 success: true, 
                 status: 'verified', 
-                similarity: result.similarity,
-                message: "Identity verified successfully!" 
+                message: "Identity verified & data extracted!",
+                extractedData: { name, address }
             });
+
         } else {
-            // 3. FAIL: Mismatch
-            return res.status(400).json({ 
-                success: false, 
-                status: 'failed', 
-                similarity: result.similarity,
-                error: result.message || "Face mismatch. Please retake the photos." 
-            });
+            res.status(400).json({ success: false, error: result.message || "Face mismatch." });
         }
 
     } catch (error) {
@@ -236,11 +268,41 @@ async function verifyIdentity(req, res) {
     }
 }
 
+// ==========================================
+// 6. SELLER LISTINGS (From Incoming Changes)
+// ==========================================
+const sellerListingsController = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const listings = await sellerlistings(userId);
+        res.status(200).json({ data: listings });
+    } catch (error) {
+        console.error('Error fetching seller listings:', error);
+        res.status(400).json({ error: 'Failed to fetch listings' });
+    }
+}
+
+// ==========================================
+// 7. GARAGE LISTINGS (From Incoming Changes)
+// ==========================================
+const garageController = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const listings = await garagelisting(userId);
+        res.status(200).json({ data: listings });
+    } catch (error) {
+        console.error('Error fetching garage listings:', error);
+        res.status(400).json({ error: 'Failed to fetch listings' });
+    }
+}
+
 // ✅ EXPORT ALL FUNCTIONS
 module.exports = { 
     updateProfile, 
     updateAvatar, 
     uploadKYC,
     validateIDStep,
-    verifyIdentity
+    verifyIdentity,
+    sellerListingsController,
+    garageController
 };

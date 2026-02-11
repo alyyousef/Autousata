@@ -45,6 +45,7 @@ const getVehicles = async () => {
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
             sale_type: v.SALE_TYPE,
+            images:v.IMAGES,
         }));
     } catch (error) {
         console.error('Error fetching vehicles:', error);
@@ -60,7 +61,75 @@ const getVehicles = async () => {
     }
 };
 
-
+const getVehicle=async(vehicleId)=>{
+    let connection;
+    try{
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT V.*, 
+                    CASE WHEN A.ID IS NOT NULL THEN 'auction' ELSE 'fixed_price' END AS SALE_TYPE,
+                    U.FIRST_NAME||' '||U.LAST_NAME AS SELLER_NAME,
+                    U.BIO,
+                    U.LOCATION_CITY AS SELLER_LOCATION,
+                    U.EMAIL AS SELLER_EMAIL,
+                    U.PHONE AS SELLER_PHONE
+            FROM DIP.VEHICLES V
+            LEFT JOIN DIP.AUCTIONS A ON A.VEHICLE_ID = V.ID AND A.STATUS NOT IN ('cancelled')
+            JOIN DIP.USERS U ON V.SELLER_ID = U.ID
+            WHERE V.ID = :vehicleId`,
+            {vehicleId},
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        
+        return result.rows.map((v) => ({
+            id: v.ID,
+            sellerId: v.SELLER_ID,
+            make: v.MAKE,
+            model: v.MODEL,
+            year: v.YEAR_MFG,
+            milage: v.MILEAGE_KM,
+            vin: v.VIN,
+            plate_number: v.PLATE_NUMBER,
+            color: v.COLOR,
+            body_type: v.BODY_TYPE,
+            transmission: v.TRANSMISSION,
+            fuel_type: v.FUEL_TYPE,
+            seats: v.SEATS, 
+            car_condition: v.CAR_CONDITION,
+            price: v.PRICE_EGP, 
+            status: v.STATUS,
+            currency: v.CURRENCY,
+            description: v.DESCRIPTION,
+            location: v.LOCATION_CITY,
+            features: v.FEATURES,
+            inspection_req: v.INSPECTION_REQ,
+            inspection_report: v.INSPECTION_REPORT_ID,
+            createdAt: v.CREATED_AT,
+            updatedAt: v.UPDATED_AT,
+            publishedAt: v.PUBLISHED_AT,
+            deletedAt: v.DELETED_AT,
+            viewCount: v.VIEW_COUNT,
+            sale_type: v.SALE_TYPE,
+            images:v.IMAGES,
+            seller_name:v.SELLER_NAME,
+            seller_bio:v.BIO,
+            seller_email:v.SELLER_EMAIL,
+            seller_location:v.SELLER_LOCATION,
+            seller_phone:v.SELLER_PHONE
+        }));
+    } catch (error) {
+        console.error('Error fetching vehicle:', error);
+        throw error;
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (err) {
+                console.error('Error closing connection:', err);
+            }
+        }
+    }
+}
 
 const filterstatusVehicles = async (filter) => {
     let connection;
@@ -106,6 +175,7 @@ const filterstatusVehicles = async (filter) => {
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
             sale_type: v.SALE_TYPE,
+            images:v.IMAGES,
         }));
     } catch (error) {
         console.error('Error filtering vehicles by status:', error);
@@ -169,6 +239,7 @@ const searchVehicles = async (searchTerm) => {
             deletedAt: v.DELETED_AT,
             viewCount: v.VIEW_COUNT,
             sale_type: v.SALE_TYPE,
+            images:v.IMAGES,
         }));
     }
     catch (error) {
@@ -853,5 +924,6 @@ module.exports = {
     addinspectionreport,
     selectinspector,
     viewreport,
-    editreport
+    editreport,
+    getVehicle
 };

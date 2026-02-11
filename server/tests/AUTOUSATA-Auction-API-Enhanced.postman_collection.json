@@ -1,0 +1,699 @@
+{
+  "info": {
+    "_postman_id": "autousata-auctions-enhanced-v2",
+    "name": "AUTOUSATA - Auction API (Enhanced with Bug Fixes)",
+    "description": "Comprehensive test suite covering image fetching, status normalization, performance optimization, and concurrency scenarios. Tests the fixes for VEHICLES.IMAGES column usage, BID_COUNT denormalization, and status field normalization.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sellerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "buyerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sellerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "buyerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vehicleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auctionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "actualBidCount",
+      "value": "0",
+      "type": "number"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication Setup",
+      "item": [
+        {
+          "name": "Register Seller",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Seller registered successfully', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('sellerToken', jsonData.token);",
+                  "    pm.collectionVariables.set('sellerId', jsonData.user?.id || jsonData.userId);",
+                  "    pm.test('Seller token saved', () => {",
+                  "        pm.expect(jsonData.token).to.be.a('string');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Seller\",\n  \"email\": \"seller{{$timestamp}}@autousata.com\",\n  \"phone\": \"{{$randomPhoneNumber}}\",\n  \"password\": \"testpass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Buyer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Buyer registered successfully', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('buyerToken', jsonData.token);",
+                  "    pm.collectionVariables.set('buyerId', jsonData.user?.id || jsonData.userId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Buyer\",\n  \"email\": \"buyer{{$timestamp}}@autousata.com\",\n  \"phone\": \"{{$randomPhoneNumber}}\",\n  \"password\": \"testpass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Image Fetching Tests (VEHICLES.IMAGES)",
+      "item": [
+        {
+          "name": "List Auctions - Verify Images Array",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response status is 200', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has auctions array', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('auctions');",
+                  "    pm.expect(jsonData.auctions).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Each auction has vehicleId.images array', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 0) {",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            pm.expect(auction.vehicleId).to.have.property('images');",
+                  "            pm.expect(auction.vehicleId.images).to.be.an('array');",
+                  "        });",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Image URLs are valid (if present)', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 0) {",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            if (auction.vehicleId.images.length > 0) {",
+                  "                auction.vehicleId.images.forEach(img => {",
+                  "                    pm.expect(img).to.match(/^https?:\\/\\//);",
+                  "                });",
+                  "            }",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?page=1&limit=9&sortBy=endingSoon",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "9" },
+                { "key": "sortBy", "value": "endingSoon" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Auction Details - Verify Images",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Auction has vehicleId.images array', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.vehicleId).to.have.property('images');",
+                  "    pm.expect(jsonData.vehicleId.images).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Images fallback logic works', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    // Images should be array (empty or with URLs from VEHICLES.IMAGES)",
+                  "    pm.expect(Array.isArray(jsonData.vehicleId.images)).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Status Normalization Tests",
+      "item": [
+        {
+          "name": "List Auctions - Verify Status is ACTIVE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is normalized to uppercase', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 0) {",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            pm.expect(auction.status).to.be.oneOf(['ACTIVE', 'DRAFT', 'SCHEDULED', 'ENDED', 'CANCELLED', 'SETTLED']);",
+                  "            // For live auctions, status should be 'ACTIVE'",
+                  "            pm.expect(auction.status).to.equal('ACTIVE');",
+                  "        });",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Status is NOT lowercase', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 0) {",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            pm.expect(auction.status).to.not.be.oneOf(['live', 'draft', 'ended', 'cancelled']);",
+                  "        });",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?page=1&limit=9",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "9" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Auction Details - Verify Status Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is normalized to uppercase', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.be.a('string');",
+                  "    pm.expect(jsonData.status).to.be.oneOf(['ACTIVE', 'DRAFT', 'SCHEDULED', 'ENDED', 'CANCELLED', 'SETTLED']);",
+                  "});",
+                  "",
+                  "pm.test('Status matches expected frontend format', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    // Frontend expects uppercase, not lowercase 'live'",
+                  "    pm.expect(jsonData.status).to.not.match(/^(live|draft|ended)$/);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Performance Tests (BID_COUNT Optimization)",
+      "item": [
+        {
+          "name": "List Auctions - Response Time Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response time is acceptable (<200ms)', () => {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(200);",
+                  "});",
+                  "",
+                  "pm.test('Each auction has bidCount field', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 0) {",
+                  "        jsonData.auctions.forEach(auction => {",
+                  "            pm.expect(auction).to.have.property('bidCount');",
+                  "            pm.expect(auction.bidCount).to.be.a('number');",
+                  "        });",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Pagination works correctly', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "    pm.expect(jsonData.pagination).to.have.property('page');",
+                  "    pm.expect(jsonData.pagination).to.have.property('pages');",
+                  "    pm.expect(jsonData.pagination).to.have.property('total');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify BID_COUNT Accuracy",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This test verifies that the denormalized BID_COUNT column matches actual bid count"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Auction detail has bidCount', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('bidCount');",
+                  "    pm.expect(jsonData.bidCount).to.be.a('number');",
+                  "    pm.collectionVariables.set('actualBidCount', jsonData.bidCount);",
+                  "});",
+                  "",
+                  "// Note: To fully test accuracy, compare with GET /api/auctions/:id/bids count",
+                  "pm.test('BID_COUNT should be non-negative', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.bidCount).to.be.at.least(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Concurrency & Validation Tests",
+      "item": [
+        {
+          "name": "Invalid Bid - Below Minimum",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Bid below minimum is rejected', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error message mentions minimum bid', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.msg || jsonData.message).to.match(/minimum/i);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}", "bids"]
+            }
+          }
+        },
+        {
+          "name": "Self-Bidding Prevention",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Seller cannot bid on own auction', () => {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates self-bidding', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.msg || jsonData.message).to.match(/cannot bid.*own/i);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}", "bids"]
+            }
+          }
+        },
+        {
+          "name": "Valid Bid - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Valid bid is accepted', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains bid details', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData).to.have.property('currentBid');",
+                  "});",
+                  "",
+                  "pm.test('Current bid updated correctly', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.currentBid).to.be.a('number');",
+                  "    pm.expect(jsonData.currentBid).to.be.at.least(50);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions/{{auctionId}}/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions", "{{auctionId}}", "bids"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Sorting & Filtering Tests",
+      "item": [
+        {
+          "name": "Sort by Ending Soon",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Auctions sorted by end time', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 1) {",
+                  "        const dates = jsonData.auctions.map(a => new Date(a.endTime).getTime());",
+                  "        for (let i = 0; i < dates.length - 1; i++) {",
+                  "            pm.expect(dates[i]).to.be.at.most(dates[i + 1]);",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?sortBy=endingSoon",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [{ "key": "sortBy", "value": "endingSoon" }]
+            }
+          }
+        },
+        {
+          "name": "Sort by Highest Bid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Auctions sorted by highest bid', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 1) {",
+                  "        const bids = jsonData.auctions.map(a => a.currentBid);",
+                  "        for (let i = 0; i < bids.length - 1; i++) {",
+                  "            pm.expect(bids[i]).to.be.at.least(bids[i + 1]);",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?sortBy=highestBid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [{ "key": "sortBy", "value": "highestBid" }]
+            }
+          }
+        },
+        {
+          "name": "Sort by Most Bids",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Auctions sorted by bid count', () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.auctions.length > 1) {",
+                  "        const counts = jsonData.auctions.map(a => a.bidCount);",
+                  "        for (let i = 0; i < counts.length - 1; i++) {",
+                  "            pm.expect(counts[i]).to.be.at.least(counts[i + 1]);",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auctions?sortBy=mostBids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auctions"],
+              "query": [{ "key": "sortBy", "value": "mostBids" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

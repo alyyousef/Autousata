@@ -1,5 +1,3 @@
-// App.tsx (full file)
-import KYCProcessPage from './pages/KYCProcessPage';
 import React, { useEffect, useLayoutEffect } from "react";
 import {
   HashRouter,
@@ -13,12 +11,11 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { UserRole } from "./types";
 
-import ResetPasswordPage from "./pages/ResetPasswordPage"; // <--- Add this importimport { UserRole } from "./types";
-
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
-
 import LandingPage from "./pages/LandingPage";
 import HomePage from "./pages/HomePage";
 import PressNewsPage from "./pages/PressNewsPage";
@@ -40,8 +37,7 @@ import PaymentConfirmationPage from "./pages/PaymentConfirmationPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
-import { UserRole } from "./types";
-//import AdminPayoutsPage from "./pages/"
+import KYCProcessPage from "./pages/KYCProcessPage";
 
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
@@ -92,8 +88,11 @@ const AppRoutes: React.FC = () => {
           <Route path="/auctions" element={<AuctionsPage />} />
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
-          <Route path="/kyc-process" element={<KYCProcessPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
+          
+          {/* ✅ KYC Route Added Here */}
+          <Route path="/kyc-process" element={<KYCProcessPage />} />
+          
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />

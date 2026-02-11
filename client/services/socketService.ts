@@ -17,6 +17,9 @@ export const initializeSocket = (): Socket => {
   const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const token = getAuthToken();
 
+  console.log('[Socket.IO] Connecting to:', serverUrl);
+  console.log('[Socket.IO] Auth token:', token ? 'Present' : 'Missing');
+
   socket = io(serverUrl, {
     auth: {
       token,
@@ -85,6 +88,7 @@ export interface AuctionUpdate {
   auctionId: string;
   currentBid: number;
   bidCount: number;
+  minBidIncrement?: number;
   leadingBidderId?: string;
   newBid?: {
     id: string;
@@ -119,8 +123,15 @@ export interface AuctionEndedEvent {
 // Join an auction room
 export const joinAuction = (auctionId: string): void => {
   const activeSocket = socket || initializeSocket();
+  console.log('[Socket.IO] joinAuction called for:', auctionId);
+  console.log('[Socket.IO] Socket connected:', activeSocket.connected, 'Socket ID:', activeSocket.id);
+  
+  if (!activeSocket.connected) {
+    console.warn('[Socket.IO] ⚠️ Socket not connected, join_auction may fail');
+  }
+  
   activeSocket.emit('join_auction', { auctionId });
-  console.log(`[Socket.IO] Joined auction: ${auctionId}`);
+  console.log(`[Socket.IO] ✅ Emitted join_auction event for: ${auctionId}`);
 };
 
 // Leave an auction room
@@ -133,11 +144,11 @@ export const leaveAuction = (auctionId: string): void => {
 
 // Place a bid via Socket.IO
 export const placeBid = (auctionId: string, amount: number): void => {
-  if (socket) {
+  if (socket && socket.connected) {
     socket.emit('place_bid', { auctionId, amount });
-    console.log(`[Socket.IO] Placed bid: ${amount} EGP on auction ${auctionId}`);
+    console.log(`[Socket.IO] ✅ Placed bid: ${amount} EGP on auction ${auctionId}`);
   } else {
-    console.error('[Socket.IO] Cannot place bid: Socket not connected');
+    console.error('[Socket.IO] ❌ Cannot place bid: Socket not connected. Connected:', socket?.connected);
   }
 };
 
@@ -151,7 +162,10 @@ export const onBidPlaced = (callback: (data: BidPlacedEvent) => void): void => {
 // Listen for auction updates
 export const onAuctionUpdated = (callback: (data: AuctionUpdate) => void): void => {
   if (socket) {
-    socket.on('auction_updated', callback);
+    socket.on('auction_updated', (data) => {
+      console.log('[Socket.IO] Received auction_updated event:', data);
+      callback(data);
+    });
   }
 };
 

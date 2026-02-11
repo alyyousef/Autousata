@@ -16,8 +16,12 @@ async function register(req, res) {
     let connection;
 
     const phoneRegex = /^[0-9]{10,15}$/;
-    if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid phone format.' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password too weak.' });
+    if (!phoneRegex.test(phone)) {
+        return res.status(400).json({ error: 'Invalid phone format. Only numbers allowed (10-15 digits).' });
+    }
+    if (!password || password.length < 8) {
+        return res.status(400).json({ error: 'Password too weak. Minimum 8 characters.' });
+    }
 
     try {
         console.log(`👉 Registering: ${email}`);
@@ -52,8 +56,8 @@ async function register(req, res) {
                 `UPDATE users 
                  SET email_verification_token = :otp,
                      email_token_expiry = :expiry
-                 WHERE email = :email`,
-                { otp: otpCode, expiry: expiryTime, email: email },
+                 WHERE LOWER(email) = :email`,
+                { otp: otpCode, expiry: expiryTime, email: email.toLowerCase() },
                 { autoCommit: true }
             );
 
@@ -61,7 +65,7 @@ async function register(req, res) {
 
             const { accessToken, refreshToken } = generateTokens(newUserId);
             res.status(201).json({ 
-                message: 'User registered.', accessToken, refreshToken,
+                message: 'User registered successfully. Please verify your email.', accessToken, refreshToken,
                 user: { id: newUserId, firstName, lastName, email, role: 'client', profileImage: profilePicUrl, emailVerified: false }
             });
 
@@ -112,8 +116,12 @@ async function login(req, res) {
 
         if (match) {
             try {
+                // ✅ Preserved KYC Extraction Fields from HEAD
                 const userResult = await connection.execute(
-                    `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
+                    `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, 
+                            EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY,
+                            KYC_ADDRESS_FROM_ID, KYC_NAME_FROM_ID 
+                     FROM USERS WHERE ID = :id`,
                     [authData.id], { outFormat: oracledb.OUT_FORMAT_OBJECT }
                 );
 
@@ -127,6 +135,9 @@ async function login(req, res) {
                         phoneVerified: dbUser.PHONE_VERIFIED == 1,
                         kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
                         kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
+                        // ✅ Added fields
+                        kycAddressFromId: dbUser.KYC_ADDRESS_FROM_ID,
+                        kycNameFromId: dbUser.KYC_NAME_FROM_ID,
                         location: { city: dbUser.LOCATION_CITY || '' } 
                     };
                     const { accessToken, refreshToken } = generateTokens(fullUser.id);
@@ -212,8 +223,10 @@ async function verifyEmailOtp(req, res) {
 async function refreshToken(req, res) {
     const { refreshToken: token } = req.body;
     if (!token) return res.status(400).json({ error: 'Refresh token required' });
+    
     const decoded = verifyRefreshToken(token);
-    if (!decoded) return res.status(403).json({ error: 'Invalid refresh token' });
+    if (!decoded) return res.status(403).json({ error: 'Invalid or expired refresh token' });
+    
     const tokens = generateTokens(decoded.userId);
     res.json({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
 }
@@ -228,23 +241,51 @@ async function getMe(req, res) {
         if (!targetId) return res.status(401).json({ error: 'Not authenticated' });
 
         connection = await db.getConnection();
+        
+        // 1. FORCE DB QUERY (No caching)
+        // ✅ Preserved KYC Extraction Fields from HEAD
         const result = await connection.execute(
-            `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
-            [targetId], { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            `SELECT 
+                ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, 
+                PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, 
+                KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY,
+                KYC_ADDRESS_FROM_ID,
+                KYC_NAME_FROM_ID
+             FROM USERS 
+             WHERE ID = :id`,
+            [targetId], 
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
         
         const dbUser = result.rows[0];
+
+        // 🔍 DEBUG: Print this to your terminal
+        console.log(`🔄 GetMe Refreshed: ${dbUser.EMAIL} | DB KYC Status: [${dbUser.KYC_STATUS}] | Addr: [${dbUser.KYC_ADDRESS_FROM_ID ? 'Yes' : 'No'}]`);
+
+        // 2. Disable Browser Caching for this request
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+        // 3. Return Fresh Data
         res.json({ 
             user: {
-                id: dbUser.ID, firstName: dbUser.FIRST_NAME, lastName: dbUser.LAST_NAME,
-                email: dbUser.EMAIL, phone: dbUser.PHONE, role: dbUser.ROLE,
+                id: dbUser.ID, 
+                firstName: dbUser.FIRST_NAME, 
+                lastName: dbUser.LAST_NAME,
+                email: dbUser.EMAIL, 
+                phone: dbUser.PHONE, 
+                role: dbUser.ROLE,
                 profileImage: dbUser.PROFILE_PIC_URL,
-                emailVerified: dbUser.EMAIL_VERIFIED == 1,
-                phoneVerified: dbUser.PHONE_VERIFIED == 1,
+                emailVerified: dbUser.EMAIL_VERIFIED == '1' || dbUser.EMAIL_VERIFIED == 1,
+                phoneVerified: dbUser.PHONE_VERIFIED == '1' || dbUser.PHONE_VERIFIED == 1,
+                
+                // ✅ KYC Data
                 kycStatus: dbUser.KYC_STATUS || 'not_uploaded',
                 kycDocumentUrl: dbUser.KYC_DOCUMENT_URL,
+                kycAddressFromId: dbUser.KYC_ADDRESS_FROM_ID,
+                kycNameFromId: dbUser.KYC_NAME_FROM_ID,
+
                 location: { city: dbUser.LOCATION_CITY || '' }
             }
         });
@@ -367,4 +408,13 @@ async function resendOtp(req, res) {
     }
 }
 
-module.exports = { register, login, verifyEmailOtp, refreshToken, getMe, forgotPassword, resetPassword, resendOtp };
+module.exports = { 
+    register, 
+    login, 
+    verifyEmailOtp, 
+    refreshToken, 
+    getMe, 
+    forgotPassword, 
+    resetPassword, 
+    resendOtp 
+};

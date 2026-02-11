@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Gavel, Clock, MapPin, Share2, Heart, ShieldCheck,
@@ -12,6 +12,8 @@ import ImageLightbox from '../components/ImageLightbox';
 import RealTimeBidHistory, { RealTimeBid } from '../components/RealTimeBidHistory';
 import * as socketService from '../services/socketService';
 import { apiService } from '../services/api';
+import { handleApiError } from '../utils/errorHandler';
+import { CardSkeleton, Skeleton } from '../components/LoadingSkeleton';
 
 const MIN_BID = 50;
 const RETRACTION_WINDOW_MINUTES = 5;
@@ -30,6 +32,12 @@ const AuctionDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const currentUserId = user?.id || '';
+  
+  // Use ref to avoid re-registering socket listeners when userId changes
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
 
   const [auction, setAuction] = useState<any>(null);
   const [auctionLoading, setAuctionLoading] = useState(true);
@@ -52,8 +60,9 @@ const AuctionDetailPage: React.FC = () => {
   const [auctionEndTime, setAuctionEndTime] = useState<string>('');
   const [reservePrice, setReservePrice] = useState(0);
   const [startPrice, setStartPrice] = useState(0);
-  const [auctionStatus, setAuctionStatus] = useState<string>('live');
+  const [auctionStatus, setAuctionStatus] = useState<string>('ACTIVE');
   const [socketConnected, setSocketConnected] = useState(false);
+  const [bidJustUpdated, setBidJustUpdated] = useState(false);
 
   const auctionEndsAt = auctionEndTime ? new Date(auctionEndTime).getTime() : 0;
   const { addNotification: pushNotification } = useNotifications();
@@ -119,12 +128,13 @@ const AuctionDetailPage: React.FC = () => {
         setAuctionStatus(auctionData.status);
         setBidAmount(Math.max(auctionData.currentBid + auctionData.minBidIncrement, MIN_BID));
 
-        if (auctionData.status === 'cancelled' || auctionData.status === 'ended') {
+        if (auctionData.status === 'CANCELLED' || auctionData.status === 'ENDED') {
           setIsCancelled(true);
         }
       } catch (err) {
         if (!cancelled) {
-          setAuctionError('Failed to load auction details');
+          const errorMsg = err instanceof Error ? err.message : 'Failed to load auction details';
+          setAuctionError(errorMsg);
         }
       } finally {
         if (!cancelled) setAuctionLoading(false);
@@ -194,7 +204,7 @@ const AuctionDetailPage: React.FC = () => {
   // ============================================================
   useEffect(() => {
     if (!id || !auction) return;
-    if (auctionStatus !== 'ended') return;
+    if (auctionStatus !== 'ENDED') return;
 
     const checkPayment = async () => {
       try {
@@ -219,32 +229,54 @@ const AuctionDetailPage: React.FC = () => {
   // 6. SOCKET.IO — REAL-TIME AUCTION UPDATES
   // ============================================================
   useEffect(() => {
-    if (!id || !auction) return;
+    if (!id) return;
 
+    console.log('[AuctionDetail] Setting up socket for auction:', id);
     const socket = socketService.initializeSocket();
+    console.log('[AuctionDetail] Socket instance:', socket.id, 'Connected:', socket.connected);
     setSocketConnected(socket.connected);
 
-    socket.on('connect', () => setSocketConnected(true));
-    socket.on('disconnect', () => setSocketConnected(false));
+    socket.on('connect', () => {
+      console.log('[AuctionDetail] Socket connected, joining auction:', id);
+      setSocketConnected(true);
+      addLocalNotification('Connected to live updates', 'success');
+      // Re-join auction room after reconnect
+      socketService.joinAuction(id);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('[AuctionDetail] Socket disconnected');
+      setSocketConnected(false);
+      pushNotification(
+        'Lost connection to live updates. Refresh to reconnect.',
+        'error'
+      );
+      addLocalNotification('Connection lost. Refresh to reconnect.', 'warn');
+    });
 
-    // Join the auction room
-    socketService.joinAuction(id);
+    // Join the auction room immediately if already connected
+    if (socket.connected) {
+      console.log('[AuctionDetail] Socket already connected, joining auction:', id);
+      socketService.joinAuction(id);
+    }
 
     // Server sends current state on join
     const handleAuctionJoined = (data: socketService.AuctionJoinedEvent) => {
+      console.log('[AuctionDetail] ✅ auction_joined event received:', data);
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
       setMinBidIncrement(data.minBidIncrement || 50);
       setAuctionEndTime(data.endTime);
       setAuctionStatus(data.status);
       setBidAmount(Math.max(data.currentBid + (data.minBidIncrement || 50), MIN_BID));
-      if (data.status === 'ended' || data.status === 'cancelled') {
+      if (data.status === 'ENDED' || data.status === 'CANCELLED') {
         setIsCancelled(true);
       }
     };
 
     // Server sends recent bid history on join
     const handleBidHistory = (data: { bids: any[] }) => {
+      console.log('[AuctionDetail] ✅ bid_history event received:', data.bids?.length, 'bids');
       const formattedBids: RealTimeBid[] = (data.bids || []).map((b: any) => ({
         id: b.id || Math.random().toString(36).slice(2),
         bidderId: b.isYou ? 'You' : (b.displayName || 'Bidder'),
@@ -281,13 +313,24 @@ const AuctionDetailPage: React.FC = () => {
 
     // Broadcast to all users in auction room
     const handleAuctionUpdated = (data: socketService.AuctionUpdate) => {
+      console.log('[AuctionDetail] ✅ auction_updated event received!', {
+        currentBid: data.currentBid,
+        bidCount: data.bidCount,
+        minBidIncrement: data.minBidIncrement,
+        timestamp: new Date().toISOString()
+      });
+      
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
-      const increment = auction.minBidIncrement || 50;
-      setBidAmount(Math.max(data.currentBid + increment, MIN_BID));
+      setMinBidIncrement(data.minBidIncrement || 50);
+      setBidAmount(Math.max(data.currentBid + (data.minBidIncrement || 50), MIN_BID));
+      
+      // Visual feedback for bid update
+      setBidJustUpdated(true);
+      setTimeout(() => setBidJustUpdated(false), 2000);
 
       if (data.newBid) {
-        const isYou = data.leadingBidderId === currentUserId;
+        const isYou = data.leadingBidderId === currentUserIdRef.current;
         const newBid: RealTimeBid = {
           id: data.newBid.id,
           bidderId: isYou ? 'You' : (data.newBid.displayName || 'Bidder'),
@@ -324,7 +367,7 @@ const AuctionDetailPage: React.FC = () => {
     // Auction ended
     const handleAuctionEnded = (data: socketService.AuctionEndedEvent) => {
       setIsCancelled(true);
-      setAuctionStatus('ended');
+      setAuctionStatus('ENDED');
       pushNotification(
         data.reserveMet
           ? `Auction ended. ${data.winnerId ? 'Winner declared!' : 'No winner.'}`
@@ -348,6 +391,7 @@ const AuctionDetailPage: React.FC = () => {
       addLocalNotification(error.message, 'warn');
     };
 
+    console.log('[AuctionDetail] Registering event listeners for auction:', id);
     socket.on('auction_joined', handleAuctionJoined);
     socket.on('bid_history', handleBidHistory);
     socket.on('bid_placed', handleBidPlaced);
@@ -356,8 +400,10 @@ const AuctionDetailPage: React.FC = () => {
     socketService.onAuctionEnded(handleAuctionEnded);
     socketService.onAuctionEndingSoon(handleAuctionEndingSoon);
     socketService.onBidError(handleBidError);
+    console.log('[AuctionDetail] All event listeners registered');
 
     return () => {
+      console.log('[AuctionDetail] Cleanup: removing event listeners and leaving auction:', id);
       socket.off('connect');
       socket.off('disconnect');
       socket.off('auction_joined', handleAuctionJoined);
@@ -370,9 +416,9 @@ const AuctionDetailPage: React.FC = () => {
       socketService.offBidError(handleBidError);
       socketService.leaveAuction(id);
     };
-  }, [id, auction, currentUserId, pushNotification]);
+  }, [id]);
 
-  // ============================================================
+  // ==================
   // HELPERS
   // ============================================================
   const addLocalNotification = useCallback((message: string, tone: Notification['tone']) => {
@@ -393,7 +439,7 @@ const AuctionDetailPage: React.FC = () => {
     return `${days}d ${hours}h ${minutes}m ${seconds}s`;
   };
 
-  const isAuctionEnded = now >= auctionEndsAt || auctionStatus === 'ended' || auctionStatus === 'cancelled';
+  const isAuctionEnded = now >= auctionEndsAt || auctionStatus === 'ENDED' || auctionStatus === 'CANCELLED';
   const minAllowedBid = Math.max(MIN_BID, currentBid + minBidIncrement);
   const reserveMet = currentBid >= reservePrice;
   const images: string[] = auction?.vehicle?.images?.length > 0 ? auction.vehicle.images : [];
@@ -453,7 +499,7 @@ const AuctionDetailPage: React.FC = () => {
 
   const handleCancelAuction = () => {
     setIsCancelled(true);
-    setAuctionStatus('cancelled');
+    setAuctionStatus('CANCELLED');
     addLocalNotification('Auction cancelled by seller. Bidding is closed.', 'warn');
   };
 
@@ -466,11 +512,15 @@ const AuctionDetailPage: React.FC = () => {
         navigate(`/payment/${id}`);
       } else {
         setPaymentStatus('unpaid');
-        addLocalNotification(response.error || 'Failed to initiate payment.', 'warn');
+        const errorMsg = response.error || 'Failed to initiate payment.';
+        addLocalNotification(errorMsg, 'warn');
+        pushNotification(errorMsg, 'error');
       }
-    } catch {
+    } catch (error) {
       setPaymentStatus('unpaid');
-      addLocalNotification('Payment initiation failed.', 'warn');
+      const errorMsg = error instanceof Error ? error.message : 'Payment initiation failed.';
+      addLocalNotification(errorMsg, 'warn');
+      pushNotification(errorMsg, 'error');
     }
   };
 
@@ -479,8 +529,28 @@ const AuctionDetailPage: React.FC = () => {
   // ============================================================
   if (auctionLoading) {
     return (
-      <div className="bg-slate-50 min-h-screen flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+      <div className="bg-slate-50 min-h-screen py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-6">
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <CardSkeleton className="h-96" />
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <CardSkeleton className="h-80" />
+              <CardSkeleton className="h-64" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -598,8 +668,8 @@ const AuctionDetailPage: React.FC = () => {
                   <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">{vehicle.year}</span>
                   <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-bold uppercase tracking-wider">{vehicle.condition}</span>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    auctionStatus === 'live' ? 'bg-emerald-50 text-emerald-700' :
-                    auctionStatus === 'ended' ? 'bg-rose-50 text-rose-700' :
+                    auctionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' :
+                    auctionStatus === 'ENDED' ? 'bg-rose-50 text-rose-700' :
                     'bg-slate-100 text-slate-700'
                   }`}>
                     {auctionStatus}
@@ -680,7 +750,7 @@ const AuctionDetailPage: React.FC = () => {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Status</p>
-                    <p className={`text-lg font-bold capitalize ${auctionStatus === 'live' ? 'text-emerald-600' : 'text-slate-900'}`}>{auctionStatus}</p>
+                    <p className={`text-lg font-bold capitalize ${auctionStatus === 'ACTIVE' ? 'text-emerald-600' : 'text-slate-900'}`}>{auctionStatus}</p>
                   </div>
                 </div>
               </div>
@@ -733,11 +803,30 @@ const AuctionDetailPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-4 mb-8">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-sm items-center">
                     <span className="text-slate-500">Current Bid</span>
-                    <span className="text-slate-400 font-medium">{bidCount} bid{bidCount !== 1 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 font-medium">{bidCount} bid{bidCount !== 1 ? 's' : ''}</span>
+                      {bidJustUpdated && (
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full animate-bounce">
+                          NEW
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-4xl font-black text-slate-900">EGP {currentBid.toLocaleString()}</div>
+                  <div 
+                    key={currentBid}
+                    className={`text-4xl font-black transition-all duration-300 ${
+                      bidJustUpdated 
+                        ? 'text-indigo-600 scale-110' 
+                        : 'text-slate-900 scale-100'
+                    }`}
+                  >
+                    EGP {currentBid.toLocaleString()}
+                    {bidJustUpdated && (
+                      <span className="ml-2 text-sm text-indigo-600 animate-pulse">↑</span>
+                    )}
+                  </div>
                   <div className={`flex items-center gap-1 text-xs font-semibold ${reserveMet ? 'text-emerald-600' : 'text-amber-600'}`}>
                     <ShieldCheck size={14} />
                     {reserveMet ? 'Reserve Met' : 'Reserve Not Met'}
@@ -771,7 +860,7 @@ const AuctionDetailPage: React.FC = () => {
                       <p className="text-[11px] text-rose-600 text-center font-semibold">{bidError}</p>
                     )}
                     <p className="text-[10px] text-slate-400 text-center uppercase tracking-wider font-medium">
-                      Next min bid: EGP {minAllowedBid.toLocaleString()} &bull; Increment: EGP {minBidIncrement.toLocaleString()}
+                      Next min bid: <span className="text-slate-600 font-bold">EGP {minAllowedBid.toLocaleString()}</span> &bull; Increment: EGP {minBidIncrement.toLocaleString()}
                     </p>
                   </div>
                 )}

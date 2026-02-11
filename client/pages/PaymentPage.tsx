@@ -5,6 +5,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { apiService } from '../services/api';
 import { useStripe as useStripeContext } from '../contexts/StripeContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { handlePaymentError } from '../utils/errorHandler';
 
 // Inner payment form component that uses Stripe hooks
 const PaymentForm: React.FC<{
@@ -47,7 +48,8 @@ const PaymentForm: React.FC<{
       });
 
       if (error) {
-        setErrorMessage(error.message || t('Payment failed', 'فشل الدفع'));
+        // Use the payment-specific error handler for better user messages
+        setErrorMessage(handlePaymentError(error, t));
         setIsProcessing(false);
         return;
       }
@@ -79,7 +81,8 @@ const PaymentForm: React.FC<{
         setIsProcessing(false);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : t('An unexpected error occurred', 'حدث خطأ غير متوقع'));
+      // Use payment error handler for consistent messaging
+      setErrorMessage(handlePaymentError(err, t));
       setIsProcessing(false);
     }
   };
