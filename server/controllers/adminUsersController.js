@@ -151,3 +151,43 @@ exports.banUser = async (req, res) => {
       .json({ error: err.message || "Failed to ban user" });
   }
 };
+
+exports.updateUserRoleController = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newRole, role } = req.body || {};
+
+    if (!userId || userId.trim().length < 1) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const normalizedRole = String(newRole ?? role ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedRole) {
+      return res.status(400).json({ error: "Role is required" });
+    }
+
+    const allowedRoles = new Set(["admin", "inspector", "client"]);
+    if (!allowedRoles.has(normalizedRole)) {
+      return res
+        .status(400)
+        .json({ error: "Role must be one of admin, inspector, client" });
+    }
+
+    const result = await adminUsersService.updateRole({
+      userId: userId.trim(),
+      newRole: normalizedRole,
+    });
+
+    res
+      .status(200)
+      .json({ message: "User role updated successfully", user: result });
+  } catch (error) {
+    console.error("Admin update user role error:", error);
+    res
+      .status(error.statusCode || 500)
+      .json({ error: error.message || "Failed to change user role" });
+  }
+};

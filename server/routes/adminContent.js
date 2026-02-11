@@ -12,13 +12,14 @@ const {
   searchKYCController,
   filterKYCByStatusController, 
   viewKYCDetailsController,
-    viewUserController
+  viewUserController,
+  getalluserskycController
 
 } = require("../controllers/adminContentController");
 const router = express.Router();
 const { authenticate, authorize } = require("../middleware/auth");
 
-router.get('/kyc/pending', authenticate,authorize("admin"), getPendingKYC);
+router.get('/kyc', authenticate,authorize("admin"), getalluserskycController);
 router.get('/payments/pending', authenticate,authorize("admin"), getPendingPayments);
 
 //auctions

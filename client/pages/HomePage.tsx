@@ -316,7 +316,7 @@ const HomePage: React.FC = () => {
               ))}
             </datalist>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* <div className="flex flex-wrap items-center gap-2 text-xs">
                 {[
                   { value: 'all', label: t('All', 'الكل') },
                   { value: 'make', label: t('Make', 'الماركة') },
@@ -337,7 +337,7 @@ const HomePage: React.FC = () => {
                     {option.label}
                   </button>
                 ))}
-              </div>
+              </div> */}
               <button
                 type="button"
                 onClick={() => fetchVehicles()}

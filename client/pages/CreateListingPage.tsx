@@ -8,6 +8,7 @@ import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loa
 import { geminiService } from '../geminiService'; // Keeping AI service
 import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import CustomSelect, { CustomSelectOption } from '../components/CustomSelect';
 import Autocomplete from '../components/Autocomplete';
 import { getMakeOptions, getModelOptions, isValidMake } from '../data/carMakeModels';
@@ -135,6 +136,77 @@ const CreateListingPage: React.FC = () => {
   const [validationAttempted, setValidationAttempted] = useState(false);
   
   const { t, isArabic, formatNumber, formatCurrencyEGP } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const resolvedKycStatus = user
+    ? (user.kycStatus
+        ? String(user.kycStatus).toLowerCase()
+        : user.isKycVerified
+          ? 'approved'
+          : 'not_uploaded')
+    : null;
+
+  const getKycGateCopy = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return {
+          badge: t('KYC Review', 'مراجعة الهوية'),
+          title: t('Your verification is under review', 'جاري مراجعة هويتك'),
+          description: t(
+            'Please wait until our compliance team finishes reviewing your documents. We will notify you the moment it is approved.',
+            'من فضلك انتظر لغاية ما فريق المراجعة يخلص فحص المستندات، وهنبعتلك إشعار أول ما يتم الموافقة.',
+          ),
+          actionLabel: t('View KYC status', 'شوف حالة التحقق'),
+        };
+      case 'rejected':
+        return {
+          badge: t('KYC Required', 'مطلوب تحقق الهوية'),
+          title: t('Your previous submission was rejected', 'تم رفض مستنداتك السابقة'),
+          description: t(
+            'Please upload updated documents so we can verify your identity before you create listings.',
+            'من فضلك ارفع مستندات جديدة علشان نقدر نتحقق من هويتك قبل ما تنشئ إعلانات.',
+          ),
+          actionLabel: t('Resubmit documents', 'ارفع المستندات مرة تانية'),
+        };
+      default:
+        return {
+          badge: t('Verification Needed', 'مطلوب التحقق'),
+          title: t('Complete KYC to sell cars', 'كمّل التحقق علشان تعرض سيارتك'),
+          description: t(
+            'We need a quick identity verification before we publish any listings from your account.',
+            'لازم نعمل تحقق سريع من هويتك قبل ما ننشر أي إعلان من حسابك.',
+          ),
+          actionLabel: t('Start verification', 'ابدأ التحقق'),
+        };
+    }
+  };
+
+  const renderKycGate = (status: string) => {
+    const copy = getKycGateCopy(status);
+    const statusLabel = status.replace('_', ' ');
+
+    return (
+      <section className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="max-w-lg w-full bg-white border border-slate-200 shadow-xl rounded-3xl p-8 text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle size={28} />
+          </div>
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">{copy.badge}</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-900">{copy.title}</h1>
+          <p className="mt-3 text-sm text-slate-600 leading-relaxed">{copy.description}</p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            {t('Current status:', 'الحالة الحالية:')} <span className="text-slate-900">{statusLabel}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            {copy.actionLabel}
+          </button>
+        </div>
+      </section>
+    );
+  };
   const listingSchema = useMemo(() => createListingSchema(t), [t]);
   
   // ✅ FIX 1: Ensure this state is actually updated
@@ -452,6 +524,41 @@ const CreateListingPage: React.FC = () => {
     { value: 'fair', label: t('Fair', 'مقبولة') },
     { value: 'poor', label: t('Poor', 'ضعيفة') }
   ];
+
+  if (authLoading) {
+    return (
+      <section className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 py-10 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <p className="mt-4 text-sm font-medium text-slate-600">
+          {t('Loading your profile...', 'جاري تحميل بياناتك...')}
+        </p>
+      </section>
+    );
+  }
+
+  if (!authLoading && !user) {
+    return (
+      <section className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="max-w-lg w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
+          <h1 className="text-2xl font-black text-slate-900">{t('Log in to create a listing', 'سجل دخولك علشان تنشئ إعلان')}</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            {t('Please sign in first so we can link the listing to your verified profile.', 'لازم تسجل دخول الأول علشان نربط الإعلان بملفك المتحقق.')}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/login', { state: { from: '/create-listing' } })}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            {t('Go to login', 'اذهب لتسجيل الدخول')}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (resolvedKycStatus && resolvedKycStatus !== 'approved') {
+    return renderKycGate(resolvedKycStatus);
+  }
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 font-sans text-slate-900">
