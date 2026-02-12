@@ -250,10 +250,7 @@ function initializeAuctionSocket(io) {
     // ===== PLACE_BID Event =====
     socket.on('place_bid', async (data) => {
       // Guests cannot place bids
-      if (isGuest) {
-        socket.emit('bid_error', { message: 'Authentication required to place bids' });
-        return;
-      }
+
 
       const { auctionId, amount } = data;
 
