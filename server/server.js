@@ -88,10 +88,6 @@ const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
 const adminRoutes = require("./routes/admin");
 const adminFinanceRoutes = require("./routes/adminFinance");
-const adminAuthRoutes = require("./routes/adminAuth");
-const adminUsersRoutes = require("./routes/adminUsers");
-const adminContentRoutes = require("./routes/adminContent");
-const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 
 // ✅ Now authLimiter is defined, so this works:
