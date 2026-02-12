@@ -1,78 +1,71 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:5005/api';
 
-  interface ApiResponse<T> {
-    data?: T;
-    error?: string;
+interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+}
+
+type TransactionsResponse = {
+  page: number;
+  limit: number;
+  items: any[];
+};
+
+export interface KycItem {
+  id: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  documentType?: string;
+  status?: string;
+  submittedAt?: string;
+}
+
+class ApiService {
+  // 1. Get tokens from storage
+  private getAccessToken(): string | null {
+    return localStorage.getItem('accessToken');
   }
-  type TransactionsResponse = {
-    page: number;
-    limit: number;
-    items: any[];
-  };
 
-
-
-
-
-
-
-  export interface KycItem {
-    id: string;
-    email?: string;
-    phone?: string;
-    firstName?: string;
-    lastName?: string;
-    documentType?: string;
-    status?: string;
-    submittedAt?: string;
+  private getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
   }
 
+  // 2. Helper to save both tokens
+  private setTokens(accessToken: string, refreshToken: string) {
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+  }
 
-    class ApiService {
-      // 1. Get tokens from storage
-      private getAccessToken(): string | null {
-        return localStorage.getItem('accessToken');
-      }
+  private clearTokens() {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
 
-      private getRefreshToken(): string | null {
-        return localStorage.getItem('refreshToken');
-      }
-
-      // 2. Helper to save both tokens
-      private setTokens(accessToken: string, refreshToken: string) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-      }
-
-      private clearTokens() {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-      }
-
-      // =========================================================
-      // CORE REQUEST HANDLER (With Auto-Refresh Logic)
-      // =========================================================
-      private async request<T>(
-        endpoint: string,
-        options: RequestInit = {},
-        isRetry = false // Prevents infinite loops // Prevents infinite loops
-      ): Promise<ApiResponse<T>> {
+  // =========================================================
+  // CORE REQUEST HANDLER (With Auto-Refresh Logic)
+  // =========================================================
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    isRetry = false 
+  ): Promise<ApiResponse<T>> {
     
-        
-        const token = this.getAccessToken();
-        const isFormData = options.body instanceof FormData;
+    const token = this.getAccessToken();
+    const isFormData = options.body instanceof FormData;
 
-        const headers: HeadersInit = {
-          ...(!isFormData && { 'Content-Type': 'application/json' }),
-          ...(token && { Authorization: `Bearer ${token}` }),
-          ...options.headers,
-        };
+    const headers: HeadersInit = {
+      ...(!isFormData && { 'Content-Type': 'application/json' }),
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    };
 
-        try {
-          const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-            ...options,
-            headers,
-          });
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
 
       if (response.ok) {
         return { data: await response.json() };
@@ -80,19 +73,19 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
       const errorData = await response.json();
 
-        // B. If Token Expired (401), try to refresh!
-        if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
-          const success = await this.refreshAccessToken();
-          if (success) {
-            // Retry the ORIGINAL request with the NEW token
-            return this.request<T>(endpoint, options, true);
-          } else {
-            // Refresh failed -> Logout user
-            this.logout();
-            window.location.href = '/login'; 
-            return { error: 'Session expired. Please login again.' };
-          }
+      // B. If Token Expired (401), try to refresh!
+      if (response.status === 401 && !isRetry && errorData.error === 'TokenExpired') {
+        const success = await this.refreshAccessToken();
+        if (success) {
+          // Retry the ORIGINAL request with the NEW token
+          return this.request<T>(endpoint, options, true);
+        } else {
+          // Refresh failed -> Logout user
+          this.logout();
+          window.location.href = '/login'; 
+          return { error: 'Session expired. Please login again.' };
         }
+      }
 
       return { error: errorData.error || 'Request failed' };
     } catch (error) {
@@ -107,12 +100,12 @@ const API_BASE_URL = 'http://localhost:5000/api';
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
 
-        try {
-          const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
-          });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -175,19 +168,6 @@ const API_BASE_URL = 'http://localhost:5000/api';
     });
   }
 
-  async uploadKYC(file: File) {
-    const formData = new FormData();
-    formData.append('kycDocument', file);
-
-    return this.request<{ kycStatus: string; kycDocumentUrl: string }>(
-      '/profile/kyc',
-      {
-        method: 'PUT',
-        body: formData,
-      }
-    );
-  }
-
   async login(email: string, password: string) {
     const response = await this.request<{
       accessToken: string;
@@ -210,7 +190,7 @@ const API_BASE_URL = 'http://localhost:5000/api';
   }
 
   // =========================================================
-  // PASSWORD RESET METHODS (Correctly placed inside class)
+  // PASSWORD RESET METHODS
   // =========================================================
   async forgotPassword(email: string) {
     return this.request<{ message: string }>('/auth/forgot-password', {
@@ -227,7 +207,74 @@ const API_BASE_URL = 'http://localhost:5000/api';
   }
 
   // =========================================================
-  // OTHER METHODS
+  // PROFILE & KYC METHODS
+  // =========================================================
+  async updateProfile(data: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    location?: { city: string; country?: string };
+  }) {
+    return this.request<{ user: any }>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return this.request<{ avatar: string }>('/profile/avatar', {
+      method: 'PUT',
+      body: formData,
+    });
+  }
+
+  async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file);
+
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>(
+      '/profile/kyc',
+      {
+        method: 'PUT',
+        body: formData,
+      }
+    );
+  }
+
+  // ✅ RESTORED: Validate ID Step
+  async validateID(idImage: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-id', {
+      method: 'POST',
+      body: JSON.stringify({ idImage }),
+    });
+  }
+
+  // ✅ RESTORED: Validate Document Only (For generic checks)
+  async validateDocumentOnly(image: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-document', {
+      method: 'POST',
+      body: JSON.stringify({ image }),
+    });
+  }
+
+  // ✅ RESTORED: Verify Identity (Final Step)
+  async verifyIdentity(idImage: string, selfieImage: string) {
+    return this.request<{ 
+      success: boolean; 
+      status: string; 
+      similarity: number; 
+      message: string; 
+    }>('/profile/verify-identity', {
+      method: 'POST',
+      body: JSON.stringify({ idImage, selfieImage }),
+    });
+  }
+
+  // =========================================================
+  // OTHER METHODS (User, History)
   // =========================================================
   async getCurrentUser() {
     return this.request<{ user: any }>('/auth/me');
@@ -237,6 +284,9 @@ const API_BASE_URL = 'http://localhost:5000/api';
     return this.request<{ loginHistory: any[] }>('/auth/login-history');
   }
 
+  // =========================================================
+  // VEHICLE & AUCTION METHODS
+  // =========================================================
   async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -319,34 +369,11 @@ const API_BASE_URL = 'http://localhost:5000/api';
     return this.request<any>(`/vehicles/browse/${vehicleId}`);
   }
 
-  async createDirectPaymentIntent(vehicleId: string) {
-    return this.request<{
-      success: boolean;
-      clientSecret: string;
-      paymentId: string;
-      breakdown: {
-        vehiclePrice: number;
-        platformCommission: number;
-        stripeFee: number;
-        totalAmount: number;
-        sellerPayout: number;
-      };
-      vehicle: {
-        id: string;
-        title: string;
-      };
-    }>('/payments/create-direct-intent', {
-      method: 'POST',
-      body: JSON.stringify({ vehicleId }),
-    });
-  }
-
   // =========================================================
-  // VEHICLE & AUCTION CREATION METHODS
+  // CREATION METHODS
   // =========================================================
   async createVehicle(data: any, files: File[]) {
     const formData = new FormData();
-
     Object.keys(data).forEach((key) => {
       if (data[key] !== undefined && data[key] !== null && key !== 'images') {
         if (Array.isArray(data[key])) {
@@ -356,11 +383,9 @@ const API_BASE_URL = 'http://localhost:5000/api';
         }
       }
     });
-
     files.forEach((file) => {
       formData.append('images', file);
     });
-
     return this.request<{ _id: string }>('/vehicles', {
       method: 'POST',
       body: formData,
@@ -378,31 +403,8 @@ const API_BASE_URL = 'http://localhost:5000/api';
     return this.request<{ auctions: any[] }>('/auctions/seller');
   }
 
-  // Profile endpoints
-  async updateProfile(data: {
-    name?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    location?: { city: string; country?: string };
-  }) {
-    return this.request<{ user: any }>('/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateAvatar(file: File) {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    return this.request<{ avatar: string }>('/profile/avatar', {
-      method: 'PUT',
-      body: formData,
-    });
-  }
-
   // =========================================================
-  // PAYMENT METHODS
+  // PAYMENT & ESCROW METHODS
   // =========================================================
   async createPaymentIntent(auctionId: string) {
     return this.request<{
@@ -427,153 +429,141 @@ const API_BASE_URL = 'http://localhost:5000/api';
     });
   }
 
-  
+  async createDirectPaymentIntent(vehicleId: string) {
+    return this.request<{
+      success: boolean;
+      clientSecret: string;
+      paymentId: string;
+      breakdown: {
+        vehiclePrice: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      vehicle: {
+        id: string;
+        title: string;
+      };
+    }>('/payments/create-direct-intent', {
+      method: 'POST',
+      body: JSON.stringify({ vehicleId }),
+    });
+  }
 
-    /**
-     * Get payment details by auction ID
-     */
-    async getPaymentByAuction(auctionId: string) {
-      return this.request<{
-        success: boolean;
-        payment: {
+  async getPaymentByAuction(auctionId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
           id: string;
-          auctionId: string;
-          amountEGP: number;
           status: string;
-          initiatedAt: string;
-          completedAt?: string;
-          escrow?: {
-            id: string;
-            status: string;
-            commissionEGP: number;
-            sellerPayoutEGP: number;
-          };
-        };
-      }>(`/payments/auction/${auctionId}`);
-    }
-
- 
-      
-
-    /**
-     * Confirm payment completion
-     */
-    async confirmPayment(paymentId: string) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        paymentId: string;
-        escrowId: string;
-      }>(`/payments/${paymentId}/confirm`, {
-        method: 'POST',
-      });
-    }
-
-   
-    /**
-     * Get escrow details
-     */
-    async getEscrowDetails(escrowId: string) {
-      return this.request<{
-        success: boolean;
-        escrow: {
-          id: string;
-          auctionId: string;
-          totalAmountEGP: number;
           commissionEGP: number;
           sellerPayoutEGP: number;
-          status: string;
-          buyerReceived?: string;
-          vehicle: {
-            year: number;
-            make: string;
-            model: string;
-          };
         };
-      }>(`/payments/escrows/${escrowId}`);
-    }
+      };
+    }>(`/payments/auction/${auctionId}`);
+  }
 
-
-
-     /**
-       * Buyer confirms vehicle receipt (releases escrow)
-       */
-      async confirmVehicleReceipt(escrowId: string) {
-        return this.request<{
-          success: boolean;
-          message: string;
-          escrowId: string;
-          sellerPayoutEGP: number;
-        }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
-          method: 'POST',
-        });
-      }
-
-
-         async getDisputedEscrows() {
-      return this.request<{
-        success: boolean;
-        disputes: Array<{
-          id: string;
-          auctionId: string;
-          totalAmountEGP: number;
-          disputeReason: string;
-          disputedAt: string;
-          vehicle: {
-            year: number;
-            make: string;
-            model: string;
-          };
-          buyer: {
-            name: string;
-            email: string;
-          };
-          seller: {
-            name: string;
-            email: string;
-          };
-        }>;
-      }>('/payments/escrows/disputed');
-    }
-
-
-    /**
-     * Admin: Get all disputed escrows
-     */
- 
-
-    /**
-     * Admin: Process refund
-     */
-    async processRefund(paymentId: string, reason: string, amount?: number) {
-      return this.request<{
-        success: boolean;
-        message: string;
-        refundId: string;
-        amountRefundedEGP: number;
-      }>(`/payments/${paymentId}/refund`, {
-        method: 'POST',
-        body: JSON.stringify({ reason, amount }),
-      });
-    }
-
-  // ===================== Admin Content =====================
-  async getPendingKYC() {
-    return this.request<KycItem[]>('/admin/kyc/pending', {
-      method: 'GET',
+  async confirmPayment(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      paymentId: string;
+      escrowId: string;
+    }>(`/payments/${paymentId}/confirm`, {
+      method: 'POST',
     });
+  }
+
+  async getEscrowDetails(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      escrow: {
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        commissionEGP: number;
+        sellerPayoutEGP: number;
+        status: string;
+        buyerReceived?: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+      };
+    }>(`/payments/escrows/${escrowId}`);
+  }
+
+  async confirmVehicleReceipt(escrowId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      escrowId: string;
+      sellerPayoutEGP: number;
+    }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
+      method: 'POST',
+    });
+  }
+
+  async getDisputedEscrows() {
+    return this.request<{
+      success: boolean;
+      disputes: Array<{
+        id: string;
+        auctionId: string;
+        totalAmountEGP: number;
+        disputeReason: string;
+        disputedAt: string;
+        vehicle: {
+          year: number;
+          make: string;
+          model: string;
+        };
+        buyer: {
+          name: string;
+          email: string;
+        };
+        seller: {
+          name: string;
+          email: string;
+        };
+      }>;
+    }>('/payments/escrows/disputed');
+  }
+
+  async processRefund(paymentId: string, reason: string, amount?: number) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      refundId: string;
+      amountRefundedEGP: number;
+    }>(`/payments/${paymentId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, amount }),
+    });
+  }
+
+  // =========================================================
+  // ADMIN METHODS
+  // =========================================================
+  async getPendingKYC() {
+    return this.request<KycItem[]>('/admin/kyc/pending', { method: 'GET' });
   }
 
   async getLiveAuctions() {
-    return this.request<unknown[]>('/admin/auctions/live', {
-      method: 'GET',
-    });
+    return this.request<unknown[]>('/admin/auctions/live', { method: 'GET' });
   }
 
   async getPendingPayments() {
-    return this.request<unknown[]>('/admin/payments/pending', {
-      method: 'GET',
-    });
+    return this.request<unknown[]>('/admin/payments/pending', { method: 'GET' });
   }
 
   public adminListUsers(page = 1, limit = 20) {
@@ -593,14 +583,8 @@ const API_BASE_URL = 'http://localhost:5000/api';
       limit: number;
       total: number;
       totalPages: number;
-    }>(`/admin/users?q=${q}&page=${page}&limit=${limit}`, { method: "GET" });
+    }>(`/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`, { method: "GET" });
   }
-
-  /**
-   * Get escrow details
-   */
- 
-
 
   adminGetUserTransactions(userId: string, queryString: string) {
     const qs = queryString ? `?${queryString}` : '';
@@ -608,7 +592,6 @@ const API_BASE_URL = 'http://localhost:5000/api';
       `/admin/users/${encodeURIComponent(userId)}/transactions${qs}`,
       { method: "GET" }
     );
-
   }
 
   adminSuspendUser(userId: string, body: { reason: string }) {
@@ -618,15 +601,11 @@ const API_BASE_URL = 'http://localhost:5000/api';
     });
   }
 
-
-
   async adminReactivateUser(userId: string) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
       method: "PATCH",
     });
   }
-
-
 
   async adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {

@@ -1,6 +1,8 @@
 // client/services/adminApi.ts
 import { apiService } from "./api";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:5005/api';
+
 export interface AdminUserSearchResult {
   id: string;
   email?: string;
@@ -242,7 +244,7 @@ export const getAdminVehicles = async (token?: string): Promise<VehicleItem[]> =
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch('http://localhost:5000/api/admin/vehicles', {
+  const response = await fetch('http://localhost:5005/api/admin/vehicles', {
     method: 'GET',
     headers,
   });
@@ -261,7 +263,7 @@ export const filterAdminVehicles = async (status: string, token?: string): Promi
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`http://localhost:5000/api/admin/vehicles/filter?status=${encodeURIComponent(status)}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/vehicles/filter?status=${encodeURIComponent(status)}`, {
     method: 'GET',
     headers,
   });
@@ -280,7 +282,7 @@ export const searchAdminVehicles = async (searchTerm: string, token?: string): P
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`http://localhost:5000/api/admin/vehicles/search?search=${encodeURIComponent(searchTerm)}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/vehicles/search?search=${encodeURIComponent(searchTerm)}`, {
     method: 'GET',
     headers,
   });
@@ -302,7 +304,7 @@ export const getVehicleById = async (
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/vehicles/${vehicleId}`, {
     method: 'GET',
     headers,
   });
@@ -332,7 +334,7 @@ export const updateVehicleStatus = async (
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}/status`, {
+    const response = await fetch(`http://localhost:5005/api/admin/vehicles/${vehicleId}/status`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ status }),
@@ -362,7 +364,7 @@ export const acceptVehicle = async (
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}/accept`, {
+    const response = await fetch(`http://localhost:5005/api/admin/vehicles/${vehicleId}/accept`, {
       method: 'PATCH',
       headers,
     });
@@ -391,7 +393,7 @@ export const rejectVehicle = async (
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/vehicles/${vehicleId}/reject`, {
+    const response = await fetch(`http://localhost:5005/api/admin/vehicles/${vehicleId}/reject`, {
       method: 'PATCH',
       headers,
     });
@@ -420,7 +422,7 @@ export const createInspectionReport = async (
   }
 
   try {
-    const response = await fetch('http://localhost:5000/api/admin/inspections', {
+    const response = await fetch('http://localhost:5005/api/admin/inspections', {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -544,7 +546,7 @@ export const acceptInspectionReport = async (
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/inspections/${inspectionId}/accept`, {
+    const response = await fetch(`http://localhost:5005/api/admin/inspections/${inspectionId}/accept`, {
       method: 'PATCH',
       headers,
     });
@@ -573,7 +575,7 @@ export const rejectInspectionReport = async (
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/inspections/${inspectionId}/reject`, {
+    const response = await fetch(`http://localhost:5005/api/admin/inspections/${inspectionId}/reject`, {
       method: 'PATCH',
       headers,
     });
@@ -598,7 +600,7 @@ export const getPendingKYC = async (token?: string): Promise<KYCDocument[]> => {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/kyc', {
+  const response = await fetch('http://localhost:5005/api/admin/content/kyc', {
     method: 'GET',
     headers,
     credentials: 'include',
@@ -618,7 +620,7 @@ export const searchKYC = async (searchTerm: string, token?: string): Promise<KYC
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/search?searchTerm=${encodeURIComponent(searchTerm)}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/content/kyc/search?searchTerm=${encodeURIComponent(searchTerm)}`, {
     method: 'GET',
     headers,
     credentials: 'include',
@@ -638,7 +640,7 @@ export const filterKYC = async (status: string, token?: string): Promise<KYCDocu
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:5000/api/admin/content/kyc/filter?status=${encodeURIComponent(status)}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/content/kyc/filter?status=${encodeURIComponent(status)}`, {
     method: 'GET',
     headers,
     credentials: 'include',
@@ -661,7 +663,7 @@ export const approveKYC = async (kycId: string, token?: string): Promise<{ ok: b
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/approve`, {
+    const response = await fetch(`http://localhost:5005/api/admin/content/kyc/${kycId}/approve`, {
       method: 'PATCH',
       headers,
     });
@@ -687,7 +689,7 @@ export const rejectKYC = async (kycId: string, reason: string, token?: string): 
   }
 
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/reject`, {
+    const response = await fetch(`http://localhost:5005/api/admin/content/kyc/${kycId}/reject`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ reason }),
@@ -713,7 +715,7 @@ export const getPendingPayments = async (token?: string): Promise<PendingPayment
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/payments/pending', {
+  const response = await fetch('http://localhost:5005/api/admin/content/payments/pending', {
     method: 'GET',
     headers,
   });
@@ -733,7 +735,7 @@ export const getreport = async (reportId: string, token?: string): Promise<any> 
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`http://localhost:5000/api/admin/inspections/${reportId}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/inspections/${reportId}`, {
     method: 'GET',
     headers,
   });
@@ -754,7 +756,7 @@ export const editreport = async (reportId: string, payload: Partial<CreateInspec
     headers['Authorization'] = `Bearer ${token}`;
     }
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/inspections/${reportId}/edit`, {
+    const response = await fetch(`http://localhost:5005/api/admin/inspections/${reportId}/edit`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(payload),
@@ -820,7 +822,7 @@ export const getAllAuctions = async (token?: string): Promise<LiveAuction[]> => 
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('http://localhost:5000/api/admin/content/auctions', {
+  const response = await fetch('http://localhost:5005/api/admin/content/auctions', {
     method: 'GET',
     headers,
     credentials: 'include',
@@ -844,7 +846,7 @@ export const filterAuctions = async (status: string, token?: string): Promise<Li
   }
 
   const response = await fetch(
-    `http://localhost:5000/api/admin/content/auctions/filter?status=${encodeURIComponent(status)}`,
+    `http://localhost:5005/api/admin/content/auctions/filter?status=${encodeURIComponent(status)}`,
     {
       method: 'GET',
       headers,
@@ -869,7 +871,7 @@ export const searchAuctions = async (searchTerm: string, token?: string): Promis
   }
 
   const response = await fetch(
-    `http://localhost:5000/api/admin/content/auctions/search?searchTerm=${encodeURIComponent(searchTerm)}`,
+    `http://localhost:5005/api/admin/content/auctions/search?searchTerm=${encodeURIComponent(searchTerm)}`,
     {
       method: 'GET',
       headers,
@@ -901,7 +903,7 @@ export const updateAuctionStatus = async (
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/content/auctions/${auctionId}/status`,
+      `http://localhost:5005/api/admin/content/auctions/${auctionId}/status`,
       {
         method: 'PATCH',
         headers,
@@ -938,7 +940,7 @@ export const setAuctionStartTime = async (
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/content/auctions/${auctionId}/start-time`,
+      `http://localhost:5005/api/admin/content/auctions/${auctionId}/start-time`,
       {
         method: 'PATCH',
         headers,
@@ -964,7 +966,7 @@ export const getAuctionById = async (auctionId: string, token?: string): Promise
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  const response = await fetch(`http://localhost:5000/api/admin/content/auctions/${auctionId}`, {
+  const response = await fetch(`http://localhost:5005/api/admin/content/auctions/${auctionId}`, {
     method: 'GET',
     headers,
   });
@@ -1033,7 +1035,7 @@ export const updateKYC = async (
     headers['Authorization'] = `Bearer ${token}`;
     }
     try {
-    const response = await fetch(`http://localhost:5000/api/admin/content/kyc/${kycId}/status`, {
+    const response = await fetch(`http://localhost:5005/api/admin/content/kyc/${kycId}/status`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify(payload),
@@ -1054,7 +1056,7 @@ export const viewuser = async (userId: string, token?: string): Promise<AdminUse
     if (token) {
     headers['Authorization'] = `Bearer ${token}`;
     }
-    const response = await fetch(`http://localhost:5000/api/admin/content/users/${userId}`, {
+    const response = await fetch(`http://localhost:5005/api/admin/content/users/${userId}`, {
 
     method: 'GET',
     headers,
@@ -1081,7 +1083,7 @@ export const updateUserRole = async (
 
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/users/${userId}/role`,
+      `http://localhost:5005/api/admin/users/${userId}/role`,
       {
         method: "PATCH",
         headers,

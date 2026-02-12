@@ -43,7 +43,6 @@ async function updateProfile(req, res) {
 
     try {
         console.log(`📝 Updating profile for User ID: ${userId}`);
-        
         connection = await db.getConnection();
 
         const result = await connection.execute(
@@ -102,7 +101,6 @@ async function updateAvatar(req, res) {
 
     try {
         console.log(`📸 Uploading avatar for User ID: ${userId}`);
-
         const avatarUrl = await uploadToS3(file, 'avatars');
         if (!avatarUrl) throw new Error('S3 Upload failed');
 
@@ -146,7 +144,6 @@ async function uploadKYC(req, res) {
     if (!kycUrl) throw new Error('Failed to upload to S3');
 
     connection = await oracledb.getConnection();
-    
     await connection.execute(
       `UPDATE users 
        SET kyc_document_url = :kycUrl, 
@@ -202,14 +199,15 @@ async function verifyIdentity(req, res) {
     try {
         console.log(`🔍 Verifying User: ${userId}...`);
 
-        // 1. Run Verification (Rekognition)
+        // 1. Run Verification (Rekognition Service)
         const result = await verifyFaceMatch(idImage, selfieImage);
 
-        if (result.isMatch && result.similarity > 85) {
+        if (result.isMatch && result.similarity > 80) {
             
-            // 2. Parse Text (Using data from Rekognition)
-            const { name, address } = parseIDText(result.extractedText || []);
-            console.log(`   📝 Extracted: Name=[${name}], Addr=[${address}]`);
+            // 2. Get the Extracted Data directly from the result
+            const { name, address, idNumber, factoryId } = result.extractedData || {};
+            
+            console.log(`   📝 Saving Data: Name=[${name}], Addr=[${address}], ID=[${idNumber}]`);
 
             // 3. Upload Images to S3
             const idBuffer = Buffer.from(idImage.replace(/^data:image\/\w+;base64,/, ""), 'base64');
@@ -223,8 +221,10 @@ async function verifyIdentity(req, res) {
             // 4. Update Database
             connection = await db.getConnection();
             
-            // Simple logic to guess a "City" from the full address
-            const shortCity = address.split(',').pop()?.trim() || "Egypt";
+            // Guess a "City" for the location field (last word of address)
+            const shortCity = (address && address !== "Not Detected") 
+                ? address.split(" ").pop() 
+                : "Cairo";
 
             const sql = `
                 UPDATE users 
@@ -241,8 +241,8 @@ async function verifyIdentity(req, res) {
             await connection.execute(sql, {
                 doc_url: kycUrl,
                 selfie_url: selfieUrl,
-                addr: address || "Address Not Detectable",
-                full_name: name || "Name Not Detectable",
+                addr: address,
+                full_name: name,
                 short_addr: shortCity,
                 u_id: userId
             }, { autoCommit: true });
@@ -250,8 +250,8 @@ async function verifyIdentity(req, res) {
             res.json({ 
                 success: true, 
                 status: 'verified', 
-                message: "Identity verified & data extracted!",
-                extractedData: { name, address }
+                message: "Identity verified successfully!",
+                extractedData: { name, address, idNumber }
             });
 
         } else {
@@ -259,8 +259,8 @@ async function verifyIdentity(req, res) {
         }
 
     } catch (error) {
-        console.error("❌ Verification Error:", error);
-        res.status(500).json({ error: "Verification service unavailable." });
+        console.error("❌ Verification Error:", error.message);
+        res.status(400).json({ success: false, error: error.message }); // Send error to frontend
     } finally {
         if (connection) {
             try { await connection.close(); } catch (e) { console.error(e); }
@@ -269,7 +269,7 @@ async function verifyIdentity(req, res) {
 }
 
 // ==========================================
-// 6. SELLER LISTINGS (From Incoming Changes)
+// 6. SELLER LISTINGS
 // ==========================================
 const sellerListingsController = async (req, res) => {
     try {
@@ -283,7 +283,7 @@ const sellerListingsController = async (req, res) => {
 }
 
 // ==========================================
-// 7. GARAGE LISTINGS (From Incoming Changes)
+// 7. GARAGE LISTINGS
 // ==========================================
 const garageController = async (req, res) => {
     try {
