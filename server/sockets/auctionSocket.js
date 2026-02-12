@@ -179,7 +179,12 @@ function initializeAuctionSocket(io) {
     socket.userRole = user.role;
     // Join user's personal room for targeted notifications (outbid, etc.)
     socket.join(`user:${user.id}`);
-    console.log(`[Socket.IO] ✅ User ${user.id} authenticated (${user.role})`);
+    console.log(`[Socket.IO] ✅ User ${user.id} authenticated (${user.role}), socket: ${socket.id}`);
+
+    // If the user was previously in an auction room (reconnection), log it
+    if (socket.currentAuctionId) {
+      console.log(`[Socket.IO] User ${user.id} reconnected, previously in auction: ${socket.currentAuctionId}`);
+    }
 
     // ===== JOIN_AUCTION Event =====
     socket.on('join_auction', async (data) => {
@@ -207,8 +212,10 @@ function initializeAuctionSocket(io) {
         socket.join(`auction:${auctionId}`);
         socket.currentAuctionId = auctionId;
 
+        const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
+        const roomMembers = Array.from(io.sockets.adapter.rooms.get(`auction:${auctionId}`) || []);
         console.log(`[Socket.IO] ✅ User ${userId} (${socket.id}) joined room: auction:${auctionId}`);
-        console.log(`[Socket.IO] Room auction:${auctionId} now has ${io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0} members`);
+        console.log(`[Socket.IO] Room auction:${auctionId} now has ${roomSize} members:`, roomMembers);
 
         // Send current auction state
         socket.emit('auction_joined', {
@@ -250,14 +257,14 @@ function initializeAuctionSocket(io) {
 
     // ===== PLACE_BID Event =====
     socket.on('place_bid', async (data) => {
-
-
       const { auctionId, amount } = data;
 
       if (!auctionId || !amount) {
         socket.emit('bid_error', { message: 'Auction ID and amount required' });
         return;
       }
+
+      let connection;
 
       try {
         // Rate limit check
@@ -271,7 +278,7 @@ function initializeAuctionSocket(io) {
         }
 
         // Get database connection
-        const connection = await db.getConnection();
+        connection = await db.getConnection();
 
         // Fetch pre-bid auction state
         const preBidAuction = await getAuctionDetails(auctionId);
@@ -318,7 +325,11 @@ function initializeAuctionSocket(io) {
 
           // Broadcast to all OTHER sockets in room (bidder already got bid_placed)
           const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
-          console.log(`[Socket.IO] 📢 Broadcasting auction_updated to auction:${auctionId} (${roomSize} members, excl. bidder)`);
+          const roomMembers = Array.from(io.sockets.adapter.rooms.get(`auction:${auctionId}`) || []);
+          console.log(`[Socket.IO] 📢 Broadcasting auction_updated to auction:${auctionId}`);
+          console.log(`[Socket.IO] Room has ${roomSize} total members: ${roomMembers.join(', ')}`);
+          console.log(`[Socket.IO] Bidder socket ${socket.id} will NOT receive broadcast (already got bid_placed)`);
+          console.log(`[Socket.IO] ${roomSize - 1} other socket(s) should receive auction_updated`);
 
           socket.broadcast.to(`auction:${auctionId}`).emit('auction_updated', {
             auctionId,
@@ -336,7 +347,7 @@ function initializeAuctionSocket(io) {
             newEndTime: result.autoExtendInfo?.newEndTime
           });
 
-          console.log(`[Socket.IO] ✅ Broadcast complete to ${roomSize} members`);
+          console.log(`[Socket.IO] ✅ Broadcast complete for auction ${auctionId}`);
 
           // Notify previous leader they've been outbid
           const previousLeaderId = result.bid ? await getPreviousLeader(auctionId, user.id, connection) : null;
@@ -402,7 +413,34 @@ function initializeAuctionSocket(io) {
       if (auctionId && socket.currentAuctionId === auctionId) {
         socket.leave(`auction:${auctionId}`);
         socket.currentAuctionId = null;
-        console.log(`[Socket.IO] User ${socket.userId} left auction ${auctionId}`);
+        const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
+        console.log(`[Socket.IO] User ${socket.userId} (${socket.id}) left auction ${auctionId}`);
+        console.log(`[Socket.IO] Room auction:${auctionId} now has ${roomSize} members`);
+      }
+    });
+
+    // ===== VERIFY_ROOM Event — Health check to confirm room membership =====
+    socket.on('verify_room', (data) => {
+      const { auctionId } = data;
+      if (!auctionId) return;
+
+      const room = io.sockets.adapter.rooms.get(`auction:${auctionId}`);
+      const isInRoom = room && room.has(socket.id);
+      const roomSize = room?.size || 0;
+
+      console.log(`[Socket.IO] verify_room check: User ${socket.userId} (${socket.id}) in auction:${auctionId}? ${isInRoom} (room size: ${roomSize})`);
+
+      socket.emit('room_verified', {
+        auctionId,
+        inRoom: isInRoom,
+        roomSize,
+        socketId: socket.id
+      });
+
+      // If not in room but should be, auto-rejoin
+      if (!isInRoom && socket.currentAuctionId === auctionId) {
+        console.warn(`[Socket.IO] Auto-fixing: User ${socket.userId} should be in auction:${auctionId} but isn't. Rejoining...`);
+        socket.join(`auction:${auctionId}`);
       }
     });
 

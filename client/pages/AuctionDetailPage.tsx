@@ -82,6 +82,69 @@ const AuctionDetailPage: React.FC = () => {
     pushNotificationRef.current = pushNotification;
   }, [pushNotification]);
 
+  // Track last activity time for health check (detects when room membership is lost)
+  const lastActivityTimeRef = useRef(Date.now());
+
+  // ============================================================
+  // DEFENSIVE ROOM REJOIN — Handles edge cases where socket is
+  // connected but user is no longer in the auction room
+  // ============================================================
+  useEffect(() => {
+    if (!id) return;
+
+    // Rejoin room when tab becomes visible (handles background disconnections)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const socket = socketService.getSocket();
+        if (socket?.connected) {
+          console.log('[AuctionDetail] Tab visible, defensively rejoining auction:', id);
+          socketService.joinAuction(id);
+          // Verify room membership
+          socket.emit('verify_room', { auctionId: id });
+        }
+      }
+    };
+
+    // Handle room verification response
+    const handleRoomVerified = (data: { auctionId: string; inRoom: boolean; roomSize: number }) => {
+      console.log('[AuctionDetail] Room verification:', data);
+      if (!data.inRoom && data.auctionId === id) {
+        console.warn('[AuctionDetail] Not in room! Rejoining...');
+        socketService.joinAuction(id);
+        addLocalNotification('Reconnected to auction updates', 'info');
+      }
+    };
+
+    // Periodic health check: verify we're still receiving updates
+    // If socket is connected but we haven't seen an update in 30s, verify room membership
+    const healthCheckInterval = setInterval(() => {
+      const socket = socketService.getSocket();
+      if (socket?.connected && !isCancelled && auctionStatus === 'ACTIVE') {
+        const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
+        if (timeSinceActivity > 30000) {
+          console.warn('[AuctionDetail] No activity for 30s, verifying room membership');
+          socket.emit('verify_room', { auctionId: id });
+          lastActivityTimeRef.current = Date.now();
+        }
+      }
+    }, 15000); // Check every 15 seconds
+
+    const socket = socketService.getSocket();
+    if (socket) {
+      socket.on('room_verified', handleRoomVerified);
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (socket) {
+        socket.off('room_verified', handleRoomVerified);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(healthCheckInterval);
+    };
+  }, [id, isCancelled, auctionStatus]);
+
   // ============================================================
   // 1. FETCH AUCTION DATA FROM API
   // ============================================================
@@ -226,23 +289,28 @@ const AuctionDetailPage: React.FC = () => {
     console.log('[AuctionDetail] Socket instance:', socket.id, 'Connected:', socket.connected);
     setSocketConnected(socket.connected);
 
-    socket.on('connect', () => {
+    // Named handler functions with stable references for proper cleanup
+    const handleConnect = () => {
       console.log('[AuctionDetail] Socket connected, joining auction:', id);
       setSocketConnected(true);
       addLocalNotification('Connected to live updates', 'success');
       // Re-join auction room after reconnect
       socketService.joinAuction(id);
-    });
+    };
     
-    socket.on('disconnect', () => {
+    const handleDisconnect = () => {
       console.log('[AuctionDetail] Socket disconnected');
       setSocketConnected(false);
       pushNotificationRef.current(
-        'Lost connection to live updates. Refresh to reconnect.',
+        'Lost connection to live updates. Attempting to reconnect...',
         'error'
       );
-      addLocalNotification('Connection lost. Refresh to reconnect.', 'warn');
-    });
+      addLocalNotification('Connection lost. Reconnecting...', 'warn');
+    };
+
+    // Register handlers with named references (critical for proper cleanup)
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     // Join the auction room immediately if already connected
     if (socket.connected) {
@@ -253,6 +321,7 @@ const AuctionDetailPage: React.FC = () => {
     // Server sends current state on join
     const handleAuctionJoined = (data: socketService.AuctionJoinedEvent) => {
       console.log('[AuctionDetail] ✅ auction_joined event received:', data);
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
       setMinBidIncrement(data.minBidIncrement || 50);
@@ -267,6 +336,7 @@ const AuctionDetailPage: React.FC = () => {
     // Server sends recent bid history on join (anonymized names from server)
     const handleBidHistory = (data: { bids: any[] }) => {
       console.log('[AuctionDetail] ✅ bid_history event received:', data.bids?.length, 'bids');
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       const formattedBids: RealTimeBid[] = (data.bids || []).map((b: any) => ({
         id: b.id || Math.random().toString(36).slice(2),
         bidderId: b.displayName || `User ${(b.bidderId || '').substring(0, 4)}***`,
@@ -280,6 +350,7 @@ const AuctionDetailPage: React.FC = () => {
     // Bid confirmation — sent ONLY to the bidder's own socket (instant feedback)
     const handleBidPlaced = (data: any) => {
       console.log('[AuctionDetail] ✅ bid_placed (confirmation):', data);
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
 
       const { bid, auction: auctionState, autoExtended, autoExtendInfo } = data;
 
@@ -331,6 +402,7 @@ const AuctionDetailPage: React.FC = () => {
         bidCount: data.bidCount,
         timestamp: new Date().toISOString()
       });
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
 
       // Update all state from socket payload (no DB call)
       setCurrentBid(data.currentBid);
@@ -368,6 +440,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // User outbid notification
     const handleUserOutbid = (data: socketService.UserOutbidEvent) => {
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       pushNotificationRef.current(
         `You've been outbid! New leading bid: EGP ${data.newBid.toLocaleString()}`,
         'warn'
@@ -380,6 +453,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // Auction ended
     const handleAuctionEnded = (data: socketService.AuctionEndedEvent) => {
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       setIsCancelled(true);
       setAuctionStatus('ENDED');
       pushNotificationRef.current(
@@ -393,6 +467,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // Auction ending soon
     const handleAuctionEndingSoon = (data: { auctionId: string; minutesLeft: number }) => {
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       addLocalNotification(
         `Auction ending in ${data.minutesLeft} minute${data.minutesLeft === 1 ? '' : 's'}!`,
         'warn'
@@ -401,6 +476,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // Bid errors
     const handleBidError = (error: { message: string }) => {
+      lastActivityTimeRef.current = Date.now(); // Track activity for health check
       setBidError(error.message);
       addLocalNotification(error.message, 'warn');
     };
@@ -418,16 +494,25 @@ const AuctionDetailPage: React.FC = () => {
 
     return () => {
       console.log('[AuctionDetail] Cleanup: removing event listeners and leaving auction:', id);
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('auction_joined', handleAuctionJoined);
-      socket.off('bid_history', handleBidHistory);
-      socket.off('bid_placed', handleBidPlaced);
-      socket.off('auction_updated', handleAuctionUpdated);
-      socketService.offUserOutbid(handleUserOutbid);
-      socketService.offAuctionEnded(handleAuctionEnded);
-      socketService.offAuctionEndingSoon(handleAuctionEndingSoon);
-      socketService.offBidError(handleBidError);
+      
+      // CRITICAL: Only remove the specific handlers we registered, not ALL handlers
+      // Validate socket instance hasn't changed (prevents cleaning up wrong socket)
+      const currentSocket = socketService.getSocket();
+      if (currentSocket === socket) {
+        socket.off('connect', handleConnect);
+        socket.off('disconnect', handleDisconnect);
+        socket.off('auction_joined', handleAuctionJoined);
+        socket.off('bid_history', handleBidHistory);
+        socket.off('bid_placed', handleBidPlaced);
+        socket.off('auction_updated', handleAuctionUpdated);
+        socketService.offUserOutbid(handleUserOutbid);
+        socketService.offAuctionEnded(handleAuctionEnded);
+        socketService.offAuctionEndingSoon(handleAuctionEndingSoon);
+        socketService.offBidError(handleBidError);
+      } else {
+        console.warn('[AuctionDetail] Socket instance changed during component lifetime, skipping cleanup');
+      }
+      
       socketService.leaveAuction(id);
     };
   }, [id]);
