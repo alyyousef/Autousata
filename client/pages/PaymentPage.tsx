@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CreditCard, Lock, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { apiService } from '../services/api';
@@ -7,11 +7,13 @@ import { useStripe as useStripeContext } from '../contexts/StripeContext';
 
 // Inner payment form component that uses Stripe hooks
 const PaymentForm: React.FC<{
-  auction: any;
+  item: any;
   clientSecret: string;
   paymentId: string;
+  gatewayOrderId: string;
+  purchaseType: string;
   breakdown: any;
-}> = ({ auction, clientSecret, paymentId, breakdown }) => {
+}> = ({ item, clientSecret, paymentId, gatewayOrderId, purchaseType, breakdown }) => {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
@@ -33,7 +35,7 @@ const PaymentForm: React.FC<{
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: window.location.origin + `/#/payment/${auction.id}/confirmation`,
+          return_url: window.location.origin + `/#/payment/${item.id}/confirmation?type=${purchaseType}`,
         },
         redirect: 'if_required',
       });
@@ -45,8 +47,8 @@ const PaymentForm: React.FC<{
       }
 
       if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Confirm payment in backend
-        const confirmResponse = await apiService.confirmPayment(paymentId);
+        // Confirm payment in backend (pass gatewayOrderId so backend can create the payment record)
+        const confirmResponse = await apiService.confirmPayment(paymentId, gatewayOrderId);
         
         if (confirmResponse.error) {
           setErrorMessage(confirmResponse.error);
@@ -54,8 +56,8 @@ const PaymentForm: React.FC<{
           return;
         }
 
-        // Navigate to confirmation page
-        navigate(`/payment/${auction.id}/confirmation`);
+        // Navigate to confirmation page with type
+        navigate(`/payment/${item.id}/confirmation?type=${purchaseType}`);
       } else {
         setErrorMessage('Payment processing incomplete');
         setIsProcessing(false);
@@ -94,7 +96,7 @@ const PaymentForm: React.FC<{
         <h3 className="text-sm font-semibold text-slate-700">Payment Breakdown</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-600">Winning Bid</span>
+            <span className="text-slate-600">Vehicle Price</span>
             <span className="font-medium text-slate-900">
               EGP {breakdown.bidAmount.toLocaleString()}
             </span>
@@ -144,7 +146,7 @@ const PaymentForm: React.FC<{
 
       <div className="text-center">
         <Link
-          to={`/listing/${auction.id}`}
+          to={`/listing/${item.id}`}
           className="text-xs text-slate-500 hover:text-slate-700"
         >
           Back to listing
@@ -156,13 +158,18 @@ const PaymentForm: React.FC<{
 
 const PaymentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { stripe: stripeInstance, isLoading: stripeLoading } = useStripeContext();
   
-  const [auction, setAuction] = useState<any>(null);
+  // Check if this is a direct purchase (from browse) or auction payment
+  const purchaseType = searchParams.get('type') === 'direct' ? 'direct' : 'auction';
+  
+  const [item, setItem] = useState<any>(null); // Can be auction or vehicle
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [gatewayOrderId, setGatewayOrderId] = useState<string | null>(null);
   const [breakdown, setBreakdown] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,43 +177,99 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     const initializePayment = async () => {
       if (!id) {
-        setError('Invalid auction ID');
+        setError(purchaseType === 'direct' ? 'Invalid vehicle ID' : 'Invalid auction ID');
         setIsLoading(false);
         return;
       }
 
       try {
-        // Fetch auction details first
-        const auctionRes = await apiService.getAuctionById(id);
-        if (auctionRes.error || !auctionRes.data) {
-           setError(auctionRes.error || 'Auction not found');
-           setIsLoading(false);
-           return;
-        }
+        if (purchaseType === 'direct') {
+          // Direct purchase flow - fetch vehicle and create direct payment intent
+          const vehicleRes = await apiService.getPublicVehicle(id);
+          if (vehicleRes.error || !vehicleRes.data) {
+            setError(vehicleRes.error || 'Vehicle not found');
+            setIsLoading(false);
+            return;
+          }
 
-        // Must transform API response to flat structure needed by UI
-        const fetchedAuction = {
+          const vehicle = vehicleRes.data;
+          setItem({
+            id: vehicle._id || vehicle.id,
+            vehicle: {
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+            }
+          });
+
+          // Create direct payment intent
+          const response = await apiService.createDirectPaymentIntent(id);
+
+          if (response.error) {
+            setError(response.error);
+            setIsLoading(false);
+            return;
+          }
+
+          if (response.data) {
+            setClientSecret(response.data.clientSecret);
+            setPaymentId(response.data.paymentId);
+            setGatewayOrderId(response.data.gatewayOrderId);
+            // Store in sessionStorage for confirmation page
+            sessionStorage.setItem(`payment_${id}`, JSON.stringify({
+              paymentId: response.data.paymentId,
+              gatewayOrderId: response.data.gatewayOrderId,
+              type: 'direct'
+            }));
+            // Map vehiclePrice to bidAmount for consistency in breakdown display
+            setBreakdown({
+              bidAmount: response.data.breakdown.vehiclePrice,
+              platformCommission: response.data.breakdown.platformCommission,
+              stripeFee: response.data.breakdown.stripeFee,
+              totalAmount: response.data.breakdown.totalAmount,
+              sellerPayout: response.data.breakdown.sellerPayout
+            });
+          }
+        } else {
+          // Auction payment flow - existing logic
+          const auctionRes = await apiService.getAuctionById(id);
+          if (auctionRes.error || !auctionRes.data) {
+            setError(auctionRes.error || 'Auction not found');
+            setIsLoading(false);
+            return;
+          }
+
+          // Must transform API response to flat structure needed by UI
+          const fetchedAuction = {
             id: auctionRes.data._id || auctionRes.data.id,
             vehicle: {
-                year: auctionRes.data.vehicleId.year,
-                make: auctionRes.data.vehicleId.make,
-                model: auctionRes.data.vehicleId.model,
+              year: auctionRes.data.vehicleId.year,
+              make: auctionRes.data.vehicleId.make,
+              model: auctionRes.data.vehicleId.model,
             }
-        };
-        setAuction(fetchedAuction);
+          };
+          setItem(fetchedAuction);
 
-        const response = await apiService.createPaymentIntent(id);
+          const response = await apiService.createPaymentIntent(id);
 
-        if (response.error) {
-          setError(response.error);
-          setIsLoading(false);
-          return;
-        }
+          if (response.error) {
+            setError(response.error);
+            setIsLoading(false);
+            return;
+          }
 
-        if (response.data) {
-          setClientSecret(response.data.clientSecret);
-          setPaymentId(response.data.paymentId);
-          setBreakdown(response.data.breakdown);
+          if (response.data) {
+            setClientSecret(response.data.clientSecret);
+            setPaymentId(response.data.paymentId);
+            setGatewayOrderId(response.data.gatewayOrderId);
+            // Store in sessionStorage for confirmation page
+            sessionStorage.setItem(`payment_${id}`, JSON.stringify({
+              paymentId: response.data.paymentId,
+              gatewayOrderId: response.data.gatewayOrderId,
+              type: 'auction'
+            }));
+            setBreakdown(response.data.breakdown);
+          }
         }
 
         setIsLoading(false);
@@ -217,7 +280,7 @@ const PaymentPage: React.FC = () => {
     };
 
     initializePayment();
-  }, [id]);
+  }, [id, purchaseType]);
 
   // Loading state
   if (isLoading || stripeLoading) {
@@ -232,14 +295,14 @@ const PaymentPage: React.FC = () => {
   }
 
   // Error state
-  if (error || !auction) {
+  if (error || !item) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center max-w-md">
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
           <h1 className="text-xl font-semibold text-slate-900 mb-2">Payment Error</h1>
           <p className="text-sm text-slate-600 mb-4">
-            {error || 'We could not find this auction.'}
+            {error || 'We could not find this listing.'}
           </p>
           <Link
             to="/browse"
@@ -253,7 +316,7 @@ const PaymentPage: React.FC = () => {
   }
 
   // No client secret yet
-  if (!clientSecret || !paymentId || !breakdown) {
+  if (!clientSecret || !paymentId || !gatewayOrderId || !breakdown) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center">
@@ -275,7 +338,7 @@ const PaymentPage: React.FC = () => {
               <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Secure payment</p>
               <h1 className="text-2xl font-semibold text-slate-900">Complete your purchase</h1>
               <p className="text-sm text-slate-500 mt-1">
-                {auction.vehicle.year} {auction.vehicle.make} {auction.vehicle.model}
+                {item.vehicle.year} {item.vehicle.make} {item.vehicle.model}
               </p>
             </div>
             <div className="text-right">
@@ -317,9 +380,11 @@ const PaymentPage: React.FC = () => {
               }}
             >
               <PaymentForm
-                auction={auction}
+                item={item}
                 clientSecret={clientSecret}
                 paymentId={paymentId}
+                gatewayOrderId={gatewayOrderId}
+                purchaseType={purchaseType}
                 breakdown={breakdown}
               />
             </Elements>

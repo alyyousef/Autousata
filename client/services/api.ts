@@ -202,6 +202,7 @@ const API_BASE_URL = 'http://localhost:5000/api';
       success: boolean;
       clientSecret: string;
       paymentId: string;
+      gatewayOrderId: string;
       breakdown: {
         vehiclePrice: number;
         platformCommission: number;
@@ -395,6 +396,7 @@ const API_BASE_URL = 'http://localhost:5000/api';
         success: boolean;
         clientSecret: string;
         paymentId: string;
+        gatewayOrderId: string;
         breakdown: {
           bidAmount: number;
           platformCommission: number;
@@ -414,6 +416,30 @@ const API_BASE_URL = 'http://localhost:5000/api';
     }
 
   
+
+    /**
+     * Get payment details by vehicle ID (for direct purchases)
+     */
+    async getPaymentByVehicle(vehicleId: string) {
+      return this.request<{
+        success: boolean;
+        payment: {
+          id: string;
+          vehicleId: string;
+          purchaseType: string;
+          amountEGP: number;
+          status: string;
+          initiatedAt: string;
+          completedAt?: string;
+          escrow?: {
+            id: string;
+            status: string;
+            commissionEGP: number;
+            sellerPayoutEGP: number;
+          };
+        };
+      }>(`/payments/vehicle/${vehicleId}`);
+    }
 
     /**
      * Get payment details by auction ID
@@ -444,14 +470,15 @@ const API_BASE_URL = 'http://localhost:5000/api';
     /**
      * Confirm payment completion
      */
-    async confirmPayment(paymentId: string) {
+    async confirmPayment(paymentId: string, gatewayOrderId?: string) {
       return this.request<{
         success: boolean;
         message: string;
-        paymentId: string;
-        escrowId: string;
+        payment: any;
+        breakdown: any;
       }>(`/payments/${paymentId}/confirm`, {
         method: 'POST',
+        body: JSON.stringify({ gatewayOrderId }),
       });
     }
 
