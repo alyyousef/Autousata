@@ -12,7 +12,6 @@ import ImageLightbox from '../components/ImageLightbox';
 import RealTimeBidHistory, { RealTimeBid } from '../components/RealTimeBidHistory';
 import * as socketService from '../services/socketService';
 import { apiService } from '../services/api';
-import { handleApiError } from '../utils/errorHandler';
 import { CardSkeleton, Skeleton } from '../components/LoadingSkeleton';
 
 const MIN_BID = 50;

@@ -14,14 +14,7 @@ export const initializeSocket = (): Socket => {
     return socket;
   }
 
-  // Clean up previous socket if it exists but disconnected
-  if (socket) {
-    socket.removeAllListeners();
-    socket.disconnect();
-    socket = null;
-  }
-
-  const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005';
+  const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const token = getAuthToken();
 
   if (!token) {

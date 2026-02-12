@@ -250,6 +250,8 @@ function initializeAuctionSocket(io) {
 
     // ===== PLACE_BID Event =====
     socket.on('place_bid', async (data) => {
+
+
       const { auctionId, amount } = data;
 
       if (!auctionId || !amount) {
