@@ -60,18 +60,24 @@ app.use("/api", globalLimiter);
 // 3. STANDARD MIDDLEWARE
 // =====================================================
 // Webhook route MUST come before express.json()
-const webhookRoutes = require('./routes/webhooks');
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+const webhookRoutes = require("./routes/webhooks");
+app.use(
+  "/api/webhooks",
+  express.raw({ type: "application/json" }),
+  webhookRoutes,
+);
 
-app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // HTTP Logger
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 
 // =====================================================
 // 4. ROUTES
@@ -85,7 +91,9 @@ const adminAuthRoutes = require("./routes/adminAuth");
 const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
 const adminRoutes = require("./routes/admin");
+const adminActivityRoutes = require("./routes/adminActivityRoutes");
 
+app.use("/api/admin/activity-logs", adminActivityRoutes);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/vehicles", vehicleRoutes);
@@ -128,8 +136,8 @@ app.use(errorHandler);
 // =====================================================
 // 6. SERVER STARTUP
 // =====================================================
-const initializeAuctionSocket = require('./sockets/auctionSocket');
-const auctionScheduler = require('./services/auctionScheduler');
+const initializeAuctionSocket = require("./sockets/auctionSocket");
+const auctionScheduler = require("./services/auctionScheduler");
 
 async function startServer() {
   try {

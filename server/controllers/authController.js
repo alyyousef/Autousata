@@ -9,6 +9,7 @@ const {
   sendPasswordResetEmail,
 } = require("../services/emailService");
 require("dotenv").config();
+const { logActivity } = require("../services/activityLogsServices");
 
 // ==========================================
 // 1. REGISTER
@@ -20,9 +21,9 @@ async function register(req, res) {
 
   const phoneRegex = /^[0-9]{10,15}$/;
   if (!phoneRegex.test(phone)) {
-    return res
-      .status(400)
-      .json({ error: "Invalid phone format. Only numbers allowed (10-15 digits)." });
+    return res.status(400).json({
+      error: "Invalid phone format. Only numbers allowed (10-15 digits).",
+    });
   }
   if (!password || password.length < 8) {
     return res
@@ -50,7 +51,7 @@ async function register(req, res) {
         img: profilePicUrl,
         out_id: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
         out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-      }
+      },
     );
 
     const status = result.outBinds.out_status;
@@ -66,14 +67,24 @@ async function register(req, res) {
              email_token_expiry = :expiry
          WHERE LOWER(email) = :email`,
         { otp: otpCode, expiry: expiryTime, email: email.toLowerCase() },
-        { autoCommit: true }
+        { autoCommit: true },
       );
 
       sendVerificationEmail(email, otpCode).catch((e) =>
-        console.error("Email failed:", e)
+        console.error("Email failed:", e),
       );
 
       const { accessToken, refreshToken } = generateTokens(newUserId);
+      await logActivity({
+        userId: newUserId,
+        userRole: "client",
+        action: "REGISTER_SUCCESS",
+        severity: "INFO",
+        description: `User registered: ${email}`,
+        ipAddress: getIp(req),
+        userAgent: req.headers["user-agent"] || null,
+      });
+
       return res.status(201).json({
         message: "User registered successfully. Please verify your email.",
         accessToken,
@@ -92,6 +103,17 @@ async function register(req, res) {
 
     return res.status(400).json({ error: status });
   } catch (err) {
+    await logActivity({
+      userId: "null",
+      userRole: "client",
+      action: "REGISTER_FAILED",
+      severity: err.message?.includes("ORA-00001") ? "WARN" : "ALERT",
+
+      description: `Registration failed for: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
+
     console.error("Registration Error:", err);
     if (err.message?.includes("ORA-00001")) {
       return res.status(409).json({ error: "Email already exists" });
@@ -127,7 +149,7 @@ async function login(req, res) {
         role: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
         img: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
         status: { dir: oracledb.BIND_OUT, type: oracledb.STRING },
-      }
+      },
     );
 
     const authData = result.outBinds;
@@ -149,7 +171,7 @@ async function login(req, res) {
         const userResult = await connection.execute(
           `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
           [authData.id],
-          { outFormat: oracledb.OUT_FORMAT_OBJECT }
+          { outFormat: oracledb.OUT_FORMAT_OBJECT },
         );
 
         if (userResult.rows.length > 0) {
@@ -169,6 +191,17 @@ async function login(req, res) {
             location: { city: dbUser.LOCATION_CITY || "" },
           };
           const { accessToken, refreshToken } = generateTokens(fullUser.id);
+
+          await logActivity({
+            userId: authData.id,
+            userRole: authData.role,
+            action: "LOGIN_SUCCESS",
+            severity: "INFO",
+            description: `Login success: ${email}`,
+            ipAddress: getIp(req),
+            userAgent: req.headers["user-agent"] || null,
+          });
+
           return res.json({
             message: "Login successful",
             accessToken,
@@ -196,18 +229,51 @@ async function login(req, res) {
         },
       });
     }
+    await logActivity({
+      userId: authData?.id || null,
+      userRole: authData?.role || null,
+      action: "LOGIN_FAILED",
+      severity: "WARN",
+      description: `Login failed: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
 
     return res.status(401).json({ error: "Invalid credentials" });
   } catch (err) {
     console.error("Login Error:", err);
+    await logActivity({
+      userId: authData?.id || "null",
+      userRole: authData?.role || "null",
+      action: "LOGIN_BLOCKED_UNVERIFIED",
+      severity: "WARN",
+      description: `Login blocked (unverified email): ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
+
     return res.status(500).json({ error: "Login failed" });
   } finally {
     if (connection) {
       try {
         await connection.close();
-      } catch (e) {}
+      } catch (e) {
+        await logActivity({
+          userId: "null",
+          userRole: "client",
+          action: "LOGIN_ERROR",
+          severity: "ALERT",
+          description: `Login server error for: ${email}`,
+          ipAddress: getIp(req),
+          userAgent: req.headers["user-agent"] || null,
+        });
+      }
     }
   }
+}
+
+function getIp(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
 }
 
 // ==========================================
@@ -220,13 +286,32 @@ async function verifyEmailOtp(req, res) {
   try {
     const safeEmail = email.toLowerCase();
     connection = await db.getConnection();
+    await logActivity({
+      userId: null,
+      userRole: "client",
+      action: "EMAIL_VERIFIED",
+      severity: "INFO",
+      description: `Email verified: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
 
     const result = await connection.execute(
       `SELECT TRIM(email_verification_token) as TOKEN, email_token_expiry as EXPIRY
        FROM users WHERE LOWER(email) = :email`,
       [safeEmail],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
+
+    await logActivity({
+      userId: null,
+      userRole: "client",
+      action: "EMAIL_VERIFY_FAILED",
+      severity: "WARN",
+      description: `Email verification failed for: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
 
     if (result.rows.length === 0) {
       return res.status(400).json({ error: "User not found." });
@@ -236,7 +321,9 @@ async function verifyEmailOtp(req, res) {
     const dbToken = user.TOKEN;
 
     if (!dbToken) {
-      return res.status(400).json({ error: "No active code. Please click Resend." });
+      return res
+        .status(400)
+        .json({ error: "No active code. Please click Resend." });
     }
 
     const expiry = new Date(user.EXPIRY);
@@ -253,7 +340,7 @@ async function verifyEmailOtp(req, res) {
     await connection.execute(
       `UPDATE users SET email_verified = '1', email_verification_token = NULL, email_token_expiry = NULL WHERE LOWER(email) = :email`,
       { email: safeEmail },
-      { autoCommit: true }
+      { autoCommit: true },
     );
 
     return res.json({ success: true, message: "Email verified successfully!" });
@@ -306,10 +393,11 @@ async function getMe(req, res) {
     const result = await connection.execute(
       `SELECT ID, FIRST_NAME, LAST_NAME, EMAIL, PHONE, ROLE, PROFILE_PIC_URL, EMAIL_VERIFIED, PHONE_VERIFIED, KYC_STATUS, KYC_DOCUMENT_URL, LOCATION_CITY FROM USERS WHERE ID = :id`,
       [targetId],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
 
-    if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: "User not found" });
 
     const dbUser = result.rows[0];
     return res.json({
@@ -353,7 +441,7 @@ async function forgotPassword(req, res) {
     connection = await db.getConnection();
     const check = await connection.execute(
       `SELECT id FROM users WHERE email = :email`,
-      [email]
+      [email],
     );
 
     if (check.rows.length === 0) {
@@ -370,12 +458,31 @@ async function forgotPassword(req, res) {
     await connection.execute(
       `UPDATE users SET reset_password_token = :token, reset_password_expiry = :expiry WHERE id = :id`,
       { token: resetToken, expiry: expiry, id: userId },
-      { autoCommit: true }
+      { autoCommit: true },
     );
+    await logActivity({
+      userId,
+      userRole: "client",
+      action: "PASSWORD_RESET_REQUEST",
+      severity: "INFO",
+      description: `Password reset requested: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
 
     await sendPasswordResetEmail(email, resetToken);
     return res.json({ success: true, message: "Password reset link sent." });
   } catch (err) {
+    await logActivity({
+      userId: null,
+      userRole: "client",
+      action: "PASSWORD_RESET_FAILED",
+      severity: "WARN",
+      description: `Password reset failed: ${email}`,
+      ipAddress: getIp(req),
+      userAgent: req.headers["user-agent"] || null,
+    });
+
     console.error("Forgot Password Error:", err);
     return res.status(500).json({ error: "Server error" });
   } finally {
@@ -400,10 +507,11 @@ async function resetPassword(req, res) {
     const result = await connection.execute(
       `SELECT id, reset_password_expiry FROM users WHERE reset_password_token = :token`,
       [token],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
 
-    if (result.rows.length === 0) return res.status(400).json({ error: "Invalid token." });
+    if (result.rows.length === 0)
+      return res.status(400).json({ error: "Invalid token." });
 
     const user = result.rows[0];
     if (new Date() > new Date(user.RESET_PASSWORD_EXPIRY)) {
@@ -414,7 +522,7 @@ async function resetPassword(req, res) {
     await connection.execute(
       `UPDATE users SET password_hash = :pw, reset_password_token = NULL, reset_password_expiry = NULL WHERE id = :id`,
       { pw: hashedPassword, id: user.ID },
-      { autoCommit: true }
+      { autoCommit: true },
     );
 
     return res.json({ message: "Password reset successfully." });
@@ -451,7 +559,7 @@ async function resendOtp(req, res) {
            email_token_expiry = :expiry
        WHERE email = :email`,
       { otp: newOtp, expiry: expiryTime, email: email },
-      { autoCommit: true }
+      { autoCommit: true },
     );
 
     if (result.rowsAffected === 0) {

@@ -1,19 +1,50 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const userController = require('../controllers/userController');
-const { authenticate } = require('../middleware/auth');
-const { upload } = require('../middleware/uploadMiddleware'); // Need 'upload' for file parsing
+const userController = require("../controllers/userController");
+const { authenticate } = require("../middleware/auth");
+const { upload } = require("../middleware/uploadMiddleware"); // Need 'upload' for file parsing
+const activityLogger = require("../middleware/activityLogger");
 
-console.log('✅ Profile Routes Loaded');
+console.log("✅ Profile Routes Loaded");
 
-// PUT /api/profile (Text Data)
-router.put('/', authenticate, userController.updateProfile);
+router.put(
+  "/",
+  authenticate,
+  activityLogger({
+    action: "PROFILE_UPDATE",
+    severity: "INFO",
+    entityType: "USER",
+    getEntityId: (req) => req.user.id,
+  }),
+  userController.updateProfile,
+);
 
-// PUT /api/profile/avatar (Image Data)
-// We use 'upload.single("avatar")' because that's what the frontend sends
-router.put('/avatar', authenticate, upload.single('avatar'), userController.updateAvatar);
-router.put('/kyc', authenticate, upload.single('kycDocument'), userController.uploadKYC);
+router.put(
+  "/avatar",
+  authenticate,
+  upload.single("avatar"),
+  activityLogger({
+    action: "AVATAR_UPLOAD",
+    severity: "INFO",
+    entityType: "USER",
+    getEntityId: (req) => req.user.id,
+  }),
+  userController.updateAvatar,
+);
 
-router.get('/listings',authenticate,userController.sellerListingsController);
-router.get('/mygarage',authenticate,userController.garageController);
+router.put(
+  "/kyc",
+  authenticate,
+  upload.single("kycDocument"),
+  activityLogger({
+    action: "KYC_UPLOAD",
+    severity: "WARN", // KYC is sensitive
+    entityType: "USER",
+    getEntityId: (req) => req.user.id,
+  }),
+  userController.uploadKYC,
+);
+
+router.get("/listings", authenticate, userController.sellerListingsController);
+router.get("/mygarage", authenticate, userController.garageController);
 module.exports = router;

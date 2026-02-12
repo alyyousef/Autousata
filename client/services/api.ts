@@ -634,6 +634,47 @@ class ApiService {
 
     return this.request(`/admin/finance/revenue?${qs}`, { method: 'GET' });
   }
+
+
+    // ===================== Admin Activity Logs =====================
+  async adminGetActivityLogs(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    severity?: string;
+    role?: string;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
+    suspiciousOnly?: boolean;
+    from?: string; // ISO date/time string
+    to?: string;   // ISO date/time string
+  }) {
+    const qp = new URLSearchParams();
+    if (params.page) qp.set("page", String(params.page));
+    if (params.limit) qp.set("limit", String(params.limit));
+    if (params.search) qp.set("search", params.search);
+    if (params.severity) qp.set("severity", params.severity);
+    if (params.role) qp.set("role", params.role);
+    if (params.action) qp.set("action", params.action);
+    if (params.entityType) qp.set("entityType", params.entityType);
+    if (params.entityId) qp.set("entityId", params.entityId);
+    if (typeof params.suspiciousOnly === "boolean") qp.set("suspiciousOnly", params.suspiciousOnly ? "1" : "0");
+    if (params.from) qp.set("from", params.from);
+    if (params.to) qp.set("to", params.to);
+
+    return this.request(`/admin/activity-logs?${qp.toString()}`, { method: "GET" });
+  }
+
+  async adminGetActivityLogById(id: string) {
+    return this.request(`/admin/activity-logs/${encodeURIComponent(id)}`, { method: "GET" });
+  }
+
+  async adminGetActivityAnalytics(params: { from: string; to: string }) {
+    const qp = new URLSearchParams({ from: params.from, to: params.to });
+    return this.request(`/admin/activity-logs/analytics?${qp.toString()}`, { method: "GET" });
+  }
+
 }
 
 export const apiService = new ApiService();

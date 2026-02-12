@@ -37,6 +37,11 @@ import PaymentConfirmationPage from "./pages/PaymentConfirmationPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
+
+import AdminActivityLogsPage from "./pages/AdminActivityLogsPage";
+import AdminActivityAlertsPage from "./pages/AdminActivityAlertsPage";
+import AdminActivityAnalyticsPage from "./pages/AdminActivityAnalyticsPage";
+
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
 
@@ -100,7 +105,6 @@ const AppRoutes: React.FC = () => {
             element={<PaymentConfirmationPage />}
           />
         </Route>
-
         {/* ===================== PROTECTED (Layout) ===================== */}
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
@@ -143,6 +147,31 @@ const AppRoutes: React.FC = () => {
             }
           />
         </Route>
+
+        <Route
+          path="/admin/activity"
+          element={
+            <RequireAdmin>
+              <AdminActivityLogsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/activity/alerts"
+          element={
+            <RequireAdmin>
+              <AdminActivityAlertsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/activity/analytics"
+          element={
+            <RequireAdmin>
+              <AdminActivityAnalyticsPage />
+            </RequireAdmin>
+          }
+        />
       </Routes>
     </>
   );

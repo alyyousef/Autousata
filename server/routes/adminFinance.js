@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { authenticate, authorize } = require("../middleware/auth");
 const adminFinanceController = require("../controllers/adminFinanceController");
+//const activityLogger = require("../middleware/activityLogger");
 
 // GET /api/admin/finance/revenue?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month
 router.get(
