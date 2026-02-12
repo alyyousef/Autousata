@@ -225,14 +225,27 @@ router.post('/', auth, upload.array('images', 10), async (req, res) => {
 
     connection = await oracledb.getConnection();
 
-    const existingVehicle = await connection.execute(
-      `SELECT id FROM vehicles WHERE vin = :vin OR plate_number = :plateNumber`,
-      { vin, plateNumber: normalizedPlateNumber },
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
+    // Only check for duplicates if VIN or plate number is actually provided
+    if (vin || normalizedPlateNumber) {
+      const conditions = [];
+      const binds = {};
+      if (vin) {
+        conditions.push('vin = :vin');
+        binds.vin = vin;
+      }
+      if (normalizedPlateNumber) {
+        conditions.push('plate_number = :plateNumber');
+        binds.plateNumber = normalizedPlateNumber;
+      }
+      const existingVehicle = await connection.execute(
+        `SELECT id FROM vehicles WHERE ${conditions.join(' OR ')}`,
+        binds,
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
 
-    if (existingVehicle.rows && existingVehicle.rows.length > 0) {
-      return res.status(400).json({ msg: 'Vehicle with this VIN or Plate Number already exists' });
+      if (existingVehicle.rows && existingVehicle.rows.length > 0) {
+        return res.status(400).json({ msg: 'Vehicle with this VIN or Plate Number already exists' });
+      }
     }
 
     const vehicleId = randomUUID();
@@ -299,8 +312,8 @@ router.post('/', auth, upload.array('images', 10), async (req, res) => {
       {
         id: vehicleId,
         sellerId: req.user.id,
-        vin,
-        plateNumber: normalizedPlateNumber,
+        vin: vin || null,
+        plateNumber: normalizedPlateNumber || null,
         status: 'draft',
         make,
         model,

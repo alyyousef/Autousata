@@ -11,7 +11,7 @@ export const geminiService = {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Create a professional, persuasive, and detailed car auction listing description for a ${specs.year} ${specs.make} ${specs.model} in ${specs.condition} condition. Key notes: ${specs.notes}. Include sections for Exterior, Interior, Mechanical, and Why to Buy.`,
+        contents: `Create a professional, persuasive, and detailed car auction listing description for a ${specs.year} ${specs.make} ${specs.model} in ${specs.condition} condition. Key notes: ${specs.notes}. Include sections for Exterior, Interior, Mechanical, and Why to Buy it should be about 1500 characters only.`,
       });
       return response.text;
     } catch (error) {

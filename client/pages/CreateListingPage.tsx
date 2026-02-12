@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import axios from 'axios';
 import { Camera, Car, MapPin, DollarSign, Tag, Wand2, ArrowRight, ArrowLeft, Loader2, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import { geminiService } from '../geminiService'; // Keeping AI service
 import { apiService } from '../services/api';
@@ -400,8 +399,6 @@ const CreateListingPage: React.FC = () => {
         setSubmitError(t('Please log in before creating a listing', 'يرجى تسجيل الدخول قبل انشاء اعلان'));
         return;
       }
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005/api';
 
       const normalizedMileage = Number(data.mileage) || 0;
       const normalizedPrice = Number(data.price) || 0;
@@ -447,7 +444,10 @@ const CreateListingPage: React.FC = () => {
           reservePrice: Number(data.reservePrice) || normalizedPrice
         };
 
-        await axios.post(`${baseUrl}/auctions`, auctionPayload, config);
+        const auctionRes = await apiService.createAuction(auctionPayload);
+        if (auctionRes.error) {
+          throw new Error(auctionRes.error || t('Failed to create auction', 'فشل انشاء المزاد'));
+        }
       }
 
       // Success
