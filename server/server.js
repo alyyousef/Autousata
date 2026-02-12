@@ -1,31 +1,87 @@
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
+const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const morgan = require("morgan");
+require("dotenv").config();
 
-// Import the new DB Configuration (Pool Manager)
-const db = require('./config/db');
+// Import Middleware & DB
+const { errorHandler, notFound } = require("./middleware/errorMiddleware");
+const db = require("./config/db");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+const PORT = process.env.PORT || 5005;
 
-// Webhook route MUST come before express.json() middleware
-// Stripe needs the raw body for signature verification
-const webhookRoutes = require('./routes/webhooks');
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
-
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// Request Logger
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
+// =====================================================
+// 1. SOCKET.IO SETUP
+// =====================================================
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ["websocket", "polling"],
 });
 
-// Routes
+// Export io instance for use in routes
+function getIO() {
+  return io;
+}
+module.exports = { getIO };
+
+// Attach IO to every request so controllers can use it
+app.set("io", io);
+
+// =====================================================
+// 2. SECURITY MIDDLEWARE (Helmet & Rate Limit)
+// =====================================================
+app.use(helmet());
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Too many requests from this IP, please try again later." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many login attempts, please try again later." },
+});
+
+// Apply Global Limiter
+app.use("/api", globalLimiter);
+
+// =====================================================
+// 3. STANDARD MIDDLEWARE
+// =====================================================
+// Webhook route MUST come before express.json()
+const webhookRoutes = require("./routes/webhooks");
+app.use(
+  "/api/webhooks",
+  express.raw({ type: "application/json" }),
+  webhookRoutes,
+);
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// HTTP Logger
+app.use(morgan("dev"));
+
+// =====================================================
+// 4. ROUTES
+// =====================================================
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const vehicleRoutes = require('./routes/vehicles');
@@ -72,70 +128,62 @@ app.get("/payment-redirect", (req, res) => {
 });
 
 // Test Route
-app.get('/', (req, res) => {
-    res.json({ status: 'Online', message: 'Server is running on Port ' + PORT });
+app.get("/", (req, res) => {
+  res.json({ status: "Online", message: "Server is running on Port " + PORT });
 });
 
 // =====================================================
-// STARTUP SEQUENCE: Initialize Pool -> Start Server
+// 5. ERROR HANDLING (Must be after routes)
 // =====================================================
+app.use(notFound);
+app.use(errorHandler);
+
+// =====================================================
+// 6. SERVER STARTUP
+// =====================================================
+const initializeAuctionSocket = require("./sockets/auctionSocket");
+const auctionScheduler = require("./services/auctionScheduler");
+
 async function startServer() {
-    try {
-        // 1. Initialize Oracle Pool FIRST
-        await db.initialize();
+  try {
+    // A. Initialize Oracle Pool
+    await db.initialize();
 
-        // 2. Initialize MongoDB (Passive)
-        const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/AUTOUSATA';
-        try {
-            await mongoose.connect(MONGO_URI);
-            console.log('MongoDB connected');
-        } catch (err) {
-            console.error('MongoDB connection failed (ignored):', err.message);
-        }
+    // B. Initialize Socket Logic
+    initializeAuctionSocket(io);
+    console.log("[Socket.IO] Initialized");
 
-        // 3. Start Listening
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`Server started on http://127.0.0.1:${PORT}`);
-        });
-
-        // Graceful Shutdown Logic
-        process.on('SIGINT', async () => {
-            console.log('\nShutting down...');
-            await db.close();
-            server.close(() => {
-                console.log('Server closed.');
-                process.exit(0);
-            });
-        });
-    } catch (err) {
-        console.error('Failed to start server:', err);
-        process.exit(1);
+    // C. Start Scheduler
+    if (auctionScheduler.startScheduler) {
+      auctionScheduler.startScheduler(io);
+    } else {
+      console.log("⚠️ Warning: auctionScheduler.startScheduler not found");
     }
+
+    // D. Start HTTP Server
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`✅ Server started on http://localhost:${PORT}`);
+      console.log(`Socket.IO listening on ws://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  }
 }
 
-process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down...');
-    if (auctionScheduler.stopScheduler) auctionScheduler.stopScheduler();
-    
-    io.close(() => console.log('Socket.IO closed.'));
-    
-    await db.close();
-    
-    server.close(() => {
-        console.log('Server closed.');
-        process.exit(0);
-    });
+// Graceful Shutdown
+process.on("SIGINT", async () => {
+  console.log("\n🛑 Shutting down...");
+  if (auctionScheduler.stopScheduler) auctionScheduler.stopScheduler();
+
+  io.close(() => console.log("Socket.IO closed."));
+
+  await db.close();
+
+  server.close(() => {
+    console.log("Server closed.");
+    process.exit(0);
+  });
 });
 
-// =====================================================
-// CRITICAL FIX: EXPORT APP & CONDITIONAL START
-// =====================================================
-
-// Only start the server if this file is run directly (node server.js)
-// This prevents the server from starting when we run 'npm test'
-if (require.main === module) {
-    startServer();
-}
-
-// Export the app so Jest can test it
-module.exports = app;
+startServer();

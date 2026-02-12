@@ -42,6 +42,8 @@ import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AdminUserProfilePage from "./pages/AdminUserProfilePage";
 import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
 import KYCProcessPage from "./pages/KYCProcessPage";
+import AdminProfilePage from "./pages/AdminProfile";
+import AdminLayout from "./layouts/AdminLayout";
 
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
@@ -71,7 +73,8 @@ const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== UserRole.ADMIN) return <Navigate to="/browse" replace />;
+  const normalizedRole = String(user.role ?? '').toUpperCase();
+  if (normalizedRole !== UserRole.ADMIN) return <Navigate to="/browse" replace />;
   return children;
 };
 
@@ -119,7 +122,12 @@ const AppRoutes: React.FC = () => {
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
+          
 
+        </Route>
+
+        <Route element={<AdminLayout user={user} />}>
+          
           {/* ---------- ADMIN PROTECTED ---------- */}
           <Route
             path="/admin"
@@ -129,7 +137,7 @@ const AppRoutes: React.FC = () => {
               </RequireAdmin>
             }
           />
-
+         
           <Route
             path="/admin/users"
             element={
@@ -156,6 +164,13 @@ const AppRoutes: React.FC = () => {
               </RequireAdmin>
             }
           />
+          
+          <Route path="/admin/profile" element={
+            <RequireAdmin>
+              <AdminProfilePage />
+            </RequireAdmin>
+            
+            } />
         </Route>
       </Routes>
     </>
