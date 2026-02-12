@@ -39,14 +39,9 @@ const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 
 app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/auctions', auctionRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/vehicles", vehicleRoutes);
-app.use("/api/auctions", auctionRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
