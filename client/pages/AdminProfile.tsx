@@ -7,10 +7,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { Navigate, useNavigate } from 'react-router-dom';
 import ImageLightbox from '../components/ImageLightbox';
+import { AuctionStatus, VehicleStatus } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ProfileSkeleton } from '../components/LoadingSkeleton';
 
-const ProfilePage: React.FC = () => {
+const AdminProfilePage: React.FC = () => {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -35,7 +36,19 @@ const ProfilePage: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsError, setListingsError] = useState('');
-  const [sellerListings, setSellerListings] = useState<any[]>([]);
+  const [sellerListings, setSellerListings] = useState<Array<{
+    id: string;
+    vehicle: {
+      id: string;
+      make: string;
+      model: string;
+      year?: number;
+      price?: number;
+      status?: VehicleStatus | string;
+      images?: string[];
+    };
+    auctionStatus?: AuctionStatus | string;
+  }>>([]);
 
   // =========================================================
   // Sync User Data
@@ -240,12 +253,18 @@ const ProfilePage: React.FC = () => {
     }).format(value);
   };
 
-  // ✅ HELPER: Correct KYC Status Logic
-  const kycStatus = user.kycStatus || 'not_uploaded'; // 'verified', 'pending', 'denied'
-  const isVerified = kycStatus === 'verified' || kycStatus === 'approved';
-  const isPending = kycStatus === 'pending';
+  const getVehicleStatusBadge = (status?: VehicleStatus | string) => {
+    const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
+    const map: Record<string, { label: string; className: string }> = {
+      draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
+      active: { label: 'Active', className: 'bg-emerald-50 text-emerald-600' },
+      sold: { label: 'Sold', className: 'bg-rose-50 text-rose-600' },
+      delisted: { label: 'Delisted', className: 'bg-amber-50 text-amber-700' }
+    };
+    return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
+  };
 
-  const getAuctionStatusBadge = (status?: string) => {
+  const getAuctionStatusBadge = (status?: AuctionStatus | string) => {
     if (!status) return { label: 'No Auction', className: 'bg-slate-100 text-slate-500' };
     const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
     const map: Record<string, { label: string; className: string }> = {
@@ -260,31 +279,24 @@ const ProfilePage: React.FC = () => {
     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
   };
 
-  const getVehicleStatusBadge = (status?: string) => {
-     const normalized = typeof status === 'string' ? status.toLowerCase() : 'draft';
-     const map: Record<string, { label: string; className: string }> = {
-       draft: { label: 'Draft', className: 'bg-slate-100 text-slate-600' },
-       active: { label: 'Active', className: 'bg-emerald-50 text-emerald-600' },
-       sold: { label: 'Sold', className: 'bg-rose-50 text-rose-600' },
-       delisted: { label: 'Delisted', className: 'bg-amber-50 text-amber-700' }
-     };
-     return map[normalized] || { label: 'Unknown', className: 'bg-slate-100 text-slate-500' };
-  };
-
+  // Helper for Small Badges
   const renderKycBadge = () => {
-    // Use the variables defined above
-    if (isVerified) {
-       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded"><CheckCircle size={10} /> Verified</span>;
+    const status = user.kycStatus || 'not_uploaded';
+    switch (status) {
+      case 'verified': 
+      case 'approved':
+        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-1 rounded"><CheckCircle size={10} /> Verified</span>;
+      case 'pending':
+        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded"><AlertTriangle size={10} /> Pending</span>;
+      case 'denied':
+      case 'failed':
+        return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Failed</span>;
+      default:
+        return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Unverified</span>;
     }
-    if (isPending) {
-       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2 py-1 rounded"><AlertTriangle size={10} /> Pending</span>;
-    }
-    if (kycStatus === 'denied' || kycStatus === 'failed') {
-       return <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-700 px-2 py-1 rounded"><XCircle size={10} /> Failed</span>;
-    }
-    return <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-1 rounded">Unverified</span>;
   };
 
+  const isVerified = user.kycStatus === 'verified' || user.kycStatus === 'approved';
 
   return (
     <div className="bg-slate-50 min-h-screen py-12 profile-static-cards profile-page relative">
@@ -386,7 +398,7 @@ const ProfilePage: React.FC = () => {
             </div>
 
             {/* 2. Contact Verification Status */}
-            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
+            {/* <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Contact Verification</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -409,25 +421,26 @@ const ProfilePage: React.FC = () => {
                    <div className={`w-2 h-2 rounded-full ${user.phoneVerified ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* 3. ✅ KYC Verification Card */}
-            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
+            {/* <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6 flex items-center gap-2">
                 <FileText size={16} /> Identity Verification (KYC)
               </h3>
               
               <div className="space-y-4">
                 {/* Header Row */}
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">Document Status</span>
                   {renderKycBadge()}
                 </div>
 
                 {/* Status-Based Content */}
-                {isVerified ? (
+                {/* {isVerified ? (
+                  // ✅ VERIFIED STATE (Green Badge)
                   <>
-                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3 text-emerald-800">
                       <div className="bg-white p-2 rounded-full shadow-sm text-emerald-600">
                         <ShieldCheck size={20} />
                       </div>
@@ -436,9 +449,8 @@ const ProfilePage: React.FC = () => {
                         <p className="text-xs opacity-80">You can now sell & bid freely.</p>
                       </div>
                     </div>
-
-                    {/* ✅ NEW: Extracted Address Section */}
-                    {user.kycAddress && (
+                    {/* Extracted Address Section */}
+                    {/* {user.kycAddress && (
                       <div className="mt-2 pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
                          <div className="flex items-start gap-3">
                             <MapPin size={16} className="text-slate-400 mt-1" />
@@ -468,18 +480,9 @@ const ProfilePage: React.FC = () => {
                       </div>
                     )}
                   </>
-                ) : isPending ? (
-                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-center gap-3 text-amber-800">
-                    <div className="bg-white p-2 rounded-full shadow-sm text-amber-600">
-                      <AlertTriangle size={20} />
-                    </div>
-                    <div>
-                       <p className="text-sm font-bold">Verification Pending</p>
-                       <p className="text-xs opacity-80">We are reviewing your ID.</p>
-                    </div>
-                  </div>
                 ) : (
-                  <>
+                  // ❌ UNVERIFIED STATE (Verify Now Button) */}
+                  {/* <>
                     <p className="text-xs text-slate-500 leading-relaxed">
                       To sell or bid on vehicles, you must complete the identity verification process.
                     </p>
@@ -491,10 +494,10 @@ const ProfilePage: React.FC = () => {
                       <ShieldCheck size={18} /> Verify Identity Now
                     </button>
                   </>
-                )}
+                )} */}
                 
                 {/* View Document Link (If exists) */}
-                {user.kycDocumentUrl && (
+                {/* {user.kycDocumentUrl && (
                   <a 
                     href={user.kycDocumentUrl} 
                     target="_blank" 
@@ -505,7 +508,7 @@ const ProfilePage: React.FC = () => {
                   </a>
                 )}
               </div>
-            </div>
+            </div>  */}
 
             {/* 4. Security Card */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-6 premium-card-hover">
@@ -579,7 +582,7 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
+                  <label htmlFor="profile-location" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Primary Location</label>
                   {isEditing ? (
                     <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
                       placeholder="e.g. Cairo"
@@ -594,7 +597,7 @@ const ProfilePage: React.FC = () => {
             </div>
 
             {/* My Listings Section */}
-            <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
+            {/* <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-black text-slate-900">My Listings</h3>
                 {(user.role === 'SELLER' || user.role === 'DEALER') && (
@@ -605,7 +608,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Only show listings for Sellers/Dealers/Buyers */}
-              {(user.role === 'SELLER' || user.role === 'DEALER' || user.role === 'BUYER') && (
+              {/* {(user.role === 'SELLER' || user.role === 'DEALER' || user.role === 'BUYER') && (
                 <>
                   {listingsLoading && (
                     <div className="text-sm text-slate-500">Loading your listings...</div>
@@ -661,7 +664,7 @@ const ProfilePage: React.FC = () => {
                   )}
                 </>
               )}
-            </div>
+            </div> */} 
 
             {/* Recent Activity Section */}
             <div className="bg-white/95 rounded-3xl shadow-sm border border-slate-200 p-8 premium-card-hover">
@@ -679,4 +682,4 @@ const ProfilePage: React.FC = () => {
   );
 };
 
-export default ProfilePage;
+export default AdminProfilePage;

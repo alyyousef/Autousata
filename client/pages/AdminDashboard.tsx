@@ -1083,7 +1083,7 @@ const AdminDashboard: React.FC = () => {
               Monitor platform health and handle user verifications.
             </p>
           </div>
-          <div className="flex gap-4">
+          {/* <div className="flex gap-4">
             <Link
               to="/admin/users"
               className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"
@@ -1101,7 +1101,7 @@ const AdminDashboard: React.FC = () => {
               <BarChart3 size={18} />
               Platform Metrics
             </button>
-          </div>
+          </div> */}
         </div>
 
         {/* Priority Queues */}
@@ -1245,7 +1245,7 @@ const AdminDashboard: React.FC = () => {
           {/* Tabs */}
           <div className="px-8 pt-6 border-b border-slate-100">
             <div className="flex gap-8">
-              {["vehicles", "kyc", "auctions", "payments"].map((tab) => (
+              {["vehicles", "kyc", "auctions"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
