@@ -30,7 +30,7 @@ const AUCTION_ID = process.env.AUCTION_ID || 'test-auction-001';
 const TOKEN_A = process.env.TOKEN_A || '';
 const TOKEN_B = process.env.TOKEN_B || '';
 const BID_AMOUNT = Number(process.env.BID_AMOUNT) || 10000;
-const TIMEOUT_MS = 200; // Maximum acceptable latency
+const TIMEOUT_MS = Number(process.env.TIMEOUT_MS) || 200; // Maximum acceptable latency
 
 // ---------------------------------------------------------------------------
 // Helpers
