@@ -251,7 +251,7 @@ router.post(
   authenticate,
   activityLogger({
     action: "ESCROW_DISPUTE_CREATE",
-    severity: "WARNING", // disputes are important
+    severity: "WARN", // disputes are important
     entityType: "ESCROW",
     getEntityId: (req) => req.params.id,
     getDescription: (req) => `Dispute opened for escrow ${req.params.id}`,
@@ -348,7 +348,7 @@ router.post(
   authorize("admin"),
   activityLogger({
     action: "PAYMENT_REFUND_ADMIN",
-    severity: "CRITICAL",
+    severity: "ALERT",
     entityType: "PAYMENT",
     getEntityId: (req) => req.params.id,
     getDescription: (req) => `Admin refund payment ${req.params.id}`,

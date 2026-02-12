@@ -25,28 +25,52 @@ const PaymentConfirmationPage: React.FC = () => {
       }
 
       try {
-        // Check if we have a stored paymentId (from PaymentPage)
-        const storedPaymentId = sessionStorage.getItem(`payment_${id}`);
+        // Read stored payment data from sessionStorage (set by PaymentPage)
+        const storedRaw = sessionStorage.getItem(`payment_${id}`);
+        let storedPaymentId: string | null = null;
+        let storedGatewayOrderId: string | null = null;
+        let storedType: string | null = null;
+
+        if (storedRaw) {
+          try {
+            const parsed = JSON.parse(storedRaw);
+            storedPaymentId = parsed.paymentId || null;
+            storedGatewayOrderId = parsed.gatewayOrderId || null;
+            storedType = parsed.type || null;
+          } catch {
+            // Legacy format — storedRaw might be just the paymentId string
+            storedPaymentId = storedRaw;
+          }
+        }
+
+        // Determine purchase type from URL params or stored data
+        const purchaseType = searchParams.get('type') || storedType || 'auction';
 
         // If Stripe redirected back with payment_intent, confirm first
         const stripePaymentIntent = searchParams.get('payment_intent');
         if (stripePaymentIntent && storedPaymentId) {
           try {
-            await apiService.confirmPayment(storedPaymentId);
+            await apiService.confirmPayment(storedPaymentId, storedGatewayOrderId || stripePaymentIntent);
           } catch (confirmErr) {
             console.warn('Post-redirect confirm failed (webhook may handle):', confirmErr);
           }
         }
 
-        // Try fetching payment by stored paymentId first, then fall back to auction lookup
+        // Try fetching payment by stored paymentId first
         let response;
         if (storedPaymentId) {
           response = await apiService.getPaymentById(storedPaymentId);
         }
 
+        // Fallback based on purchase type
         if (!response?.data?.payment) {
-          // Fallback: try by auction ID (for auction purchases)
-          response = await apiService.getPaymentByAuction(id);
+          if (purchaseType === 'direct') {
+            // For direct purchases, look up by vehicle ID
+            response = await apiService.getPaymentByVehicle(id);
+          } else {
+            // For auction purchases, look up by auction ID
+            response = await apiService.getPaymentByAuction(id);
+          }
         }
 
         if (response?.error) {

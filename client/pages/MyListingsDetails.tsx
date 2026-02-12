@@ -20,38 +20,33 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
-import porsche911Image from '../../assests/carsPictures/porsche911.png';
-import teslaModelSPlaidImage from '../../assests/carsPictures/teslaModelSPlaid.jpg';
-import fordBroncoImage from '../../assests/carsPictures/fordBroncoF.jpg';
+import { CardSkeleton, Skeleton } from '../components/LoadingSkeleton';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
 const PAYMENT_NOTICE_KEY = 'AUTOUSATA:paymentNotice';
 const PAYMENT_STATUS_KEY = 'AUTOUSATA:paymentStatus';
 
-const ARABIC_LISTING_COPY: Record<
-  string,
-  { description: string; longDescription: string; location: string }
-> = {
-  'auc-1': {
-    description: 'بورشه 911 لون طباشيري بداخلية نبيتي باقة سبورت كرونو',
-    longDescription:
-      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين',
-    location: 'القاهرة مصر'
-  },
-  'auc-2': {
-    description: 'تسلا موديل اس بلايد دفع رباعي شامل القيادة الذاتية حالة شبه جديدة',
-    longDescription:
-      'موديل بلايد ببطاريات قوية وتسارع عالي مقصورة نظيفة وتجهيزات حديثة مع حالة شبه جديدة',
-    location: 'الجيزة مصر'
-  },
-  'auc-3': {
-    description: 'فورد برونكو اصدار خاص باقة سكواتش اربعة ابواب لون ازرق كهربائي',
-    longDescription:
-      'اصدار محدود مع تجهيزات للطرق الوعرة وتجربة قيادة قوية مع عناية ممتازة بالمقصورة والهيكل',
-    location: 'الاسكندرية مصر'
-  }
+const toNumeric = (value: unknown): number | undefined => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 };
+
+interface GarageEntry {
+  id: string;
+  saleType?: string;
+  totalAmountEGP?: number;
+  commissionEGP?: number;
+  processorFeeEGP?: number;
+  sellerPayoutEGP?: number;
+  escrowStatus?: string;
+  buyer?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+}
 
 const readDelistedIds = () => {
   if (typeof window === 'undefined') return new Set<string>();
@@ -159,7 +154,91 @@ const generateTimeStyles = (endTime: string, now: number) => {
   };
 };
 
-const ListingDetailPage: React.FC = () => {
+const parseImageArray = (raw: unknown): string[] => {
+  if (Array.isArray(raw)) {
+    return raw.filter((url): url is string => typeof url === 'string' && url.length > 0);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((url): url is string => typeof url === 'string' && url.length > 0);
+        }
+      } catch {
+        return [];
+      }
+    }
+    return trimmed
+      .split(',')
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+  }
+  return [];
+};
+
+const mapPrivateVehicleRecord = (item: any) => {
+  if (!item) return null;
+  const featuresRaw = item.features || item.FEATURES;
+  let features: string[] = [];
+  if (Array.isArray(featuresRaw)) {
+    features = featuresRaw.filter((feature): feature is string => typeof feature === 'string' && feature.trim().length > 0);
+  } else if (typeof featuresRaw === 'string') {
+    features = featuresRaw
+      .split(',')
+      .map((feature) => feature.trim())
+      .filter((feature) => feature.length > 0);
+  }
+
+  return {
+    _id: String(item._id || item.id || item.ID || ''),
+    year: Number(item.year || item.YEAR_MFG || item.year_mfg) || undefined,
+    make: item.make || item.MAKE || '',
+    model: item.model || item.MODEL || '',
+    price: Number(item.price || item.price_egp || item.PRICE_EGP) || undefined,
+    mileage: Number(item.mileage || item.milage || item.MILEAGE_KM) || undefined,
+    condition: item.condition || item.car_condition || item.CAR_CONDITION || 'Good',
+    location: item.location || item.location_city || item.LOCATION_CITY || '',
+    description: item.description || '',
+    longDescription: item.longDescription || item.description || '',
+    images: parseImageArray(item.images || item.IMAGES),
+    color: item.color || item.COLOR || '',
+    bodyType: item.body_type || item.BODY_TYPE || '',
+    transmission: item.transmission || item.TRANSMISSION || '',
+    fuelType: item.fuel_type || item.FUEL_TYPE || '',
+    seats: item.seats || item.SEATS || undefined,
+    status: item.status || item.STATUS || '',
+    features,
+    sellerName: item.sellerName || item.seller_name || '',
+  };
+};
+
+const mapFinancialEntry = (item: any): GarageEntry => ({
+  id: String(item?._id || item?.id || item?.ID || ''),
+  saleType: item?.sale_type || item?.saleType || item?.SALE_TYPE,
+  totalAmountEGP: toNumeric(item?.total_amount_egp ?? item?.TOTAL_AMOUNT_EGP ?? item?.totalAmount),
+  commissionEGP: toNumeric(item?.commission_egp ?? item?.COMMISSION_EGP ?? item?.commissionFee),
+  processorFeeEGP: toNumeric(item?.processor_fee_egp ?? item?.PROCESSOR_FEE_EGP ?? item?.processorFee),
+  sellerPayoutEGP: toNumeric(item?.seller_payout_egp ?? item?.SELLER_PAYOUT_EGP ?? item?.sellerPayout),
+  escrowStatus: item?.escrow_status || item?.ESCROW_STATUS || item?.escrowStatus,
+  buyer: item?.buyer
+    ? {
+        id: item.buyer.id,
+        name: item.buyer.name,
+        email: item.buyer.email,
+        phone: item.buyer.phone,
+      }
+    : item?.buyer_name || item?.buyer_email || item?.buyer_phone
+    ? {
+        name: item.buyer_name,
+        email: item.buyer_email,
+        phone: item.buyer_phone,
+      }
+    : undefined,
+});
+
+const MyListingsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { addNotification } = useNotifications();
@@ -182,6 +261,7 @@ const ListingDetailPage: React.FC = () => {
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [currentBid, setCurrentBid] = useState<number | null>(null);
   const [currentBidCount, setCurrentBidCount] = useState<number | null>(null);
+  const [garageEntry, setGarageEntry] = useState<GarageEntry | null>(null);
   const confettiPieces = useMemo(() => {
     if (bidSuccess === null) return [];
     const colors = ['#22c55e', '#38bdf8', '#f59e0b', '#ef4444', '#a78bfa', '#f97316', '#eab308'];
@@ -205,9 +285,6 @@ const ListingDetailPage: React.FC = () => {
       };
     });
   }, [bidSuccess]);
-
-  const fallbackImages = useMemo(() => [porsche911Image, teslaModelSPlaidImage, fordBroncoImage], []);
-  const arabicCopy = auction ? ARABIC_LISTING_COPY[auction.id] : undefined;
 
   const conditionLabel = (condition: string) => {
     const key = condition.toLowerCase();
@@ -259,63 +336,98 @@ const ListingDetailPage: React.FC = () => {
       if (!id) return;
       setLoading(true);
       setError(null);
+      setAuction(null);
+      setVehicleOnly(null);
 
-      // 1. Try fixed-price vehicle first
+      const loadPrivateVehicle = async () => {
+        if (!user) return null;
+        try {
+          const privateRes = await apiService.getMyListings();
+          const privateData = privateRes.data?.data || [];
+          const privateMatch = privateData.find((item: any, index: number) => {
+            const identifier = String(item._id || item.id || item.ID || index);
+            return identifier === id;
+          });
+          if (privateMatch) {
+            return mapPrivateVehicleRecord(privateMatch);
+          }
+        } catch {
+          // ignore
+        }
+
+        try {
+          const garageRes = await apiService.getMyGarage();
+          const garageData = garageRes.data?.data || [];
+          const garageMatch = garageData.find((item: any, index: number) => {
+            const identifier = String(item._id || item.id || item.ID || index);
+            return identifier === id;
+          });
+          if (garageMatch) {
+            return mapPrivateVehicleRecord(garageMatch);
+          }
+        } catch {
+          // ignore
+        }
+        return null;
+      };
+
       try {
-        const vehicleRes = await apiService.getPublicVehicle(id);
-        if (vehicleRes.data && !vehicleRes.error) {
+        try {
+          const vehicleRes = await apiService.getPublicVehicle(id);
+          if (vehicleRes.data && !vehicleRes.error) {
+            if (isMounted) {
+              setVehicleOnly(vehicleRes.data);
+            }
+            return;
+          }
+        } catch {
+          // continue with other strategies
+        }
+
+        try {
+          const auctionResponse = await apiService.getAuctionById(id);
+          if (!auctionResponse.error && auctionResponse.data) {
+            const raw = auctionResponse.data;
+            const vehicle = raw.vehicleId || {};
+            const images = parseImageArray(vehicle.images);
+
+            const mapped = {
+              id: raw._id,
+              vehicle: {
+                ...vehicle,
+                images,
+                description: vehicle.description || '',
+                longDescription: vehicle.description || '',
+              },
+              sellerId: raw.sellerId,
+              currentBid: raw.currentBid || 0,
+              startingBid: raw.startPrice || 0,
+              reservePrice: raw.reservePrice || 0,
+              bidCount: raw.bidCount || 0,
+              endTime: raw.endTime,
+              status: raw.status,
+              minBidIncrement: raw.minBidIncrement || 50,
+            };
+
+            if (isMounted) {
+              setAuction(mapped);
+            }
+            return;
+          }
+        } catch {
+          // continue to private lookup
+        }
+
+        const privateVehicle = await loadPrivateVehicle();
+        if (privateVehicle) {
           if (isMounted) {
-            setVehicleOnly(vehicleRes.data);
-            setLoading(false);
+            setVehicleOnly(privateVehicle);
           }
           return;
         }
-      } catch {
-        // Not a fixed-price vehicle, try auction
-      }
 
-      // 2. Fall back to auction
-      try {
-        const auctionResponse = await apiService.getAuctionById(id);
-
-        if (auctionResponse.error) {
-          setError(auctionResponse.error);
-          return;
-        }
-
-        if (!auctionResponse.data) {
+        if (isMounted) {
           setError('Listing not found.');
-          return;
-        }
-
-        const raw = auctionResponse.data;
-        const vehicle = raw.vehicleId || {};
-        const images = Array.isArray(vehicle.images) && vehicle.images.length > 0 ? vehicle.images : fallbackImages;
-
-        const mapped = {
-          id: raw._id,
-          vehicle: {
-            ...vehicle,
-            images,
-            description: vehicle.description || '',
-            longDescription: vehicle.description || ''
-          },
-          sellerId: raw.sellerId,
-          currentBid: raw.currentBid || 0,
-          startingBid: raw.startPrice || 0,
-          reservePrice: raw.reservePrice || 0,
-          bidCount: raw.bidCount || 0,
-          endTime: raw.endTime,
-          status: raw.status,
-          minBidIncrement: raw.minBidIncrement || 50
-        };
-
-        if (isMounted) {
-          setAuction(mapped);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError('Failed to load listing.');
         }
       } finally {
         if (isMounted) {
@@ -329,7 +441,7 @@ const ListingDetailPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [fallbackImages, id, t]);
+  }, [id, t, user]);
 
   useEffect(() => {
     if (!auction) return;
@@ -354,10 +466,127 @@ const ListingDetailPage: React.FC = () => {
     writePaymentNotice(auction.id);
   }, [addNotification, auction, now]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchGarageEntry = async () => {
+      if (!user || !id) return;
+
+      const sources = [
+        () => apiService.getMyGarage(),
+        () => apiService.getMyListings(),
+      ];
+
+      for (const getSource of sources) {
+        try {
+          const response = await getSource();
+          if (response.error) continue;
+          const source = response.data?.data || [];
+          const match = source.find((item: any, index: number) => {
+            const itemId = String(item._id || item.id || item.ID || index);
+            return itemId === id;
+          });
+
+          if (match) {
+            if (isMounted) {
+              setGarageEntry(mapFinancialEntry(match));
+            }
+            return;
+          }
+        } catch {
+          // ignore and try next source
+        }
+      }
+
+      if (isMounted) {
+        setGarageEntry(null);
+      }
+    };
+
+    fetchGarageEntry();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, user]);
+
+  const renderFinancialSummaryCard = () => {
+    if (!garageEntry) return null;
+
+    const amountRows = [
+      { key: 'total', label: t('Total amount', 'اجمالي المبلغ'), value: garageEntry.totalAmountEGP },
+      { key: 'commission', label: t('Commission (EGP)', 'عمولة المنصة'), value: garageEntry.commissionEGP },
+      { key: 'processor', label: t('Processor fees', 'مصاريف المعالجة'), value: garageEntry.processorFeeEGP },
+      { key: 'payout', label: t('Seller payout', 'صافي البائع'), value: garageEntry.sellerPayoutEGP },
+    ];
+
+    const rowsWithValue = amountRows.filter((row) => typeof row.value === 'number' && !Number.isNaN(row.value));
+    const hasRows = rowsWithValue.length > 0;
+    const readableStatus = garageEntry.escrowStatus?.replace(/_/g, ' ').trim() ?? '';
+
+    if (!hasRows && !readableStatus) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-2xl border border-slate-200/70 bg-white shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <ShieldCheck size={16} className="text-emerald-500" />
+          {t('Escrow summary', 'ملخص الضمان')}
+        </div>
+        {hasRows && (
+          <div className="grid grid-cols-2 gap-3">
+            {rowsWithValue.map((row) => (
+              <div key={row.key} className="text-sm">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{row.label}</p>
+                <p className="text-lg font-semibold text-slate-900">{formatCurrencyEGP(row.value as number)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {readableStatus && (
+          <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-700">
+            {t('Escrow status', 'حالة الضمان')}: <span className="uppercase tracking-wide">{readableStatus}</span>
+          </div>
+        )}
+        {garageEntry.buyer && (
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 space-y-1">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{t('Buyer contact', 'بيانات المشتري')}</p>
+            {garageEntry.buyer.name && <p className="text-sm font-semibold text-slate-900">{garageEntry.buyer.name}</p>}
+            <div className="text-sm text-slate-600">
+              {garageEntry.buyer.email && <p>{garageEntry.buyer.email}</p>}
+              {garageEntry.buyer.phone && <p>{garageEntry.buyer.phone}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
-        <div className="text-slate-600 text-sm">Loading auction...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-6">
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <CardSkeleton className="h-96" />
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <CardSkeleton className="h-64" />
+              <CardSkeleton className="h-48" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -409,23 +638,54 @@ const ListingDetailPage: React.FC = () => {
   // ──── FIXED-PRICE VEHICLE DETAIL VIEW ────
   if (vehicleOnly) {
     const v = vehicleOnly;
+    const vehicleImages: string[] = Array.isArray(v.images)
+      ? v.images.filter((img: any) => typeof img === 'string' && img.length > 0)
+      : [];
+    const financialSummary = renderFinancialSummaryCard();
     return (
       <div className="min-h-screen bg-slate-50 pb-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Link to="/browse" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-6">
-            <ChevronLeft size={16} /> {t('Back to Browse', 'رجوع للتصفح')}
+          <Link to="/my-listings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-6">
+            <ChevronLeft size={16} /> {t('Back to my Listings', 'رجوع لإعلاناتي')}
           </Link>
 
           {/* Image */}
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm mb-6">
-            {v.images && v.images.length > 0 ? (
-              <img src={v.images[0]} alt={`${v.year} ${v.make} ${v.model}`} className="w-full h-72 md:h-96 object-cover" />
+            {vehicleImages.length > 0 ? (
+              <img
+                src={vehicleImages[0]}
+                alt={`${v.year} ${v.make} ${v.model}`}
+                className="w-full h-72 md:h-96 object-cover cursor-zoom-in"
+                onClick={() => setLightboxIndex(0)}
+              />
             ) : (
               <div className="w-full h-72 md:h-96 bg-slate-100 flex items-center justify-center text-slate-300">
                 <Tag size={64} />
               </div>
             )}
           </div>
+
+          {/* Thumbnail Grid for fixed-price */}
+          {vehicleImages.length > 1 && (
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              {vehicleImages.slice(0, 4).map((image: string, index: number) => (
+                <div
+                  key={index}
+                  className="relative rounded-xl overflow-hidden border-2 border-white hover:border-slate-300 transition-all duration-300 cursor-pointer"
+                  onClick={() => setLightboxIndex(index)}
+                >
+                  <div className="aspect-square bg-slate-100">
+                    <img src={image} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  {index === 3 && vehicleImages.length > 4 && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-bold text-lg">
+                      +{vehicleImages.length - 4}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Details */}
@@ -466,7 +726,7 @@ const ListingDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              {v.features && v.features.length > 0 && (
+              {Array.isArray(v.features) && v.features.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-6">
                   <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">{t('Features', 'المميزات')}</h2>
                   <div className="flex flex-wrap gap-2">
@@ -479,7 +739,7 @@ const ListingDetailPage: React.FC = () => {
             </div>
 
             {/* Purchase Card */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-6">
                 <p className="text-xs text-slate-400 uppercase tracking-wider">{t('Price', 'السعر')}</p>
                 <p className="text-3xl font-black text-emerald-600 mb-4">{formatCurrencyEGP(v.price)}</p>
@@ -487,28 +747,23 @@ const ListingDetailPage: React.FC = () => {
                   <ShieldCheck size={16} className="text-emerald-500" />
                   {t('Verified seller', 'بائع موثق')}
                 </div>
-                {user ? (
-                  <Link
-                    to={`/payment/${v._id}?type=direct`}
-                    className="block w-full text-center px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-colors shadow-lg shadow-emerald-500/20"
-                  >
-                    {t('Buy Now', 'اشترِ الان')}
-                  </Link>
-                ) : (
-                  <Link
-                    to="/login"
-                    className="block w-full text-center px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors"
-                  >
-                    {t('Login to Buy', 'سجل دخول للشراء')}
-                  </Link>
-                )}
                 {v.sellerName && (
                   <p className="text-xs text-slate-400 text-center mt-4">{t('Sold by', 'يباع بواسطة')} {v.sellerName}</p>
                 )}
               </div>
+              {financialSummary && <div>{financialSummary}</div>}
             </div>
           </div>
         </div>
+
+        {lightboxIndex !== null && vehicleImages.length > 0 && (
+          <ImageLightbox
+            images={vehicleImages}
+            startIndex={lightboxIndex}
+            alt={`${v.year} ${v.make} ${v.model}`}
+            onClose={() => setLightboxIndex(null)}
+          />
+        )}
       </div>
     );
   }
@@ -519,17 +774,12 @@ const ListingDetailPage: React.FC = () => {
   const effectiveBidCount = currentBidCount ?? auction.bidCount;
   const isEnded = new Date(auction.endTime).getTime() <= now;
   const paymentStatus = readPaymentStatus(auction.id);
-  const descriptionText = t(
-    auction.vehicle.description,
-    arabicCopy?.description ?? auction.vehicle.description
-  );
-  const longDescriptionText = t(
-    auction.vehicle.longDescription ||
-      'This vehicle has been carefully maintained and is presented in excellent condition. It offers a strong performance package, a clean interior, and a smooth driving experience, making it a standout choice for serious buyers.',
-    arabicCopy?.longDescription ||
-      'سيارة محافظ عليها بعناية بحالة ممتازة اداء قوي وتجهيزات فاخرة وتجربة قيادة مريحة مناسبة للمشترين الجادين'
-  );
-  const locationText = t(auction.vehicle.location, arabicCopy?.location ?? auction.vehicle.location);
+  const financialSummary = renderFinancialSummaryCard();
+  const isAuctionPurchase = (garageEntry?.saleType || '').toLowerCase() === 'auction';
+  const descriptionText = auction.vehicle.description || '';
+  const longDescriptionText = auction.vehicle.longDescription || auction.vehicle.description || '';
+  const locationText = auction.vehicle.location || '';
+  const vehicleFeatures = Array.isArray(auction.vehicle?.features) ? auction.vehicle.features : [];
 
   const handleDelist = () => {
     const confirmed = window.confirm(
@@ -702,7 +952,7 @@ const ListingDetailPage: React.FC = () => {
 
               {/* Thumbnail Grid */}
               <div className="grid grid-cols-4 gap-4">
-                {auction.vehicle.images.slice(0, 4).map((image: string, index: number) => (
+                {(auction.vehicle.images || []).slice(0, 4).map((image: string, index: number) => (
                   <div
                     key={index}
                     className={`relative rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
@@ -832,16 +1082,28 @@ const ListingDetailPage: React.FC = () => {
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                           {t('Payment confirmed. Our concierge will contact you for pickup.', 'تم تاكيد الدفع وسيتم التواصل معك لاستلام السيارة')}
                         </div>
+                      ) : isAuctionPurchase ? (
+                        <>
+                          <Link
+                            to={`/payment/${auction.id}`}
+                            className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
+                          >
+                            {t('Pay Now', 'ادفع دلوقتي')}
+                            <span className="text-white/85 text-sm font-medium">
+                              {isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)})`}
+                            </span>
+                          </Link>
+                          <p className="text-xs text-amber-600 font-semibold text-center">
+                            {t(
+                              'You have 24 hours to complete payment as the winning bidder.',
+                              'معاك ٢٤ ساعة تكمل الدفع كمزايد فايز.'
+                            )}
+                          </p>
+                        </>
                       ) : (
-                        <Link
-                          to={`/payment/${auction.id}`}
-                          className="w-full rounded-2xl px-6 py-4 bg-indigo-600 text-white text-base font-semibold tracking-wide shadow-lg shadow-indigo-600/20 ring-1 ring-indigo-600/25 hover:bg-indigo-700 hover:shadow-indigo-600/30 hover:ring-indigo-600/35 active:scale-[0.99] transition-all duration-200 flex items-center justify-center gap-3"
-                        >
-                          {t('Complete payment', 'اكمل الدفع')}
-                          <span className="text-white/85 text-sm font-medium">
-                            {isArabic ? formatCurrencyEGP(effectiveBid) : `(EGP ${formatNumber(effectiveBid)})`}
-                          </span>
-                        </Link>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                          {t('Only the winning bidder can complete payment.', 'فقط المزايد الفائز يقدر يكمل الدفع.')}
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -875,6 +1137,8 @@ const ListingDetailPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {financialSummary && <div>{financialSummary}</div>}
 
               {/* Additional Action Buttons */}
               {canManageListings && (
@@ -914,6 +1178,19 @@ const ListingDetailPage: React.FC = () => {
                   {longDescriptionText}
                 </p>
               </div>
+
+              {vehicleFeatures.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">{t('Features', 'المميزات')}</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {vehicleFeatures.map((feature: string, index: number) => (
+                      <span key={`${feature}-${index}`} className="px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-sm text-slate-700">
+                        {feature}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1208,9 +1485,9 @@ const ListingDetailPage: React.FC = () => {
         }
       `}</style>
 
-      {lightboxIndex !== null && (
+      {lightboxIndex !== null && (auction.vehicle.images || []).length > 0 && (
         <ImageLightbox
-          images={auction.vehicle.images}
+          images={auction.vehicle.images || []}
           startIndex={lightboxIndex}
           alt={`${auction.vehicle.year} ${auction.vehicle.make} ${auction.vehicle.model}`}
           onClose={() => setLightboxIndex(null)}
@@ -1220,4 +1497,4 @@ const ListingDetailPage: React.FC = () => {
   );
 };
 
-export default ListingDetailPage;
+export default MyListingsPage;

@@ -1,15 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Car, ChevronDown, CircleHelp, Gavel, HandCoins, ListChecks, Menu, Moon, SearchCheck, Sun, X, User as UserIcon, Newspaper, MoreHorizontal } from 'lucide-react';
+import { Bell, ChevronDown, HandCoins, LayoutDashboard, Menu, Moon, Sun, Users, X, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const PublicLayout: React.FC = () => {
+const AdminLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const { user, loading, logout } = useAuth();
@@ -25,42 +23,6 @@ const PublicLayout: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!moreMenuRef.current) return;
-      const target = event.target as Node;
-      if (!moreMenuRef.current.contains(target)) {
-        setIsMoreOpen(false);
-      }
-    };
-
-    if (isMoreOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMoreOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!profileMenuRef.current) return;
-      const target = event.target as Node;
-      if (!profileMenuRef.current.contains(target)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-
-    if (isProfileMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isProfileMenuOpen]);
-
-  useEffect(() => {
     if (!isAuthPage) return;
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverflow = document.documentElement.style.overflow;
@@ -72,10 +34,22 @@ const PublicLayout: React.FC = () => {
     };
   }, [isAuthPage]);
 
-  useEffect(() => {
-    setIsMoreOpen(false);
-    setIsProfileMenuOpen(false);
-  }, [location.pathname]);
+    useEffect(() => {
+      setIsMenuOpen(false);
+      setIsProfileMenuOpen(false);
+    }, [location.pathname]);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (!profileMenuRef.current) return;
+        if (!profileMenuRef.current.contains(event.target as Node)) {
+          setIsProfileMenuOpen(false);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
   useEffect(() => {
     const root = document.documentElement;
     if (isDarkMode) {
@@ -90,8 +64,8 @@ const PublicLayout: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const handleLogout = async () => {
-    setIsProfileMenuOpen(false);
     setIsMenuOpen(false);
+    setIsProfileMenuOpen(false);
     await logout();
     navigate('/login');
   };
@@ -101,18 +75,13 @@ const PublicLayout: React.FC = () => {
     : '/assests/frontendPictures/logoBlackA.png';
 
   const navItems = [
-    { to: '/browse', label: t('Buy', 'شراء'), icon: SearchCheck },
-    { to: '/sell', label: t('Sell', 'بيع'), icon: HandCoins },
-    { to: '/auctions', label: t('Auction', 'المزادات'), icon: Gavel }
-  ] as const;
-
-  const moreItems = [
-    { to: '/how-it-works', label: t('How it Works', 'الية العمل'), icon: CircleHelp },
-    { to: '/press', label: t('Press', 'الصحافة'), icon: Newspaper }
+    { to: '/admin/users', label: t('User Moderation', 'إدارة المستخدمين'), icon: Users },
+    { to: '/admin/finance/revenue', label: t('Revenue', 'الإيرادات'), icon: HandCoins },
+    { to: '/admin', label: t('Dashboard', 'لوحة التحكم'), icon: LayoutDashboard }
   ] as const;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `nav-link gap-2 ${isActive ? 'nav-link-active' : ''}`;
+    `nav-link gap-2 text-sm font-semibold md:text-base ${isActive ? 'nav-link-active' : ''}`;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -130,46 +99,20 @@ const PublicLayout: React.FC = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-6 px-6 py-2 rounded-full border nav-pill shadow-sm" aria-label="Primary">
+            <nav className="hidden md:flex items-center gap-4 px-4 py-1.5 rounded-full border nav-pill shadow-sm text-sm md:text-base" aria-label="Primary">
               {navItems.map(item => (
-                <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/admin'}
+                  className={navLinkClass}
+                >
                   <span className="nav-link-glyph">
                     <item.icon size={14} />
                   </span>
                   {item.label}
                 </NavLink>
               ))}
-              <div className="relative" ref={moreMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsMoreOpen(prev => !prev)}
-                  className={`nav-link gap-2 ${isMoreOpen ? 'nav-link-open' : ''}`}
-                  aria-haspopup="menu"
-                  aria-expanded={isMoreOpen}
-                >
-                  <span className="nav-link-glyph">
-                    <MoreHorizontal size={16} />
-                  </span>
-                  {t('More', 'المزيد')}
-                </button>
-                {isMoreOpen && (
-                  <div className="absolute top-full mt-3 right-0 w-56 rounded-2xl border border-slate-200 bg-slate-900/95 shadow-lg overflow-hidden z-50 backdrop-blur">
-                    <div className="flex flex-col py-2">
-                      {moreItems.map(item => (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          className="flex items-center gap-3 px-4 py-2 text-sm text-slate-100 hover:bg-white/10 hover:text-white"
-                          onClick={() => setIsMoreOpen(false)}
-                        >
-                          <item.icon size={16} className="text-slate-300" />
-                          {item.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             </nav>
 
             {/* Desktop User Actions */}
@@ -282,7 +225,7 @@ const PublicLayout: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen(prev => !prev)}
-                    className="flex items-center gap-2 rounded-full border-2 border-slate-200 px-1 py-1 hover:border-indigo-600 transition-all shadow-sm"
+                    className="flex items-center gap-3 rounded-full border-2 border-slate-200 px-3 py-1 hover:border-indigo-600 transition-all shadow-sm"
                     aria-haspopup="menu"
                     aria-expanded={isProfileMenuOpen}
                   >
@@ -295,45 +238,27 @@ const PublicLayout: React.FC = () => {
                         </div>
                       )}
                     </span>
-                    <ChevronDown size={18} className={`text-slate-400 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-slate-900">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email}</p>
+                      <p className="text-xs text-slate-500">{t('Profile', 'الملف الشخصي')}</p>
+                    </div>
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isProfileMenuOpen && (
-                    <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden z-50">
-                      <div className="px-4 py-3 border-b border-slate-100">
-                        <p className="text-sm font-semibold text-slate-900">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email}</p>
-                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                      </div>
+                    <div className="absolute right-0 mt-3 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden z-50">
                       <div className="flex flex-col py-2 text-sm text-slate-700">
                         <Link
-                          to="/profile"
+                          to="/admin/profile"
                           onClick={() => setIsProfileMenuOpen(false)}
                           className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
                         >
                           <UserIcon size={16} />
                           {t('Profile', 'الملف الشخصي')}
                         </Link>
-                        <Link
-                          to="/my-listings"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
-                        >
-                          <ListChecks size={16} />
-                          {t('My Listings', 'اعلاناتي')}
-                        </Link>
-                        <Link
-                          to="/my-garage"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
-                        >
-                          <Car size={16} />
-                          {t('My Garage', 'جراجي')}
-                        </Link>
-                      </div>
-                      <div className="border-t border-slate-100">
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                          className="flex items-center gap-3 px-4 py-2 text-left hover:bg-slate-50 text-rose-600"
                         >
                           {t('Sign Out', 'تسجيل خروج')}
                         </button>
@@ -376,28 +301,19 @@ const PublicLayout: React.FC = () => {
           <div className="md:hidden border-t border-slate-200 bg-white nav-mobile">
             <div className="px-4 py-4 space-y-3">
               {navItems.map(item => (
-                <NavLink key={item.to} to={item.to} className={navLinkClass} onClick={() => setIsMenuOpen(false)}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/admin'}
+                  className={navLinkClass}
+                  onClick={() => setIsMenuOpen(false)}
+                >
                   <span className="nav-link-glyph">
                     <item.icon size={14} />
                   </span>
                   {item.label}
                 </NavLink>
               ))}
-              <div className="pt-2 border-t border-slate-200">
-                {moreItems.map(item => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={navLinkClass}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <span className="nav-link-glyph">
-                      <item.icon size={14} />
-                    </span>
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
 
               <button
                 type="button"
@@ -439,7 +355,7 @@ const PublicLayout: React.FC = () => {
                 ) : user ? (
                   <>
                     <Link
-                      to="/profile"
+                      to="/admin/profile"
                       className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
                       onClick={() => setIsMenuOpen(false)}
                     >
@@ -456,20 +372,6 @@ const PublicLayout: React.FC = () => {
                         <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
                         <p className="text-xs text-slate-500">{t('Profile', 'الملف الشخصي')}</p>
                       </div>
-                    </Link>
-                    <Link
-                      to="/my-listings"
-                      className="w-full p-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      {t('My Listings', 'اعلاناتي')}
-                    </Link>
-                    <Link
-                      to="/my-garage"
-                      className="w-full p-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      {t('My Garage', 'جراجي')}
                     </Link>
                     <button
                       type="button"
@@ -531,10 +433,9 @@ const PublicLayout: React.FC = () => {
                   {t('Explore', 'استكشف')}
                 </h3>
                 <ul className="space-y-3 text-sm text-slate-200">
-                  <li><Link to="/browse" className="hover:text-indigo-400">{t('Buy a car', 'اشتري عربية')}</Link></li>
-                  <li><Link to="/auctions" className="hover:text-indigo-400">{t('Live auctions', 'مزادات مباشرة')}</Link></li>
-                  <li><Link to="/sell" className="hover:text-indigo-400">{t('Sell a Car', 'بيع عربية')}</Link></li>
-                  <li><Link to="/press" className="hover:text-indigo-400">{t('Press', 'الصحافة')}</Link></li>
+                  <li><Link to="/admin/users" className="hover:text-indigo-400">{t('User Moderation', 'إدارة المستخدمين')}</Link></li>
+                  <li><Link to="/admin/finance/revenue" className="hover:text-indigo-400">{t('Revenue', 'الإيرادات')}</Link></li>
+                  <li><Link to="/admin" className="hover:text-indigo-400">{t('Dashboard', 'لوحة التحكم')}</Link></li>
                 </ul>
               </div>
               <div>
@@ -554,4 +455,4 @@ const PublicLayout: React.FC = () => {
   );
 };
 
-export default PublicLayout;
+export default AdminLayout;

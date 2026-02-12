@@ -10,7 +10,7 @@ const axios = require('axios');
 const oracledb = require('oracledb');
 
 // Test Configuration
-const BASE_URL = process.env.TEST_API_URL || 'http://localhost:5000';
+const BASE_URL = process.env.TEST_API_URL || 'http://localhost:5005';
 const TEST_CONFIG = {
   timeout: 30000,
   verbose: true

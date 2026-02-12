@@ -41,15 +41,17 @@ app.set("io", io);
 // =====================================================
 app.use(helmet());
 
+// ✅ 1. Define Global Limiter
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { error: "Too many requests from this IP, please try again later." },
 });
 
+// ✅ 2. Define Auth Limiter (Fixes your error)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 200,
   message: { error: "Too many login attempts, please try again later." },
 });
 
@@ -87,6 +89,7 @@ const profileRoutes = require("./routes/profile");
 const vehicleRoutes = require("./routes/vehicles");
 const auctionRoutes = require("./routes/auctions");
 const paymentRoutes = require("./routes/payments");
+const adminFinanceRoutes = require("./routes/adminFinance");
 const adminAuthRoutes = require("./routes/adminAuth");
 const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
@@ -94,20 +97,23 @@ const adminRoutes = require("./routes/admin");
 const adminActivityRoutes = require("./routes/adminActivityRoutes");
 
 app.use("/api/admin/activity-logs", adminActivityRoutes);
+const userRoutes = require("./routes/user");
+
+// ✅ Now authLimiter is defined, so this works:
 app.use("/api/auth", authLimiter, authRoutes);
-app.use("/api/profile", profileRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/auctions", auctionRoutes);
+app.use("/api/profile", profileRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/admin/content", adminContentRoutes);
-const adminFinanceRoutes = require("./routes/adminFinance");
 app.use("/api/admin/finance", adminFinanceRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/user", userRoutes);
 
 // Stripe redirect handler for 3D Secure / hash router compatibility
-// Stripe cannot redirect to hash URLs, so we redirect here first
 app.get("/payment-redirect", (req, res) => {
   const { listingId, paymentId, payment_intent, payment_intent_client_secret } =
     req.query;
@@ -181,4 +187,14 @@ process.on("SIGINT", async () => {
   });
 });
 
-startServer();
+// =====================================================
+// CRITICAL FIX: EXPORT APP & CONDITIONAL START
+// =====================================================
+
+// Only start the server if this file is run directly (node server.js)
+if (require.main === module) {
+  startServer();
+}
+
+// Export the app so Jest can test it
+module.exports = app;

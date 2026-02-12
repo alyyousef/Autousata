@@ -12,7 +12,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { StripeProvider } from "./contexts/StripeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { UserRole } from "./types";
-
+import "./index.css";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AppLayout from "./layouts/AppLayout";
 import PublicLayout from "./layouts/PublicLayout";
@@ -29,6 +29,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import ProfilePage from "./pages/ProfilePage";
+import MyListingsPage from "./pages/MyListingsPage";
+import MyGaragePage from "./pages/MyGaragePage";
+import MyListingsDetails from "./pages/MyListingsDetails";
+import MyGarageDetails from "./pages/MyGarageDetails";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import AuctionDetailPage from "./pages/AuctionDetailPage";
 import AuctionsPage from "./pages/AuctionsPage";
@@ -41,6 +45,9 @@ import AdminRevenueDashboard from "./pages/AdminRevenueDashboard";
 import AdminActivityLogsPage from "./pages/AdminActivityLogsPage";
 import AdminActivityAlertsPage from "./pages/AdminActivityAlertsPage";
 import AdminActivityAnalyticsPage from "./pages/AdminActivityAnalyticsPage";
+import KYCProcessPage from "./pages/KYCProcessPage";
+import AdminProfilePage from "./pages/AdminProfile";
+import AdminLayout from "./layouts/AdminLayout";
 
 const ScrollToTop: React.FC = () => {
   const { pathname } = useLocation();
@@ -70,7 +77,9 @@ const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== UserRole.ADMIN) return <Navigate to="/browse" replace />;
+  const normalizedRole = String(user.role ?? "").toUpperCase();
+  if (normalizedRole !== UserRole.ADMIN)
+    return <Navigate to="/browse" replace />;
   return children;
 };
 
@@ -92,6 +101,10 @@ const AppRoutes: React.FC = () => {
           <Route path="/listing/:id" element={<ListingDetailPage />} />
           <Route path="/sell" element={<CreateListingPage />} />
           <Route path="/sell/:id" element={<CreateListingPage />} />
+
+          {/* ✅ KYC Route Added Here */}
+          <Route path="/kyc-process" element={<KYCProcessPage />} />
+
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -99,6 +112,10 @@ const AppRoutes: React.FC = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/my-listings" element={<MyListingsPage />} />
+          <Route path="/my-garage" element={<MyGaragePage />} />
+          <Route path="/my-listing/:id" element={<MyListingsDetails />} />
+          <Route path="/my-garage/:id" element={<MyGarageDetails />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
           <Route
             path="/payment/:id/confirmation"
@@ -109,7 +126,9 @@ const AppRoutes: React.FC = () => {
         <Route element={<AppLayout user={user} />}>
           <Route path="/auction/:id" element={<AuctionDetailPage />} />
           <Route path="/dashboard" element={<SellerDashboard />} />
+        </Route>
 
+        <Route element={<AdminLayout />}>
           {/* ---------- ADMIN PROTECTED ---------- */}
           <Route
             path="/admin"
@@ -146,32 +165,41 @@ const AppRoutes: React.FC = () => {
               </RequireAdmin>
             }
           />
-        </Route>
 
-        <Route
-          path="/admin/activity"
-          element={
-            <RequireAdmin>
-              <AdminActivityLogsPage />
-            </RequireAdmin>
-          }
-        />
-        <Route
-          path="/admin/activity/alerts"
-          element={
-            <RequireAdmin>
-              <AdminActivityAlertsPage />
-            </RequireAdmin>
-          }
-        />
-        <Route
-          path="/admin/activity/analytics"
-          element={
-            <RequireAdmin>
-              <AdminActivityAnalyticsPage />
-            </RequireAdmin>
-          }
-        />
+          <Route
+            path="/admin/profile"
+            element={
+              <RequireAdmin>
+                <AdminProfilePage />
+              </RequireAdmin>
+            }
+          />
+
+          <Route
+            path="/admin/activity"
+            element={
+              <RequireAdmin>
+                <AdminActivityLogsPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/admin/activity/alerts"
+            element={
+              <RequireAdmin>
+                <AdminActivityAlertsPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/admin/activity/analytics"
+            element={
+              <RequireAdmin>
+                <AdminActivityAnalyticsPage />
+              </RequireAdmin>
+            }
+          />
+        </Route>
       </Routes>
     </>
   );

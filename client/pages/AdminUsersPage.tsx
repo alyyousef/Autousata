@@ -22,7 +22,7 @@ const AdminUsersPage: React.FC = () => {
   const fetchData = async (query: string, p: number) => {
     setError('');
     setLoading(true);
-    try {
+    try { 
       const isSearching = query.trim().length >= 1;
 
       const data = isSearching

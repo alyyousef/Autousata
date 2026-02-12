@@ -280,7 +280,7 @@ router.get("/", async (req, res) => {
     const countResult = await connection.execute(
       `SELECT COUNT(*) AS total
        FROM auctions a
-       WHERE a.status = 'live'`,
+       WHERE LOWER(a.status) = 'live'`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
@@ -296,7 +296,6 @@ router.get("/", async (req, res) => {
         a.start_time,
         a.end_time,
         a.current_bid_egp,
-        a.bid_count,
         v.make,
         v.model,
         v.year_mfg,
@@ -308,10 +307,11 @@ router.get("/", async (req, res) => {
         v.description,
         v.location_city,
         v.features,
-        v.images
+        v.images,
+        (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
-      WHERE a.status = 'live'
+      WHERE LOWER(a.status) = 'live'
       ORDER BY ${orderBy}
       OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY
     `;
@@ -345,8 +345,14 @@ router.get("/", async (req, res) => {
         poor: "Poor",
       };
 
-      // Parse vehicle images from VEHICLES.IMAGES column
-      let images = parseImagesColumn(row.IMAGES);
+      let images = [];
+      if (typeof row.IMAGES === "string") {
+        try {
+          images = JSON.parse(row.IMAGES);
+        } catch (e) {
+          images = [];
+        }
+      }
 
       return {
         _id: row.AUCTION_ID,
@@ -359,7 +365,7 @@ router.get("/", async (req, res) => {
           vin: row.VIN,
           condition: conditionMap[conditionValue] || "Good",
           description: row.DESCRIPTION || "",
-
+          images,
           location: row.LOCATION_CITY || "",
           features,
         },
@@ -420,7 +426,7 @@ router.get("/seller", auth, async (req, res) => {
       _id: row.ID,
       vehicleId: row.VEHICLE_ID,
       sellerId: row.SELLER_ID,
-      status: normalizeAuctionStatus(row.STATUS),
+      status: row.STATUS,
       startTime: row.START_TIME,
       endTime: row.END_TIME,
       currentBid: Number(row.CURRENT_BID_EGP) || 0,
@@ -457,7 +463,6 @@ router.get("/:id", async (req, res) => {
         a.end_time,
         a.current_bid_egp,
         a.min_bid_increment,
-        a.bid_count,
         v.make,
         v.model,
         v.year_mfg,
@@ -469,7 +474,8 @@ router.get("/:id", async (req, res) => {
         v.description,
         v.location_city,
         v.features,
-        v.images
+        v.images,
+        (SELECT COUNT(*) FROM bids b WHERE b.auction_id = a.id) AS bid_count
       FROM auctions a
       JOIN vehicles v ON v.id = a.vehicle_id
       WHERE a.id = :auctionId`,
@@ -504,8 +510,14 @@ router.get("/:id", async (req, res) => {
       poor: "Poor",
     };
 
-    // Parse vehicle images from VEHICLES.IMAGES column
-    let images = parseImagesColumn(row.IMAGES);
+    let images = [];
+    if (typeof row.IMAGES === "string") {
+      try {
+        images = JSON.parse(row.IMAGES);
+      } catch (e) {
+        images = [];
+      }
+    }
 
     res.json({
       _id: row.AUCTION_ID,

@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:5000/api';
 
 interface ApiResponse<T> {
   data?: T;
@@ -23,7 +23,6 @@ export interface KycItem {
 }
 
 class ApiService {
-  // 1. Get tokens from storage
   private getAccessToken(): string | null {
     return localStorage.getItem('accessToken');
   }
@@ -32,7 +31,6 @@ class ApiService {
     return localStorage.getItem('refreshToken');
   }
 
-  // 2. Helper to save both tokens
   private setTokens(accessToken: string, refreshToken: string) {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
@@ -76,10 +74,11 @@ class ApiService {
         const success = await this.refreshAccessToken();
         if (success) {
           return this.request<T>(endpoint, options, true);
+        } else {
+          this.logout();
+          window.location.href = '/login';
+          return { error: 'Session expired. Please login again.' };
         }
-        this.logout();
-        window.location.href = '/login';
-        return { error: 'Session expired. Please login again.' };
       }
 
       return { error: errorData.error || 'Request failed' };
@@ -88,9 +87,6 @@ class ApiService {
     }
   }
 
-  // =========================================================
-  // HELPER: Call the Backend to Swap Refresh Token
-  // =========================================================
   private async refreshAccessToken(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
@@ -163,19 +159,6 @@ class ApiService {
     });
   }
 
-  async uploadKYC(file: File) {
-    const formData = new FormData();
-    formData.append('kycDocument', file);
-
-    return this.request<{ kycStatus: string; kycDocumentUrl: string }>(
-      '/profile/kyc',
-      {
-        method: 'PUT',
-        body: formData,
-      }
-    );
-  }
-
   async login(email: string, password: string) {
     const response = await this.request<{
       accessToken: string;
@@ -215,7 +198,70 @@ class ApiService {
   }
 
   // =========================================================
-  // OTHER METHODS
+  // PROFILE & KYC METHODS
+  // =========================================================
+  async updateProfile(data: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    location?: { city: string; country?: string };
+  }) {
+    return this.request<{ user: any }>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return this.request<{ avatar: string }>('/profile/avatar', {
+      method: 'PUT',
+      body: formData,
+    });
+  }
+
+  async uploadKYC(file: File) {
+    const formData = new FormData();
+    formData.append('kycDocument', file);
+    return this.request<{ kycStatus: string; kycDocumentUrl: string }>(
+      '/profile/kyc',
+      {
+        method: 'PUT',
+        body: formData,
+      }
+    );
+  }
+
+  async validateID(idImage: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-id', {
+      method: 'POST',
+      body: JSON.stringify({ idImage }),
+    });
+  }
+
+  async validateDocumentOnly(image: string) {
+    return this.request<{ success: boolean; message: string }>('/profile/validate-document', {
+      method: 'POST',
+      body: JSON.stringify({ image }),
+    });
+  }
+
+  async verifyIdentity(idImage: string, selfieImage: string) {
+    return this.request<{
+      success: boolean;
+      status: string;
+      similarity: number;
+      message: string;
+    }>('/profile/verify-identity', {
+      method: 'POST',
+      body: JSON.stringify({ idImage, selfieImage }),
+    });
+  }
+
+  // =========================================================
+  // USER METHODS
   // =========================================================
   async getCurrentUser() {
     return this.request<{ user: any }>('/auth/me');
@@ -225,38 +271,17 @@ class ApiService {
     return this.request<{ loginHistory: any[] }>('/auth/login-history');
   }
 
-  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      sortBy,
-    });
-    return this.request<{ auctions: any[]; pagination: any }>(
-      `/auctions?${queryParams.toString()}`
-    );
+  async getMyListings() {
+    return this.request<{ data: any[] }>('/profile/listings');
   }
 
-  async getAuctionById(auctionId: string) {
-    return this.request<any>(`/auctions/${auctionId}`);
+  async getMyGarage() {
+    return this.request<{ data: any[] }>('/profile/mygarage');
   }
 
-  async getAuctionBids(auctionId: string, limit = 20) {
-    const queryParams = new URLSearchParams({ limit: limit.toString() });
-    return this.request<{ bids: any[] }>(
-      `/auctions/${auctionId}/bids?${queryParams.toString()}`
-    );
-  }
-
-  async placeBid(auctionId: string, amount: number) {
-    return this.request<{ bid: any; currentBid: number }>(
-      `/auctions/${auctionId}/bids`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ amount }),
-      }
-    );
-  }
-
+  // =========================================================
+  // VEHICLE METHODS
+  // =========================================================
   async getSellerVehicles() {
     return this.request<any[]>('/vehicles');
   }
@@ -265,20 +290,38 @@ class ApiService {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
+  async createVehicle(data: any, files: File[]) {
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== undefined && data[key] !== null && key !== 'images') {
+        if (Array.isArray(data[key])) {
+          formData.append(key, JSON.stringify(data[key]));
+        } else {
+          formData.append(key, String(data[key]));
+        }
+      }
+    });
+    files.forEach((file) => {
+      formData.append('images', file);
+    });
+    return this.request<{ _id: string }>('/vehicles', {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
   // =========================================================
   // BROWSE / BUY-NOW METHODS (Public)
   // =========================================================
-  async browseVehicles(
-    params: {
-      page?: number;
-      limit?: number;
-      make?: string;
-      minPrice?: number;
-      maxPrice?: number;
-      bodyType?: string;
-      sort?: string;
-    } = {}
-  ) {
+  async browseVehicles(params: {
+    page?: number;
+    limit?: number;
+    make?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    bodyType?: string;
+    sort?: string;
+  } = {}) {
     const qp = new URLSearchParams();
     if (params.page) qp.set('page', params.page.toString());
     if (params.limit) qp.set('limit', params.limit.toString());
@@ -314,52 +357,39 @@ class ApiService {
     return this.request<any>(`/vehicles/browse/${vehicleId}`);
   }
 
-  async createDirectPaymentIntent(vehicleId: string) {
-    return this.request<{
-      success: boolean;
-      clientSecret: string;
-      paymentId: string;
-      breakdown: {
-        vehiclePrice: number;
-        platformCommission: number;
-        stripeFee: number;
-        totalAmount: number;
-        sellerPayout: number;
-      };
-      vehicle: {
-        id: string;
-        title: string;
-      };
-    }>('/payments/create-direct-intent', {
-      method: 'POST',
-      body: JSON.stringify({ vehicleId }),
+  // =========================================================
+  // AUCTION METHODS
+  // =========================================================
+  async getAuctions(page = 1, limit = 9, sortBy = 'endingSoon') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
     });
+    return this.request<{ auctions: any[]; pagination: any }>(
+      `/auctions?${queryParams.toString()}`
+    );
   }
 
-  // =========================================================
-  // VEHICLE & AUCTION CREATION METHODS
-  // =========================================================
-  async createVehicle(data: any, files: File[]) {
-    const formData = new FormData();
+  async getAuctionById(auctionId: string) {
+    return this.request<any>(`/auctions/${auctionId}`);
+  }
 
-    Object.keys(data).forEach((key) => {
-      if (data[key] !== undefined && data[key] !== null && key !== 'images') {
-        if (Array.isArray(data[key])) {
-          formData.append(key, JSON.stringify(data[key]));
-        } else {
-          formData.append(key, String(data[key]));
-        }
+  async getAuctionBids(auctionId: string, limit = 20) {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    return this.request<{ bids: any[] }>(
+      `/auctions/${auctionId}/bids?${queryParams.toString()}`
+    );
+  }
+
+  async placeBid(auctionId: string, amount: number) {
+    return this.request<{ bid: any; currentBid: number }>(
+      `/auctions/${auctionId}/bids`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
       }
-    });
-
-    files.forEach((file) => {
-      formData.append('images', file);
-    });
-
-    return this.request<{ _id: string }>('/vehicles', {
-      method: 'POST',
-      body: formData,
-    });
+    );
   }
 
   async createAuction(data: any) {
@@ -373,37 +403,15 @@ class ApiService {
     return this.request<{ auctions: any[] }>('/auctions/seller');
   }
 
-  // Profile endpoints
-  async updateProfile(data: {
-    name?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    location?: { city: string; country?: string };
-  }) {
-    return this.request<{ user: any }>('/profile', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateAvatar(file: File) {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    return this.request<{ avatar: string }>('/profile/avatar', {
-      method: 'PUT',
-      body: formData,
-    });
-  }
-
   // =========================================================
-  // PAYMENT METHODS
+  // PAYMENT & ESCROW METHODS
   // =========================================================
   async createPaymentIntent(auctionId: string) {
     return this.request<{
       success: boolean;
       clientSecret: string;
       paymentId: string;
+      gatewayOrderId: string;
       breakdown: {
         bidAmount: number;
         platformCommission: number;
@@ -422,15 +430,68 @@ class ApiService {
     });
   }
 
-  async confirmPayment(paymentId: string) {
+  async createDirectPaymentIntent(vehicleId: string) {
     return this.request<{
       success: boolean;
-      message: string;
+      clientSecret: string;
       paymentId: string;
-      escrowId: string;
-    }>(`/payments/${paymentId}/confirm`, {
+      gatewayOrderId: string;
+      breakdown: {
+        vehiclePrice: number;
+        platformCommission: number;
+        stripeFee: number;
+        totalAmount: number;
+        sellerPayout: number;
+      };
+      vehicle: {
+        id: string;
+        title: string;
+      };
+    }>('/payments/create-direct-intent', {
       method: 'POST',
+      body: JSON.stringify({ vehicleId }),
     });
+  }
+
+  async getPaymentById(paymentId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        auctionId: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/${paymentId}`);
+  }
+
+  async getPaymentByVehicle(vehicleId: string) {
+    return this.request<{
+      success: boolean;
+      payment: {
+        id: string;
+        vehicleId: string;
+        purchaseType: string;
+        amountEGP: number;
+        status: string;
+        initiatedAt: string;
+        completedAt?: string;
+        escrow?: {
+          id: string;
+          status: string;
+          commissionEGP: number;
+          sellerPayoutEGP: number;
+        };
+      };
+    }>(`/payments/vehicle/${vehicleId}`);
   }
 
   async getPaymentByAuction(auctionId: string) {
@@ -453,26 +514,16 @@ class ApiService {
     }>(`/payments/auction/${auctionId}`);
   }
 
-  async getPaymentById(paymentId: string) {
+  async confirmPayment(paymentId: string, gatewayOrderId?: string) {
     return this.request<{
       success: boolean;
-      payment: {
-        id: string;
-        auctionId: string | null;
-        vehicleId: string | null;
-        purchaseType: string;
-        amountEGP: number;
-        status: string;
-        initiatedAt: string;
-        completedAt?: string;
-        escrow?: {
-          id: string;
-          status: string;
-          commissionEGP: number;
-          sellerPayoutEGP: number;
-        };
-      };
-    }>(`/payments/${paymentId}`);
+      message: string;
+      payment: any;
+      breakdown: any;
+    }>(`/payments/${paymentId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ gatewayOrderId }),
+    });
   }
 
   async getEscrowDetails(escrowId: string) {
@@ -503,17 +554,6 @@ class ApiService {
       sellerPayoutEGP: number;
     }>(`/payments/escrows/${escrowId}/confirm-receipt`, {
       method: 'POST',
-    });
-  }
-
-  async initiateDispute(escrowId: string, reason: string) {
-    return this.request<{
-      success: boolean;
-      message: string;
-      escrowId: string;
-    }>(`/payments/escrows/${escrowId}/dispute`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
     });
   }
 
@@ -555,23 +595,19 @@ class ApiService {
     });
   }
 
-  // ===================== Admin Content =====================
+  // =========================================================
+  // ADMIN METHODS
+  // =========================================================
   async getPendingKYC() {
-    return this.request<KycItem[]>('/admin/kyc/pending', {
-      method: 'GET',
-    });
+    return this.request<KycItem[]>('/admin/kyc/pending', { method: 'GET' });
   }
 
   async getLiveAuctions() {
-    return this.request<unknown[]>('/admin/auctions/live', {
-      method: 'GET',
-    });
+    return this.request<unknown[]>('/admin/auctions/live', { method: 'GET' });
   }
 
   async getPendingPayments() {
-    return this.request<unknown[]>('/admin/payments/pending', {
-      method: 'GET',
-    });
+    return this.request<unknown[]>('/admin/payments/pending', { method: 'GET' });
   }
 
   public adminListUsers(page = 1, limit = 20) {
@@ -591,10 +627,7 @@ class ApiService {
       limit: number;
       total: number;
       totalPages: number;
-    }>(
-      `/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
-      { method: 'GET' }
-    );
+    }>(`/admin/users/search?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`, { method: 'GET' });
   }
 
   adminGetUserTransactions(userId: string, queryString: string) {
@@ -612,13 +645,13 @@ class ApiService {
     });
   }
 
-  adminReactivateUser(userId: string) {
+  async adminReactivateUser(userId: string) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/reactivate`, {
       method: 'PATCH',
     });
   }
 
-  adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
+  async adminBanUser(userId: string, body: { reason: string; evidence?: any }) {
     return this.request(`/admin/users/${encodeURIComponent(userId)}/ban`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -631,7 +664,6 @@ class ApiService {
       to: params.to,
       groupBy: params.groupBy || 'day',
     }).toString();
-
     return this.request(`/admin/finance/revenue?${qs}`, { method: 'GET' });
   }
 
