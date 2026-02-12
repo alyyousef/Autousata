@@ -55,7 +55,7 @@ const RealTimeBidHistory: React.FC<RealTimeBidHistoryProps> = ({ bids, currentUs
         ) : (
           <ul className="divide-y divide-slate-100">
             {sortedBids.map((bid, index) => {
-              const isYou = bid.bidderId === currentUserId || bid.isYou;
+              const isYou = bid.isYou || false;
               const isLatest = index === 0;
 
               return (
@@ -77,7 +77,8 @@ const RealTimeBidHistory: React.FC<RealTimeBidHistoryProps> = ({ bids, currentUs
                           <span className={`font-semibold ${
                             isYou ? 'text-blue-600' : 'text-slate-900'
                           }`}>
-                            {isYou ? 'You' : bid.bidderId}
+                            {bid.bidderId}
+                            {isYou && <span className="ml-1 text-xs text-blue-400">(you)</span>}
                           </span>
                           {isLatest && (
                             <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">

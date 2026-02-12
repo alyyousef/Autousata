@@ -10,24 +10,37 @@ const getAuthToken = (): string | null => {
 
 // Initialize Socket.IO connection
 export const initializeSocket = (): Socket => {
-  if (socket) {
+  if (socket?.connected) {
     return socket;
+  }
+
+  // Clean up previous socket if it exists but disconnected
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
   }
 
   const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005';
   const token = getAuthToken();
 
+  if (!token) {
+    console.error('[Socket.IO] No accessToken in localStorage — cannot connect');
+    throw new Error('Authentication required');
+  }
+
   console.log('[Socket.IO] Connecting to:', serverUrl);
-  console.log('[Socket.IO] Auth token:', token ? 'Present' : 'Missing');
 
   socket = io(serverUrl, {
-    auth: {
-      token,
+    auth: (cb) => {
+      // Always send the latest token (handles refresh between reconnects)
+      cb({ token: getAuthToken() });
     },
     transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
   });
 
   // Connection event listeners
@@ -41,6 +54,13 @@ export const initializeSocket = (): Socket => {
 
   socket.on('connect_error', (error) => {
     console.error('[Socket.IO] Connection error:', error.message);
+  });
+
+  // Server rejects unauthenticated sockets
+  socket.on('auth_error', (data: { message: string }) => {
+    console.error('[Socket.IO] Auth rejected by server:', data.message);
+    socket?.disconnect();
+    socket = null;
   });
 
   socket.on('error', (error) => {

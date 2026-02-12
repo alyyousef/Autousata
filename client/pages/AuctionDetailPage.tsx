@@ -162,34 +162,9 @@ const AuctionDetailPage: React.FC = () => {
   }, [id]);
 
   // ============================================================
-  // 2. FETCH BID HISTORY FROM API (initial load)
+  // 2. BID HISTORY — loaded via socket (bid_history event on join)
+  //    No separate API call needed; socket sends history on join_auction
   // ============================================================
-  useEffect(() => {
-    if (!id || !auction) return;
-    let cancelled = false;
-
-    const fetchBids = async () => {
-      try {
-        const response = await apiService.getAuctionBids(id, 20);
-        if (cancelled) return;
-        if (response.data?.bids) {
-          const formattedBids: RealTimeBid[] = response.data.bids.map((b: any) => ({
-            id: b.id || b._id || Math.random().toString(36).slice(2),
-            bidderId: b.bidderId === currentUserId ? 'You' : (b.displayName || b.bidderId || 'Bidder'),
-            amount: b.amount,
-            timestamp: b.timestamp || b.createdAt,
-            isYou: b.bidderId === currentUserId,
-          }));
-          setBidHistory(formattedBids);
-        }
-      } catch {
-        // Bid history will come from WebSocket instead
-      }
-    };
-
-    fetchBids();
-    return () => { cancelled = true; };
-  }, [id, auction, currentUserId]);
 
   // ============================================================
   // 3. FETCH FINANCE ADVICE (Gemini AI)
@@ -290,12 +265,12 @@ const AuctionDetailPage: React.FC = () => {
       }
     };
 
-    // Server sends recent bid history on join
+    // Server sends recent bid history on join (anonymized names from server)
     const handleBidHistory = (data: { bids: any[] }) => {
       console.log('[AuctionDetail] ✅ bid_history event received:', data.bids?.length, 'bids');
       const formattedBids: RealTimeBid[] = (data.bids || []).map((b: any) => ({
         id: b.id || Math.random().toString(36).slice(2),
-        bidderId: b.isYou ? 'You' : (b.displayName || 'Bidder'),
+        bidderId: b.displayName || `User ${(b.bidderId || '').substring(0, 4)}***`,
         amount: b.amount,
         timestamp: b.timestamp,
         isYou: b.isYou || false,
@@ -303,16 +278,17 @@ const AuctionDetailPage: React.FC = () => {
       setBidHistory(formattedBids);
     };
 
-    // Bid confirmation — sent ONLY to the bidder's socket (instant feedback)
+    // Bid confirmation — sent ONLY to the bidder's own socket (instant feedback)
     const handleBidPlaced = (data: any) => {
       console.log('[AuctionDetail] ✅ bid_placed (confirmation):', data);
 
       const { bid, auction: auctionState, autoExtended, autoExtendInfo } = data;
 
-      // Update auction state from enriched payload (instant UI update)
+      // Update auction state from enriched payload (instant UI, no DB round-trip)
       if (auctionState) {
         setCurrentBid(auctionState.currentBid);
         setBidCount(auctionState.bidCount);
+        setMinBidIncrement(auctionState.minBidIncrement || minBidIncrementRef.current || 50);
         if (auctionState.endTime) {
           setAuctionEndTime(auctionState.endTime);
         }
@@ -322,10 +298,11 @@ const AuctionDetailPage: React.FC = () => {
         ));
       }
 
-      // Add to bid history (always "You" since this event is bidder-only)
+      // Add to bid history with anonymized name (bidder sees their own id asterisked)
+      const displayName = `User ${(bid.bidderId || '').substring(0, 4)}***`;
       const newBid: RealTimeBid = {
         id: bid.id,
-        bidderId: 'You',
+        bidderId: displayName,
         amount: bid.amount,
         timestamp: bid.timestamp,
         isYou: true,
@@ -348,7 +325,7 @@ const AuctionDetailPage: React.FC = () => {
       }
     };
 
-    // Broadcast to all OTHER sockets (other users + bidder's other tabs)
+    // Broadcast to all OTHER sockets in the auction room
     const handleAuctionUpdated = (data: socketService.AuctionUpdate) => {
       console.log('[AuctionDetail] ✅ auction_updated event:', {
         currentBid: data.currentBid,
@@ -356,9 +333,7 @@ const AuctionDetailPage: React.FC = () => {
         timestamp: new Date().toISOString()
       });
 
-      const isYou = data.leadingBidderId === currentUserIdRef.current;
-
-      // Authoritative state update
+      // Update all state from socket payload (no DB call)
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
       setMinBidIncrement(data.minBidIncrement || 50);
@@ -368,14 +343,14 @@ const AuctionDetailPage: React.FC = () => {
       setBidJustUpdated(true);
       setTimeout(() => setBidJustUpdated(false), 2000);
 
-      // Add to bid history
+      // Add to bid history — use server-provided anonymized displayName
       if (data.newBid) {
         const newBid: RealTimeBid = {
           id: data.newBid.id,
-          bidderId: isYou ? 'You' : (data.newBid.displayName || 'Bidder'),
+          bidderId: data.newBid.displayName || `User ${(data.leadingBidderId || '').substring(0, 4)}***`,
           amount: data.newBid.amount,
           timestamp: data.newBid.timestamp,
-          isYou,
+          isYou: false,
         };
         setBidHistory(prev => {
           if (prev.some(b => b.id === newBid.id)) return prev;
@@ -389,12 +364,7 @@ const AuctionDetailPage: React.FC = () => {
         addLocalNotification('Auction time extended due to late bid!', 'warn');
       }
 
-      // Contextual notification: own bid from another tab vs. other user's bid
-      if (isYou) {
-        addLocalNotification(`Your bid of EGP ${data.currentBid.toLocaleString()} confirmed.`, 'success');
-      } else {
-        addLocalNotification(`New bid: EGP ${data.currentBid.toLocaleString()}`, 'info');
-      }
+      addLocalNotification(`New bid: EGP ${data.currentBid.toLocaleString()}`, 'info');
     };
 
     // User outbid notification

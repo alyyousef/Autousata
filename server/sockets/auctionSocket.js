@@ -3,7 +3,7 @@ const bidProcessingService = require('../services/bidProcessingService');
 const webhookService = require('../services/webhookService');
 const auctionScheduler = require('../services/auctionScheduler');
 const { checkSocketRateLimit } = require('../middleware/rateLimiter');
-const { formatBidderName } = require('../utils/anonymizeBidder');
+const { formatBidderName, obfuscateName } = require('../utils/anonymizeBidder');
 const db = require('../config/db');
 const oracledb = require('oracledb');
 
@@ -37,7 +37,7 @@ async function authenticateSocket(socket) {
     // Fetch user from DB (same as HTTP auth middleware)
     connection = await db.getConnection();
     const result = await connection.execute(
-      `SELECT ID, ROLE, IS_ACTIVE, IS_BANNED FROM USERS WHERE ID = :userId`,
+      `SELECT ID, ROLE, IS_ACTIVE, IS_BANNED, FIRST_NAME, LAST_NAME FROM USERS WHERE ID = :userId`,
       { userId },
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -54,7 +54,7 @@ async function authenticateSocket(socket) {
       return null;
     }
 
-    return { id: user.ID, role: user.ROLE };
+    return { id: user.ID, role: user.ROLE, firstName: user.FIRST_NAME || '', lastName: user.LAST_NAME || '' };
   } catch (err) {
     console.error('Socket authentication error:', err.message);
     return null;
@@ -165,28 +165,28 @@ function initializeAuctionSocket(io) {
   io.on('connection', async (socket) => {
     console.log(`[Socket.IO] New connection: ${socket.id}`);
 
-    // Authenticate user — guests get read-only access
+    // Authenticate user — reject unauthenticated connections
     const user = await authenticateSocket(socket);
-    const isGuest = !user;
 
-    if (isGuest) {
-      socket.userId = null;
-      socket.userRole = 'guest';
-      console.log(`[Socket.IO] Guest connection accepted: ${socket.id} (read-only)`);
-    } else {
-      socket.userId = user.id;
-      socket.userRole = user.role;
-      // Join user's personal room for notifications
-      socket.join(`user:${user.id}`);
-      console.log(`[Socket.IO] User ${user.id} authenticated`);
+    if (!user) {
+      console.log(`[Socket.IO] ❌ Unauthenticated connection rejected: ${socket.id}`);
+      socket.emit('auth_error', { message: 'Authentication required. Please log in.' });
+      socket.disconnect(true);
+      return;
     }
+
+    socket.userId = user.id;
+    socket.userRole = user.role;
+    // Join user's personal room for targeted notifications (outbid, etc.)
+    socket.join(`user:${user.id}`);
+    console.log(`[Socket.IO] ✅ User ${user.id} authenticated (${user.role})`);
 
     // ===== JOIN_AUCTION Event =====
     socket.on('join_auction', async (data) => {
       const { auctionId } = data;
       const userId = socket.userId;
 
-      console.log(`[Socket.IO] ${isGuest ? 'Guest' : `User ${userId}`} (${socket.id}) attempting to join auction: ${auctionId}`);
+      console.log(`[Socket.IO] User ${userId} (${socket.id}) attempting to join auction: ${auctionId}`);
 
       if (!auctionId) {
         socket.emit('error', { message: 'Auction ID required' });
@@ -207,7 +207,7 @@ function initializeAuctionSocket(io) {
         socket.join(`auction:${auctionId}`);
         socket.currentAuctionId = auctionId;
 
-        console.log(`[Socket.IO] ✅ ${isGuest ? 'Guest' : `User ${userId}`} (${socket.id}) joined room: auction:${auctionId}`);
+        console.log(`[Socket.IO] ✅ User ${userId} (${socket.id}) joined room: auction:${auctionId}`);
         console.log(`[Socket.IO] Room auction:${auctionId} now has ${io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0} members`);
 
         // Send current auction state
@@ -226,21 +226,22 @@ function initializeAuctionSocket(io) {
         const recentBids = await bidProcessingService.getRecentBids(auctionId, 10);
         const formattedBids = recentBids.map(bid => ({
           id: bid.id,
+          bidderId: bid.bidderId,
           amount: bid.amount,
           timestamp: bid.timestamp,
           displayName: formatBidderName(
             { id: bid.bidderId, firstName: bid.firstName, lastName: bid.lastName },
             userId,
-            isGuest ? 'guest' : user.role,
+            user.role,
             auction.sellerId,
-            !isGuest && bid.bidderId === userId
+            bid.bidderId === userId
           ),
-          isYou: !isGuest && bid.bidderId === userId
+          isYou: bid.bidderId === userId
         }));
 
         socket.emit('bid_history', { bids: formattedBids });
 
-        console.log(`[Socket.IO] ✅ ${isGuest ? 'Guest' : `User ${userId}`} successfully joined auction ${auctionId}, sent ${formattedBids.length} bids`);
+        console.log(`[Socket.IO] ✅ User ${userId} successfully joined auction ${auctionId}, sent ${formattedBids.length} bids`);
       } catch (err) {
         console.error(`[Socket.IO] Error joining auction:`, err);
         socket.emit('error', { message: 'Failed to join auction' });
@@ -249,12 +250,6 @@ function initializeAuctionSocket(io) {
 
     // ===== PLACE_BID Event =====
     socket.on('place_bid', async (data) => {
-      // Guests cannot place bids
-      if (isGuest) {
-        socket.emit('bid_error', { message: 'Authentication required to place bids' });
-        return;
-      }
-
       const { auctionId, amount } = data;
 
       if (!auctionId || !amount) {
@@ -276,12 +271,16 @@ function initializeAuctionSocket(io) {
         // Get database connection
         const connection = await db.getConnection();
 
-        try {
-          // Get pre-bid auction state
-          const preBidAuction = await getAuctionDetails(auctionId);
+        // Fetch pre-bid auction state
+        const preBidAuction = await getAuctionDetails(auctionId);
+        if (!preBidAuction) {
+          socket.emit('bid_error', { message: 'Auction not found' });
+          await connection.close();
+          return;
+        }
 
-          // Process bid (validates and commits atomically)
-          const result = await bidProcessingService.processBid(
+        // Process bid (validates and commits atomically)
+        const result = await bidProcessingService.processBid(
             auctionId,
             user.id,
             amount,
@@ -295,18 +294,20 @@ function initializeAuctionSocket(io) {
             return;
           }
 
-          // Get fresh auction state from DB
-          const freshAuction = await getAuctionDetails(auctionId);
-          const effectiveEndTime = result.autoExtendInfo?.newEndTime
-            || (freshAuction ? freshAuction.endTime : preBidAuction.endTime);
+          // Compute new state from pre-bid + result (NO extra DB read)
+          const newBidCount = preBidAuction.bidCount + 1;
+          const effectiveEndTime = result.autoExtendInfo?.newEndTime || preBidAuction.endTime;
+          const bidderDisplayName = obfuscateName(
+            user.firstName || '', user.lastName || '', user.id
+          );
 
-          // Emit confirmation to bidder with full state (instant feedback)
+          // Emit confirmation to bidder's socket (instant feedback)
           socket.emit('bid_placed', {
             bid: result.bid,
             auction: {
               currentBid: amount,
-              bidCount: freshAuction ? freshAuction.bidCount : preBidAuction.bidCount + 1,
-              minBidIncrement: freshAuction ? freshAuction.minBidIncrement : preBidAuction.minBidIncrement,
+              bidCount: newBidCount,
+              minBidIncrement: preBidAuction.minBidIncrement,
               endTime: effectiveEndTime,
             },
             autoExtended: result.autoExtended,
@@ -320,28 +321,27 @@ function initializeAuctionSocket(io) {
           socket.broadcast.to(`auction:${auctionId}`).emit('auction_updated', {
             auctionId,
             currentBid: amount,
-            bidCount: freshAuction ? freshAuction.bidCount : 0,
-            minBidIncrement: freshAuction ? freshAuction.minBidIncrement : 0,
+            bidCount: newBidCount,
+            minBidIncrement: preBidAuction.minBidIncrement,
             leadingBidderId: user.id,
             newBid: {
               id: result.bid.id,
               amount,
               timestamp: result.bid.timestamp,
-              displayName: 'New bid',
-              isYou: false
+              displayName: bidderDisplayName,
             },
             autoExtended: result.autoExtended,
             newEndTime: result.autoExtendInfo?.newEndTime
           });
-          
+
           console.log(`[Socket.IO] ✅ Broadcast complete to ${roomSize} members`);
 
           // Notify previous leader they've been outbid
           const previousLeaderId = result.bid ? await getPreviousLeader(auctionId, user.id, connection) : null;
           
           if (previousLeaderId && previousLeaderId !== user.id) {
-            const vehicleDesc = freshAuction
-              ? `${freshAuction.vehicle.year} ${freshAuction.vehicle.make} ${freshAuction.vehicle.model}`
+            const vehicleDesc = preBidAuction.vehicle
+              ? `${preBidAuction.vehicle.year} ${preBidAuction.vehicle.make} ${preBidAuction.vehicle.model}`
               : 'Vehicle';
             
             await auctionScheduler.createNotification(
@@ -378,12 +378,18 @@ function initializeAuctionSocket(io) {
           });
 
           console.log(`[Socket.IO] Bid placed: ${auctionId} - ${amount} by ${user.id}`);
-        } finally {
-          await connection.close();
-        }
+
       } catch (err) {
         console.error(`[Socket.IO] Error placing bid:`, err);
         socket.emit('bid_error', { message: 'Failed to process bid' });
+      } finally {
+        if (connection) {
+          try {
+            await connection.close();
+          } catch (e) {
+            console.error('Connection close error:', e);
+          }
+        }
       }
     });
 
@@ -394,13 +400,13 @@ function initializeAuctionSocket(io) {
       if (auctionId && socket.currentAuctionId === auctionId) {
         socket.leave(`auction:${auctionId}`);
         socket.currentAuctionId = null;
-        console.log(`[Socket.IO] ${isGuest ? 'Guest' : `User ${socket.userId}`} left auction ${auctionId}`);
+        console.log(`[Socket.IO] User ${socket.userId} left auction ${auctionId}`);
       }
     });
 
     // ===== DISCONNECT Event =====
     socket.on('disconnect', () => {
-      console.log(`[Socket.IO] ${isGuest ? 'Guest' : `User ${socket.userId}`} disconnected: ${socket.id}`);
+      console.log(`[Socket.IO] User ${socket.userId} disconnected: ${socket.id}`);
     });
   });
 
