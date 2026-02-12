@@ -88,18 +88,25 @@ const adminUsersRoutes = require("./routes/adminUsers");
 const adminContentRoutes = require("./routes/adminContent");
 const adminRoutes = require("./routes/admin");
 const adminFinanceRoutes = require("./routes/adminFinance");
+const adminAuthRoutes = require("./routes/adminAuth");
+const adminUsersRoutes = require("./routes/adminUsers");
+const adminContentRoutes = require("./routes/adminContent");
+const adminRoutes = require("./routes/admin");
+const userRoutes = require("./routes/user");
 
 // ✅ Now authLimiter is defined, so this works:
 app.use("/api/auth", authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/auctions', auctionRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/vehicles", vehicleRoutes);
-app.use("/api/auctions", auctionRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/admin/content", adminContentRoutes);
 app.use("/api/admin/finance", adminFinanceRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/user", userRoutes);
 
 // Stripe redirect handler for 3D Secure / hash router compatibility
 app.get("/payment-redirect", (req, res) => {

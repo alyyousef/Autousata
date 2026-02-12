@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CircleHelp, Gavel, HandCoins, Menu, Moon, SearchCheck, Sun, X, User as UserIcon, Newspaper, MoreHorizontal } from 'lucide-react';
+import { Bell, Car, ChevronDown, CircleHelp, Gavel, HandCoins, ListChecks, Menu, Moon, SearchCheck, Sun, X, User as UserIcon, Newspaper, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,12 +8,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const { user, loading, logout } = useAuth();
   const { notifications, unreadCount, markAllRead, clearNotifications } = useNotifications();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
-  const isProfilePage = location.pathname === '/profile';
   const hideFooter = isAuthPage;
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -42,6 +43,24 @@ const PublicLayout: React.FC = () => {
   }, [isMoreOpen]);
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!profileMenuRef.current) return;
+      const target = event.target as Node;
+      if (!profileMenuRef.current.contains(target)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
+
+  useEffect(() => {
     if (!isAuthPage) return;
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverflow = document.documentElement.style.overflow;
@@ -55,6 +74,7 @@ const PublicLayout: React.FC = () => {
 
   useEffect(() => {
     setIsMoreOpen(false);
+    setIsProfileMenuOpen(false);
   }, [location.pathname]);
   useEffect(() => {
     const root = document.documentElement;
@@ -70,6 +90,8 @@ const PublicLayout: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   const handleLogout = async () => {
+    setIsProfileMenuOpen(false);
+    setIsMenuOpen(false);
     await logout();
     navigate('/login');
   };
@@ -256,33 +278,69 @@ const PublicLayout: React.FC = () => {
               {loading ? (
                 <div className="w-20 h-10"></div>
               ) : user ? (
-                isProfilePage ? (
+                <div className="relative" ref={profileMenuRef}>
                   <button
                     type="button"
-                    onClick={handleLogout}
-                  className="px-4 py-2 rounded-full bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 border border-red-100 transition-colors"
-                >
-                    {t('Sign Out', 'تسجيل خروج')}
-                  </button>
-                ) : (
-                  <Link 
-                    to="/profile" 
-                    className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-slate-200 overflow-hidden hover:border-indigo-600 transition-all shadow-sm"
-                    title={t('Go to Profile', 'روح للملف الشخصي')}
+                    onClick={() => setIsProfileMenuOpen(prev => !prev)}
+                    className="flex items-center gap-2 rounded-full border-2 border-slate-200 px-1 py-1 hover:border-indigo-600 transition-all shadow-sm"
+                    aria-haspopup="menu"
+                    aria-expanded={isProfileMenuOpen}
                   >
-                    {user.profileImage ? (
-                      <img 
-                        src={user.profileImage} 
-                        alt={t('Profile', 'الملف الشخصي')} 
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
-                        <UserIcon size={20} />
+                    <span className="flex items-center justify-center w-10 h-10 rounded-full overflow-hidden">
+                      {user.profileImage ? (
+                        <img src={user.profileImage} alt={t('Profile', 'الملف الشخصي')} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                          <UserIcon size={20} />
+                        </div>
+                      )}
+                    </span>
+                    <ChevronDown size={18} className={`text-slate-400 transition-transform ${isProfileMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isProfileMenuOpen && (
+                    <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-sm font-semibold text-slate-900">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.email}</p>
+                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
                       </div>
-                    )}
-                  </Link>
-                )
+                      <div className="flex flex-col py-2 text-sm text-slate-700">
+                        <Link
+                          to="/profile"
+                          onClick={() => setIsProfileMenuOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
+                        >
+                          <UserIcon size={16} />
+                          {t('Profile', 'الملف الشخصي')}
+                        </Link>
+                        <Link
+                          to="/my-listings"
+                          onClick={() => setIsProfileMenuOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
+                        >
+                          <ListChecks size={16} />
+                          {t('My Listings', 'اعلاناتي')}
+                        </Link>
+                        <Link
+                          to="/my-garage"
+                          onClick={() => setIsProfileMenuOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-50"
+                        >
+                          <Car size={16} />
+                          {t('My Garage', 'جراجي')}
+                        </Link>
+                      </div>
+                      <div className="border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                        >
+                          {t('Sign Out', 'تسجيل خروج')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 // === User is Guest ===
                 <>
@@ -375,42 +433,52 @@ const PublicLayout: React.FC = () => {
                 </button>
               </div>
               
-              <div className="pt-2 border-t border-slate-200 flex gap-3">
+              <div className="pt-2 border-t border-slate-200 flex flex-col gap-2">
                 {loading ? (
-                    <div className="p-2 text-sm text-slate-400">{t('Loading...', 'تحميل...')}</div>
+                  <div className="p-2 text-sm text-slate-400">{t('Loading...', 'تحميل...')}</div>
                 ) : user ? (
-                  isProfilePage ? (
+                  <>
+                    <Link
+                      to="/profile"
+                      className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden flex-shrink-0">
+                        {user.profileImage ? (
+                          <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
+                            <UserIcon size={20} />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
+                        <p className="text-xs text-slate-500">{t('Profile', 'الملف الشخصي')}</p>
+                      </div>
+                    </Link>
+                    <Link
+                      to="/my-listings"
+                      className="w-full p-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {t('My Listings', 'اعلاناتي')}
+                    </Link>
+                    <Link
+                      to="/my-garage"
+                      className="w-full p-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {t('My Garage', 'جراجي')}
+                    </Link>
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        handleLogout();
-                      }}
+                      onClick={handleLogout}
                       className="w-full p-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold border border-red-100 hover:bg-red-100 transition-colors"
                     >
                       {t('Sign Out', 'تسجيل خروج')}
                     </button>
-                  ) : (
-                    <Link 
-                      to="/profile" 
-                      className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                       <div className="w-10 h-10 rounded-full border border-slate-200 overflow-hidden flex-shrink-0">
-                          {user.profileImage ? (
-                            <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">
-                              <UserIcon size={20} />
-                            </div>
-                          )}
-                       </div>
-                       <div>
-                          <p className="text-sm font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
-                          <p className="text-xs text-slate-500">{t('View Profile', 'عرض الملف')}</p>
-                       </div>
-                    </Link>
-                  )
+                  </>
                 ) : (
                   <>
                     <NavLink

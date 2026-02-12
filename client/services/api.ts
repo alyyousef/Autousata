@@ -327,6 +327,18 @@ class ApiService {
     return this.request<any>(`/vehicles/${vehicleId}`);
   }
 
+  async getMyListings() {
+    return this.request<{ data: any[] }>('/profile/listings');
+  }
+
+  async getMyGarage() {
+    return this.request<{ data: any[] }>('/profile/mygarage');
+  }
+
+  // =========================================================
+  // BROWSE / BUY-NOW METHODS (Public)
+  // =========================================================
+
   async browseVehicles(params: { page?: number; limit?: number; make?: string; minPrice?: number; maxPrice?: number; bodyType?: string; sort?: string } = {}) {
     const qp = new URLSearchParams();
     if (params.page) qp.set('page', params.page.toString());

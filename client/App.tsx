@@ -29,6 +29,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import CreateListingPage from "./pages/CreateListingPage";
 import ProfilePage from "./pages/ProfilePage";
+import MyListingsPage from "./pages/MyListingsPage";
+import MyGaragePage from "./pages/MyGaragePage";
+import MyListingsDetails from "./pages/MyListingsDetails";
+import MyGarageDetails from "./pages/MyGarageDetails";
 import ListingDetailPage from "./pages/ListingDetailPage";
 import AuctionDetailPage from "./pages/AuctionDetailPage";
 import AuctionsPage from "./pages/AuctionsPage";
@@ -100,6 +104,10 @@ const AppRoutes: React.FC = () => {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/my-listings" element={<MyListingsPage />} />
+          <Route path="/my-garage" element={<MyGaragePage />} />
+          <Route path="/my-listing/:id" element={<MyListingsDetails />} />
+          <Route path="/my-garage/:id" element={<MyGarageDetails />} />
           <Route path="/payment/:id" element={<PaymentPage />} />
           <Route
             path="/payment/:id/confirmation"
