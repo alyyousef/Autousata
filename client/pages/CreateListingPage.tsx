@@ -401,7 +401,7 @@ const CreateListingPage: React.FC = () => {
         return;
       }
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005/api';
 
       const normalizedMileage = Number(data.mileage) || 0;
       const normalizedPrice = Number(data.price) || 0;

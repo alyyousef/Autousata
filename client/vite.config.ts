@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
         // ✅ NEW: Proxy setup connecting to your real backend port
         proxy: {
           '/api': {
-            target: 'http://localhost:5000', 
+            target: 'http://localhost:5005', 
             changeOrigin: true,
             secure: false,
           }
