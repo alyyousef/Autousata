@@ -277,6 +277,9 @@ function initializeAuctionSocket(io) {
         const connection = await db.getConnection();
 
         try {
+          // Get pre-bid auction state
+          const preBidAuction = await getAuctionDetails(auctionId);
+
           // Process bid (validates and commits atomically)
           const result = await bidProcessingService.processBid(
             auctionId,
@@ -292,24 +295,29 @@ function initializeAuctionSocket(io) {
             return;
           }
 
-          // Emit success to bidder
+          // Get fresh auction state from DB
+          const freshAuction = await getAuctionDetails(auctionId);
+          const effectiveEndTime = result.autoExtendInfo?.newEndTime
+            || (freshAuction ? freshAuction.endTime : preBidAuction.endTime);
+
+          // Emit confirmation to bidder with full state (instant feedback)
           socket.emit('bid_placed', {
             bid: result.bid,
+            auction: {
+              currentBid: amount,
+              bidCount: freshAuction ? freshAuction.bidCount : preBidAuction.bidCount + 1,
+              minBidIncrement: freshAuction ? freshAuction.minBidIncrement : preBidAuction.minBidIncrement,
+              endTime: effectiveEndTime,
+            },
             autoExtended: result.autoExtended,
-            autoExtendInfo: result.autoExtendInfo
+            autoExtendInfo: result.autoExtendInfo,
           });
 
-          // Get fresh auction state from DB for accurate broadcast
-          const freshAuction = await getAuctionDetails(auctionId);
-
-          // Broadcast to all users in auction room
+          // Broadcast to all OTHER sockets in room (bidder already got bid_placed)
           const roomSize = io.sockets.adapter.rooms.get(`auction:${auctionId}`)?.size || 0;
-          const roomMembers = Array.from(io.sockets.adapter.rooms.get(`auction:${auctionId}`) || []);
-          console.log(`[Socket.IO] 📢 Broadcasting auction_updated to room auction:${auctionId}`);
-          console.log(`[Socket.IO] Room has ${roomSize} members:`, roomMembers);
-          console.log(`[Socket.IO] Broadcasting data:`, { currentBid: amount, bidCount: freshAuction ? freshAuction.bidCount : 0 });
-          
-          io.to(`auction:${auctionId}`).emit('auction_updated', {
+          console.log(`[Socket.IO] 📢 Broadcasting auction_updated to auction:${auctionId} (${roomSize} members, excl. bidder)`);
+
+          socket.broadcast.to(`auction:${auctionId}`).emit('auction_updated', {
             auctionId,
             currentBid: amount,
             bidCount: freshAuction ? freshAuction.bidCount : 0,
@@ -328,7 +336,7 @@ function initializeAuctionSocket(io) {
           
           console.log(`[Socket.IO] ✅ Broadcast complete to ${roomSize} members`);
 
-          // Fetch pre-bid auction state for outbid notification
+          // Notify previous leader they've been outbid
           const previousLeaderId = result.bid ? await getPreviousLeader(auctionId, user.id, connection) : null;
           
           if (previousLeaderId && previousLeaderId !== user.id) {
@@ -349,14 +357,14 @@ function initializeAuctionSocket(io) {
               auctionId,
               vehicle: vehicleDesc,
               newBid: amount,
-              previousBid: freshAuction ? freshAuction.currentBid : 0
+              previousBid: preBidAuction.currentBid
             }, previousLeaderId);
 
             // Emit real-time notification to outbid user
             io.to(`user:${previousLeaderId}`).emit('user_outbid', {
               auctionId,
               newBid: amount,
-              yourBid: freshAuction ? freshAuction.currentBid : 0
+              yourBid: preBidAuction.currentBid
             });
             console.log(`[Socket.IO] Emitted user_outbid to user:${previousLeaderId}`);
           }

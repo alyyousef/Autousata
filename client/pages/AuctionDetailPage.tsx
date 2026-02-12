@@ -303,74 +303,73 @@ const AuctionDetailPage: React.FC = () => {
       setBidHistory(formattedBids);
     };
 
-    // Bid placed confirmation (sent to everyone in the room)
+    // Bid confirmation — sent ONLY to the bidder's socket (instant feedback)
     const handleBidPlaced = (data: any) => {
-      console.log('[AuctionDetail] ✅ bid_placed event received:', data);
-      
-      const { bid, auction: updatedAuction } = data;
-      const isYou = bid.bidderId === currentUserIdRef.current; // Use Ref for current user ID to avoid stale closure
+      console.log('[AuctionDetail] ✅ bid_placed (confirmation):', data);
 
-      // Update Top Stats
-      if (updatedAuction) {
-        setCurrentBid(updatedAuction.currentBid);
-        setBidCount(updatedAuction.bidCount);
-        // Only update end time if it was extended
-        if (updatedAuction.endTime) {
-            setAuctionEndTime(updatedAuction.endTime);
+      const { bid, auction: auctionState, autoExtended, autoExtendInfo } = data;
+
+      // Update auction state from enriched payload (instant UI update)
+      if (auctionState) {
+        setCurrentBid(auctionState.currentBid);
+        setBidCount(auctionState.bidCount);
+        if (auctionState.endTime) {
+          setAuctionEndTime(auctionState.endTime);
         }
-        setBidAmount(Math.max(updatedAuction.currentBid + (minBidIncrementRef.current || 50), MIN_BID));
+        setBidAmount(Math.max(
+          auctionState.currentBid + (auctionState.minBidIncrement || minBidIncrementRef.current || 50),
+          MIN_BID
+        ));
       }
 
-      // Update History
+      // Add to bid history (always "You" since this event is bidder-only)
       const newBid: RealTimeBid = {
         id: bid.id,
-        bidderId: isYou ? 'You' : (bid.bidderId ? `User ${bid.bidderId.substring(0, 4)}***` : 'Bidder'),
+        bidderId: 'You',
         amount: bid.amount,
         timestamp: bid.timestamp,
-        isYou,
+        isYou: true,
       };
-
       setBidHistory(prev => {
-        // Avoid duplicates
         if (prev.some(b => b.id === newBid.id)) return prev;
         return [newBid, ...prev];
       });
 
-      // Notifications & Feedback
+      // Visual feedback
       setBidJustUpdated(true);
       setTimeout(() => setBidJustUpdated(false), 2000);
 
-      if (isYou) {
-        addLocalNotification(`Your bid of EGP ${bid.amount.toLocaleString()} was placed successfully!`, 'success');
-      } else {
-        addLocalNotification(`New bid: EGP ${bid.amount.toLocaleString()}`, 'info');
-      }
+      addLocalNotification(`Your bid of EGP ${bid.amount.toLocaleString()} was placed successfully!`, 'success');
 
-      if (updatedAuction?.endTime && updatedAuction.endTime !== auctionEndTimeRef.current) {
-         addLocalNotification('Auction time extended due to late bid!', 'warn');
+      // Handle auto-extension
+      if (autoExtended && autoExtendInfo?.newEndTime) {
+        setAuctionEndTime(autoExtendInfo.newEndTime);
+        addLocalNotification('Auction time extended due to late bid!', 'warn');
       }
     };
 
-    // Broadcast to all users in auction room
+    // Broadcast to all OTHER sockets (other users + bidder's other tabs)
     const handleAuctionUpdated = (data: socketService.AuctionUpdate) => {
-      console.log('[AuctionDetail] ✅ auction_updated event received!', {
+      console.log('[AuctionDetail] ✅ auction_updated event:', {
         currentBid: data.currentBid,
         bidCount: data.bidCount,
-        minBidIncrement: data.minBidIncrement,
         timestamp: new Date().toISOString()
       });
-      
+
+      const isYou = data.leadingBidderId === currentUserIdRef.current;
+
+      // Authoritative state update
       setCurrentBid(data.currentBid);
       setBidCount(data.bidCount);
       setMinBidIncrement(data.minBidIncrement || 50);
       setBidAmount(Math.max(data.currentBid + (data.minBidIncrement || 50), MIN_BID));
-      
-      // Visual feedback for bid update
+
+      // Visual feedback
       setBidJustUpdated(true);
       setTimeout(() => setBidJustUpdated(false), 2000);
 
+      // Add to bid history
       if (data.newBid) {
-        const isYou = data.leadingBidderId === currentUserIdRef.current;
         const newBid: RealTimeBid = {
           id: data.newBid.id,
           bidderId: isYou ? 'You' : (data.newBid.displayName || 'Bidder'),
@@ -384,12 +383,18 @@ const AuctionDetailPage: React.FC = () => {
         });
       }
 
+      // Auto-extension
       if (data.autoExtended && data.newEndTime) {
         setAuctionEndTime(data.newEndTime);
         addLocalNotification('Auction time extended due to late bid!', 'warn');
       }
 
-      addLocalNotification(`New bid: EGP ${data.currentBid.toLocaleString()}`, 'info');
+      // Contextual notification: own bid from another tab vs. other user's bid
+      if (isYou) {
+        addLocalNotification(`Your bid of EGP ${data.currentBid.toLocaleString()} confirmed.`, 'success');
+      } else {
+        addLocalNotification(`New bid: EGP ${data.currentBid.toLocaleString()}`, 'info');
+      }
     };
 
     // User outbid notification
