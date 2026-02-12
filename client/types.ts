@@ -17,8 +17,13 @@ export interface User {
   phone?: string;
   role: UserRole;
   isKycVerified: boolean;
-  kycStatus?: 'approved' | 'pending' | 'rejected' | 'not_uploaded' | string;
+  kycStatus?: 'approved' | 'pending' | 'rejected' | 'not_uploaded' | 'verified' | string;
   kycDocumentUrl?: string;
+  
+  // ✅ ADD THESE TWO LINES:
+  kycAddress?: string;
+  kycNameFromId?: string;
+
   avatar?: string;
   profileImage?: string;
   location?: {

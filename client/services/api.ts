@@ -267,6 +267,13 @@ class ApiService {
       status: string; 
       similarity: number; 
       message: string; 
+      // 👇 ADD THESE LINES 👇
+      kycDocumentUrl?: string; 
+      extractedData?: {
+        name: string;
+        address: string;
+        idNumber: string;
+      };
     }>('/profile/verify-identity', {
       method: 'POST',
       body: JSON.stringify({ idImage, selfieImage }),
