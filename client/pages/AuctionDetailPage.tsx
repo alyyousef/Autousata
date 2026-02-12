@@ -33,7 +33,7 @@ const AuctionDetailPage: React.FC = () => {
   const { user } = useAuth();
   const currentUserId = user?.id || '';
   
-  // Use ref to avoid re-registering socket listeners when userId changes
+  // Use ref for currentUserId to avoid re-registering socket listeners
   const currentUserIdRef = useRef(currentUserId);
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
@@ -66,6 +66,22 @@ const AuctionDetailPage: React.FC = () => {
 
   const auctionEndsAt = auctionEndTime ? new Date(auctionEndTime).getTime() : 0;
   const { addNotification: pushNotification } = useNotifications();
+
+  // Use refs to access latest state inside socket event listeners without restarting them
+  const minBidIncrementRef = useRef(minBidIncrement);
+  useEffect(() => {
+    minBidIncrementRef.current = minBidIncrement;
+  }, [minBidIncrement]);
+
+  const auctionEndTimeRef = useRef(auctionEndTime);
+  useEffect(() => {
+    auctionEndTimeRef.current = auctionEndTime;
+  }, [auctionEndTime]);
+
+  const pushNotificationRef = useRef(pushNotification);
+  useEffect(() => {
+    pushNotificationRef.current = pushNotification;
+  }, [pushNotification]);
 
   // ============================================================
   // 1. FETCH AUCTION DATA FROM API
@@ -247,7 +263,7 @@ const AuctionDetailPage: React.FC = () => {
     socket.on('disconnect', () => {
       console.log('[AuctionDetail] Socket disconnected');
       setSocketConnected(false);
-      pushNotification(
+      pushNotificationRef.current(
         'Lost connection to live updates. Refresh to reconnect.',
         'error'
       );
@@ -302,7 +318,7 @@ const AuctionDetailPage: React.FC = () => {
         if (updatedAuction.endTime) {
             setAuctionEndTime(updatedAuction.endTime);
         }
-        setBidAmount(Math.max(updatedAuction.currentBid + (minBidIncrement || 50), MIN_BID));
+        setBidAmount(Math.max(updatedAuction.currentBid + (minBidIncrementRef.current || 50), MIN_BID));
       }
 
       // Update History
@@ -330,7 +346,7 @@ const AuctionDetailPage: React.FC = () => {
         addLocalNotification(`New bid: EGP ${bid.amount.toLocaleString()}`, 'info');
       }
 
-      if (updatedAuction?.endTime && updatedAuction.endTime !== auctionEndTime) {
+      if (updatedAuction?.endTime && updatedAuction.endTime !== auctionEndTimeRef.current) {
          addLocalNotification('Auction time extended due to late bid!', 'warn');
       }
     };
@@ -378,7 +394,7 @@ const AuctionDetailPage: React.FC = () => {
 
     // User outbid notification
     const handleUserOutbid = (data: socketService.UserOutbidEvent) => {
-      pushNotification(
+      pushNotificationRef.current(
         `You've been outbid! New leading bid: EGP ${data.newBid.toLocaleString()}`,
         'warn'
       );
@@ -392,7 +408,7 @@ const AuctionDetailPage: React.FC = () => {
     const handleAuctionEnded = (data: socketService.AuctionEndedEvent) => {
       setIsCancelled(true);
       setAuctionStatus('ENDED');
-      pushNotification(
+      pushNotificationRef.current(
         data.reserveMet
           ? `Auction ended. ${data.winnerId ? 'Winner declared!' : 'No winner.'}`
           : 'Auction ended. Reserve price not met.',
