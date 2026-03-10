@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Camera } from 'lucide-react'; // <--- Added Camera Icon
+import { Eye, EyeOff, Camera } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import bentGif from '../../assests/carsPictures/bentG.gif';
 
 const SignUpPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -90,9 +89,10 @@ const SignUpPage: React.FC = () => {
 
   return (
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
+      {/* UPDATED BACKGROUND IMAGE PATH HERE */}
       <div
         className="fixed inset-0 bg-cover"
-        style={{ backgroundImage: `url(${bentGif})`, backgroundPosition: '82% center', filter: 'none' }}
+        style={{ backgroundImage: `url('/carsPictures/bentG.gif')`, backgroundPosition: '82% center', filter: 'none' }}
         aria-hidden="true"
       />
       <div className="fixed inset-0 bg-transparent" aria-hidden="true" />
