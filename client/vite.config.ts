@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
         fs: {
           allow: ['..']
         },
-        // ✅ NEW: Proxy setup connecting to your real backend port
         proxy: {
           '/api': {
             target: 'http://localhost:5005', 
@@ -22,8 +21,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        // ✅ Fixed the missing VITE_ prefix here!
+        'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY)
       },
       resolve: {
         alias: {

@@ -20,9 +20,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { UserRole } from '../types';
 import ImageLightbox from '../components/ImageLightbox';
 import { apiService } from '../services/api';
-import porsche911Image from '../../assests/carsPictures/porsche911.png';
-import teslaModelSPlaidImage from '../../assests/carsPictures/teslaModelSPlaid.jpg';
-import fordBroncoImage from '../../assests/carsPictures/fordBroncoF.jpg';
 
 const DELISTED_STORAGE_KEY = 'AUTOUSATA:delistedListings';
 const BID_STATE_KEY = 'AUTOUSATA:bidState';
@@ -206,7 +203,12 @@ const ListingDetailPage: React.FC = () => {
     });
   }, [bidSuccess]);
 
-  const fallbackImages = useMemo(() => [porsche911Image, teslaModelSPlaidImage, fordBroncoImage], []);
+  const fallbackImages = useMemo(() => [
+    '/carsPictures/porsche911.png', 
+    '/carsPictures/teslaModelSPlaid.jpg', 
+    '/carsPictures/fordBroncoF.jpg'
+  ], []);
+  
   const arabicCopy = auction ? ARABIC_LISTING_COPY[auction.id] : undefined;
 
   const conditionLabel = (condition: string) => {

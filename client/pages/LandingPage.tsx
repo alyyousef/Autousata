@@ -12,20 +12,12 @@ import {
   Truck
 } from 'lucide-react';
 import { LandingStats, Vehicle } from '../types';
-import rrTwoImage from '../../assests/carsPictures/RRTwo.jpg';
-import rrOneImage from '../../assests/carsPictures/RROne.jpg';
-import mcLarenImage from '../../assests/carsPictures/McLaren.avif';
-import lamboOneImage from '../../assests/carsPictures/LamboOne.jpg';
-import bugattiOneImage from '../../assests/carsPictures/bugattiOne.jpg';
-import bmwI8Image from '../../assests/carsPictures/BmwI8.jpg';
-import ferrariGif from '../../assests/carsPictures/ferrariGIF.gif';
-import porscheGif from '../../assests/carsPictures/porscheGif.gif';
 import { apiService } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const heroSlides = [
   {
-    image: ferrariGif,
+    image: '/carsPictures/ferrariGIF.gif',
     headline: 'Engineered For Pure Emotion',
     headlineAr: 'مصممة لاحساس خالص',
     subhead: 'Experience iconic Ferrari motion and unmistakable performance.',
@@ -36,7 +28,7 @@ const heroSlides = [
     sponsorLineAr: 'ارث سباقات وتصميم خالد وصوت مؤثر.'
   },
   {
-    image: rrTwoImage,
+    image: '/carsPictures/RRTwo.jpg',
     headline: 'Driving Luxury Since 1985',
     headlineAr: 'رفاهية على الطريق منذ 1985',
     subhead: 'Discover curated exotics and collector-grade vehicles with verified provenance.',
@@ -47,7 +39,7 @@ const heroSlides = [
     sponsorLineAr: 'لعشاق الاحساس في القيادة. قوة V8 خالصة.'
   },
   {
-    image: rrOneImage,
+    image: '/carsPictures/RROne.jpg',
     headline: 'Built For Serious Collectors',
     headlineAr: 'مصممة لهواة الاقتناء الحقيقيين',
     subhead: 'Bid with confidence on concierge-verified listings and transparent auction terms.',
@@ -58,7 +50,7 @@ const heroSlides = [
     sponsorLineAr: 'دقة مستمدة من الحلبات وثبات على الطريق.'
   },
   {
-    image: mcLarenImage,
+    image: '/carsPictures/McLaren.avif',
     headline: 'Performance Without Compromise',
     headlineAr: 'اداء بلا تنازلات',
     subhead: 'Supercar engineering and verified listings in one premium marketplace.',
@@ -69,7 +61,7 @@ const heroSlides = [
     sponsorLineAr: 'تصميم خفيف وتسارع مستمد من السباقات.'
   },
   {
-    image: lamboOneImage,
+    image: '/carsPictures/LamboOne.jpg',
     headline: 'Where Icons Change Hands',
     headlineAr: 'حيث تنتقل الايقونات',
     subhead: 'Exclusive inventory built for collectors who expect excellence.',
@@ -80,7 +72,7 @@ const heroSlides = [
     sponsorLineAr: 'خطوط جريئة وقوة خام وشخصية لا تخطئها العين.'
   },
   {
-    image: porscheGif,
+    image: '/carsPictures/porscheGif.gif',
     headline: 'Precision In Every Curve',
     headlineAr: 'دقة في كل منعطف',
     subhead: 'Porsche handling, speed, and control built for drivers.',
@@ -91,7 +83,7 @@ const heroSlides = [
     sponsorLineAr: 'ثقة مستمدة من الحلبات مع استخدام يومي سهل.'
   },
   {
-    image: bugattiOneImage,
+    image: '/carsPictures/bugattiOne.jpg',
     headline: 'Extraordinary Cars, Trusted Process',
     headlineAr: 'سيارات استثنائية وخطوات موثوقة',
     subhead: 'From browsing to delivery, every step is transparent and secure.',
@@ -102,7 +94,7 @@ const heroSlides = [
     sponsorLineAr: 'فن هندسي على مستوى هايبركار.'
   },
   {
-    image: bmwI8Image,
+    image: '/carsPictures/BmwI8.jpg',
     headline: 'Modern Exotics, Curated Weekly',
     headlineAr: 'سيارات مميزة حديثة تتجدد اسبوعيا',
     subhead: 'Fresh featured cars and auction-ready listings updated every week.',

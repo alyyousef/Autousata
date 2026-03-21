@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./server
+    container_name: autousata-backend
+    ports:
+      - "3008:3008"
+    env_file:
+      - ./server/.env
+    restart: unless-stopped
+
+  frontend:
+    build: 
+      context: ./client
+    container_name: autousata-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -4,8 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import bugattiGif from '../../assests/carsPictures/buggatiG.gif';
-
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +52,7 @@ const LoginPage: React.FC = () => {
     <section className="relative min-h-[calc(100vh-80px)] flex items-center justify-end px-4 py-6 sm:px-6 md:py-8 text-slate-900 overflow-hidden">
       <div
         className="fixed inset-0 bg-center bg-cover"
-        style={{ backgroundImage: `url(${bugattiGif})` }}
+        style={{ backgroundImage: `url('/carsPictures/buggatiG.gif')`, backgroundPosition: 'center', filter: 'none' }}
         aria-hidden="true"
       />
       <div className="fixed inset-0 bg-transparent" aria-hidden="true" />
