@@ -1,6 +1,7 @@
 # 1. Use a lightweight, secure Alpine Linux base image
 FROM node:18-alpine
 
+RUN apk add --no-cache curl
 # 2. Set the environment to production (This makes Express 3x faster!)
 ENV NODE_ENV=production
 
